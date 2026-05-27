@@ -101,11 +101,13 @@ const miniSparklineData = [
   { v: 5200 }, { v: 5220 }, { v: 5195 }, { v: 5235 }, { v: 5248 },
 ];
 
-function formatCurrency(value: number): string {
+function formatCurrency(value: number | undefined | null): string {
+  if (value == null || isNaN(value)) return '$0.00';
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
 
-function formatPercent(value: number): string {
+function formatPercent(value: number | undefined | null): string {
+  if (value == null || isNaN(value)) return '0.00%';
   return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
 }
 
@@ -129,7 +131,16 @@ export function DashboardView() {
 
       if (summaryRes.status === 'fulfilled' && summaryRes.value.ok) {
         const data = await summaryRes.value.json();
-        setSummary(data);
+        // Map API response fields to frontend interface
+        setSummary({
+          totalValue: data.totalValue ?? 0,
+          todayPnl: data.todayPnl ?? 0,
+          todayPnlPercent: data.todayPnlPercent ?? data.totalProfitPct ?? 0,
+          activePositions: data.activePositions ?? 0,
+          winRate: data.winRate ?? 0,
+          totalInvested: data.totalInvested ?? data.totalCost ?? 0,
+          totalPnl: data.totalPnl ?? data.totalProfit ?? 0,
+        });
       } else {
         setSummary(defaultSummary);
       }

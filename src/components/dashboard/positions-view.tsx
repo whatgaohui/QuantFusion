@@ -117,7 +117,8 @@ const mockSummary: PositionSummary = {
   closedCount: 2,
 };
 
-function formatCurrency(value: number): string {
+function formatCurrency(value: number | undefined | null): string {
+  if (value == null || isNaN(value)) return '$0.00';
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
 
@@ -155,7 +156,14 @@ export function PositionsView() {
 
       if (summaryRes.status === 'fulfilled' && summaryRes.value.ok) {
         const data = await summaryRes.value.json();
-        setSummary(data);
+        // Map API response fields to frontend interface
+        setSummary({
+          totalInvested: data.totalInvested ?? data.totalCost ?? 0,
+          totalPnl: data.totalPnl ?? data.totalProfit ?? 0,
+          avgHoldingDays: data.avgHoldingDays ?? 4.2,
+          activeCount: data.activePositions ?? data.activeCount ?? 0,
+          closedCount: data.closedCount ?? 0,
+        });
       } else {
         setSummary(mockSummary);
       }
