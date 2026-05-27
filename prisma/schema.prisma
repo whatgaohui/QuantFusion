@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,20 +7,67 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+model WatchlistItem {
   id        String   @id @default(cuid())
-  email     String   @unique
+  symbol    String
   name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  addedAt   DateTime @default(now())
+  
+  @@unique([symbol])
 }
 
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Position {
+  id            String   @id @default(cuid())
+  symbol        String
+  name          String?
+  buyPrice      Float
+  quantity       Int
+  buyDate       DateTime
+  cycleDays     Int      @default(7)
+  stopLossPct   Float    @default(0.08)
+  takeProfitPct Float    @default(0.15)
+  status        String   @default("ACTIVE")  // ACTIVE, CLOSED, STOPPED
+  sellPrice     Float?
+  sellDate      DateTime?
+  sellReason    String?   // TAKE_PROFIT, STOP_LOSS, EXPIRED, MANUAL
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Alert {
+  id          String   @id @default(cuid())
+  symbol      String
+  targetPrice Float
+  condition   String   // ABOVE, BELOW
+  status      String   @default("ACTIVE") // ACTIVE, TRIGGERED, EXPIRED
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TradeLog {
+  id          String   @id @default(cuid())
+  symbol      String
+  name        String?
+  action      String   // BUY, SELL
+  price       Float
+  quantity     Int
+  reason      String?
+  profitPct   Float?
+  createdAt   DateTime @default(now())
+}
+
+model SignalResult {
+  id          String   @id @default(cuid())
+  symbol      String
+  name        String?
+  score       Int
+  signalType  String   // BUY, SELL, HOLD
+  rsi         Float?
+  macdSignal  String?
+  bollingerSignal String?
+  kdjSignal   String?
+  volumeRatio Float?
+  price       Float?
+  createdAt   DateTime @default(now())
 }
