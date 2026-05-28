@@ -615,3 +615,105 @@ Fixed 3 critical/major issues in the QuantFusion Strategy Center, News view, and
 ✅ `npx eslint` on all 4 modified files passes with no errors
 (pre-existing qa-screenshot.js errors unrelated to this task)
 
+---
+
+**Task ID**: 3a
+**Agent**: Main
+**Date**: 2025-05-28
+**Status**: ✅ Complete
+
+## Summary
+
+Created the core AI service module (`src/lib/ai-service.ts`) for the QuantFusion trading platform using the `z-ai-web-dev-sdk`. This module provides ZAI singleton initialization, stock analysis, conversational chat, market brief generation, web search + LLM synthesis, and conversation memory management.
+
+## File Created
+
+`src/lib/ai-service.ts` — Core AI service module with 6 public API functions:
+
+### 1. ZAI Singleton (`getZAI()`)
+- Lazy-initialized singleton pattern using `ZAI.create()`
+- Reuses the same instance across all function calls
+- Private to the module — accessed only internally by the public functions
+
+### 2. Conversation Memory
+- In-memory `Map<string, ConversationMessage[]>` store
+- Max 50 sessions, max 20 messages per session (oldest evicted via FIFO)
+- Helper functions: `getConversation()`, `addMessage()`, `clearConversation()`
+- Used by `chatWithAssistant()` for multi-turn conversation context
+
+### 3. System Prompts
+- `TRADING_ASSISTANT_SYSTEM` — Chinese-language trading assistant persona with 4 core capabilities (stock analysis, market interpretation, strategy advice, risk assessment) and response guidelines
+- `STOCK_ANALYSIS_SYSTEM` — Quantitative analyst persona with structured JSON output format (technical, fundamental, sentiment, risk, recommendation, score, confidence, summary)
+- `MARKET_BRIEF_SYSTEM` — Market analyst persona for daily brief generation
+
+### 4. `chatWithAssistant(message, sessionId, mode)`
+- Sends messages to the trading assistant with full conversation history
+- Builds messages array: system prompt + history + new message
+- Saves user/assistant messages to conversation memory
+- Returns `{ response, isOffline }` with graceful error handling
+- Mode parameter reserved for future deep-thinking integration
+
+### 5. `analyzeStock(symbol, stockName, marketData, mode)`
+- 4 analysis modes: quick, standard, full, debate
+- Injects real market data into the prompt (price, change%, indicators, recent kline)
+- Debate mode adds bullCase/bearCase fields to system prompt
+- Parses JSON from LLM response (with markdown code block extraction)
+- Fallback to structured plain-text extraction if JSON parsing fails
+- Returns `{ analysis: { technical, fundamental, sentiment, risk, recommendation, score, confidence, summary, bullCase?, bearCase? }, isOffline }`
+
+### 6. `generateMarketBrief(marketData)`
+- Takes indices and news arrays as input
+- Formats market data context with +/- change indicators
+- Returns `{ brief, isOffline }`
+
+### 7. `searchAndAnalyze(query, language)`
+- Two-step process: web search via `zai.functions.invoke('web_search')` → LLM synthesis
+- Returns top 5 search results with titles, snippets, and URLs
+- LLM synthesizes search context into a detailed analysis report
+- Supports zh/en language output
+- Returns `{ result, sources: [{ title, url }], isOffline }`
+
+### 8. `clearSession(sessionId)` — Deletes conversation from memory
+
+### 9. `checkAIHealth()` — Health check using a minimal LLM completion
+
+## Design Decisions
+- Uses `'assistant'` role for system prompts per SDK convention (not `'system'`)
+- Always sets `thinking: { type: 'disabled' }` for standard completions
+- All functions handle errors gracefully and return `isOffline: true` on failure
+- Module runs ONLY on the server side (API routes)
+- Conversation memory is in-memory with size limits (50 sessions × 20 messages)
+- Stock analysis JSON parsing has fallback to plain text extraction
+- Search + analyze combines `web_search` function with LLM synthesis in one call
+
+## Verification
+- ✅ `bun run lint` passes with no errors
+- ✅ `npx tsc --noEmit src/lib/ai-service.ts` compiles with no errors
+- ✅ File follows existing project code style and TypeScript strict typing
+
+
+---
+
+Task ID: 3
+Agent: Main
+Task: Phase 3 AI引擎 - 集成z-ai-web-dev-sdk实现真实AI功能
+
+Work Log:
+- Created AI service module `src/lib/ai-service.ts` with ZAI singleton, timeout helper, conversation memory
+- Implemented 6 AI functions: chatWithAssistant, analyzeStock, generateMarketBrief, searchAndAnalyze, clearSession, checkAIHealth
+- Added 25-30s timeouts on all LLM calls to prevent server crashes
+- Rewrote `/api/fusion/agent/chat` route to use real LLM with mock fallback
+- Rewrote `/api/fusion/analysis/start` route to gather market data then use LLM analysis
+- Created `/api/fusion/ai/brief` route for AI-generated market brief
+- Updated Agent Chat frontend to detect source (ai/mock) and show offline badge
+- Updated AI Analysis frontend to handle direct analysis responses (no polling needed)
+- Designed 3 system prompts: Trading Assistant, Stock Analysis (JSON), Market Brief
+
+Stage Summary:
+- ✅ AI Chat: Real LLM responses working (source: "ai")
+- ✅ AI Analysis: Real stock analysis with recommendation/score working
+- ✅ AI Brief: Endpoint created with fallback
+- ✅ All endpoints have graceful mock fallback when AI fails
+- ✅ Server stability maintained with timeouts and sequential processing
+- Known: Brief endpoint uses static market data to avoid memory pressure
+- All lint checks pass

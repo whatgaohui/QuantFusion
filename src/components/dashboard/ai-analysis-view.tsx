@@ -400,6 +400,45 @@ export function AIAnalysisView() {
 
       const data = await res.json();
       taskId = data?.data?.task_id || data?.task_id || null;
+      
+      // Check if the new API returns completed analysis directly (no polling needed)
+      const directStatus = data?.data?.status;
+      const directAnalysis = data?.data?.analysis;
+      if (directStatus === 'completed' && directAnalysis) {
+        // AI returned analysis immediately - display it
+        setAgents((prev) => prev.map((a) => ({ ...a, status: 'done' as AgentStatus })));
+        
+        const source = data?.data?.source || 'ai';
+        const mapped: AnalysisResult = {
+          symbol: sym,
+          recommendation: directAnalysis.recommendation || 'HOLD',
+          score: directAnalysis.score || 50,
+          technicalSummary: directAnalysis.technical || '',
+          fundamentalSummary: directAnalysis.fundamental || '',
+          sentimentSummary: directAnalysis.sentiment || '',
+          riskLevel: directAnalysis.confidence === 'high' ? 'LOW' : directAnalysis.confidence === 'low' ? 'HIGH' : 'MEDIUM',
+          riskScore: 100 - (directAnalysis.score || 50),
+          bullCase: directAnalysis.bullCase,
+          bearCase: directAnalysis.bearCase,
+          report: directAnalysis.summary || '',
+          provider: source === 'ai' ? 'z-ai' : 'mock',
+          tokens: 0,
+          cost: 0,
+        };
+        setResult(mapped);
+        setIsOffline(source === 'mock');
+
+        const historyItem: HistoryItem = {
+          id: Date.now().toString(),
+          symbol: sym,
+          mode: analysisMode,
+          recommendation: mapped.recommendation,
+          score: mapped.score,
+          timestamp: new Date().toISOString(),
+        };
+        setHistory((prev) => [historyItem, ...prev].slice(0, 10));
+        return;
+      }
     } catch {
       // API unreachable, fall back to mock
       await runMockAnalysis(sym, analysisMode);

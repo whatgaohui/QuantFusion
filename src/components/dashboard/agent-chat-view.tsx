@@ -422,14 +422,16 @@ export function AgentChatView() {
       });
       if (res.ok) {
         const data = await res.json();
-        const content = data?.data?.content || data?.data?.message || data?.content || data?.message || data?.response;
+        // Support multiple response formats: new AI format uses data.response, old format uses data.data
+        const content = data?.data?.response || data?.data?.content || data?.data?.message || data?.response || data?.content || data?.message;
+        const source = data?.data?.source || data?.source || 'unknown';
         if (content) {
           const assistantMessage: ChatMessage = {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
             content: typeof content === 'string' ? content : JSON.stringify(content),
             timestamp: new Date().toISOString(),
-            isOffline: false,
+            isOffline: source === 'mock',
           };
           setSessions((prev) =>
             prev.map((s) =>
@@ -438,7 +440,7 @@ export function AgentChatView() {
                 : s
             )
           );
-          setIsOfflineMode(false);
+          setIsOfflineMode(source === 'mock');
           setSending(false);
           return;
         }
