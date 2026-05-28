@@ -145,11 +145,11 @@ function getAlertTypeLabel(alertType: string): string {
 
 export function DashboardView() {
   const { t } = useLanguage();
-  const [summary, setSummary] = useState<PortfolioSummary | null>(null);
-  const [indices, setIndices] = useState<MarketIndex[] | null>(null);
-  const [trades, setTrades] = useState<Trade[] | null>(null);
-  const [alerts, setAlerts] = useState<AlertItem[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState<PortfolioSummary>(defaultSummary);
+  const [indices, setIndices] = useState<MarketIndex[]>(defaultIndices);
+  const [trades, setTrades] = useState<Trade[]>(defaultTrades);
+  const [alerts, setAlerts] = useState<AlertItem[]>(defaultAlerts);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -307,12 +307,15 @@ export function DashboardView() {
   }, [t]);
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(() => fetchData(true), 30000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+    // Only auto-refresh if user has manually refreshed once
+    // Initial load uses demo data to reduce server memory pressure
+    if (lastUpdated) {
+      const interval = setInterval(() => fetchData(true), 120000);
+      return () => clearInterval(interval);
+    }
+  }, [fetchData, lastUpdated]);
 
-  const metricCards = summary ? [
+  const metricCards = [
     {
       title: t('dash.portfolioValue'),
       value: formatCurrency(summary.totalValue),
@@ -348,9 +351,9 @@ export function DashboardView() {
       positive: summary.winRate >= 60,
       icon: Target,
     },
-  ] : [];
+  ];
 
-  if (loading && !summary) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -440,7 +443,7 @@ export function DashboardView() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {(indices || defaultIndices).map((index) => (
+              {indices.map((index) => (
                 <div
                   key={index.symbol}
                   className="bg-[#0a0a0f] rounded-lg p-3 border border-[#1e1e2e] hover:border-[#2e2e3e] transition-colors"
@@ -603,7 +606,7 @@ export function DashboardView() {
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            {(alerts || defaultAlerts).map((alert) => {
+            {alerts.map((alert) => {
               const alertType = getAlertTypeLabel(alert.alertType);
               const timeAgo = (() => {
                 const diff = Date.now() - new Date(alert.createdAt).getTime();
@@ -665,7 +668,7 @@ export function DashboardView() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(trades || defaultTrades).map((trade) => (
+                {trades.map((trade) => (
                   <TableRow key={trade.id} className="border-[#1e1e2e] hover:bg-[#1a1a2e]/50">
                     <TableCell>
                       <div>

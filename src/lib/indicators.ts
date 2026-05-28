@@ -3,14 +3,7 @@
  * Pure functions for computing common trading indicators
  */
 
-/**
- * Calculate Simple Moving Average
- */
-function sma(data: number[], period: number): number {
-  if (data.length < period) return data[data.length - 1] || 0;
-  const slice = data.slice(-period);
-  return slice.reduce((sum, val) => sum + val, 0) / period;
-}
+import { sma } from './data-service/math-utils';
 
 /**
  * Calculate Exponential Moving Average

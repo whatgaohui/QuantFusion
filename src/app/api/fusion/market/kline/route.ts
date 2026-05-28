@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getKline } from '@/lib/data-service';
+import { getKline } from '@/lib/data-service/kline';
 
 export async function GET(request: NextRequest) {
   try {

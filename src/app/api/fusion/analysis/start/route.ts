@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeStock } from '@/lib/ai-service';
-import { getQuote } from '@/lib/data-service';
+import { getQuote } from '@/lib/data-service/quotes';
 
 export async function POST(request: NextRequest) {
   try {

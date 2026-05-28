@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getQuote, getQuotes } from '@/lib/data-service';
+import { getQuote, getQuotes } from '@/lib/data-service/quotes';
 
 export async function GET(request: NextRequest) {
   try {

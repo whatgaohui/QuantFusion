@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getIndicators } from '@/lib/data-service';
+import { getIndicators } from '@/lib/data-service/indicators-api';
 
 export async function GET(request: NextRequest) {
   try {
