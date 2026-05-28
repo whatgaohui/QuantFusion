@@ -1,0 +1,10 @@
+{
+  "name": "data-service",
+  "version": "1.0.0",
+  "description": "QuantFusion Go Data Service - High-performance data engine for stock analysis",
+  "scripts": {
+    "dev": "go run . -port 8080",
+    "build": "go build -o data-service .",
+    "start": "./data-service"
+  }
+}

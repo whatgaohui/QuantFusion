@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { DEFAULT_USER_ID, ensureDefaultUser } from '@/lib/auth-utils';
 
 /**
  * GET /api/alerts
@@ -7,7 +8,10 @@ import { db } from '@/lib/db';
  */
 export async function GET() {
   try {
+    await ensureDefaultUser();
+
     const alerts = await db.alert.findMany({
+      where: { userId: DEFAULT_USER_ID },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -24,34 +28,39 @@ export async function GET() {
 /**
  * POST /api/alerts
  * Create a new alert
- * Body: { symbol, targetPrice, condition, expiresAt }
+ * Body: { symbol, alertType, targetValue, notifyChannels? }
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { symbol, targetPrice, condition, expiresAt } = body;
+    const { symbol, alertType, targetValue, notifyChannels } = body;
 
-    if (!symbol || targetPrice === undefined || !condition || !expiresAt) {
+    if (!symbol || alertType === undefined || targetValue === undefined) {
       return NextResponse.json(
-        { error: 'symbol, targetPrice, condition, and expiresAt are required' },
+        { error: 'symbol, alertType, and targetValue are required' },
         { status: 400 }
       );
     }
 
-    if (!['ABOVE', 'BELOW'].includes(condition)) {
+    const validAlertTypes = ['price_above', 'price_below', 'volume', 'rsi', 'macd', 'custom'];
+    if (!validAlertTypes.includes(alertType)) {
       return NextResponse.json(
-        { error: 'Condition must be ABOVE or BELOW' },
+        { error: `alertType must be one of: ${validAlertTypes.join(', ')}` },
         { status: 400 }
       );
     }
+
+    await ensureDefaultUser();
 
     const alert = await db.alert.create({
       data: {
+        userId: DEFAULT_USER_ID,
         symbol: symbol.toUpperCase(),
-        targetPrice: parseFloat(targetPrice),
-        condition,
-        status: 'ACTIVE',
-        expiresAt: new Date(expiresAt),
+        alertType,
+        targetValue: parseFloat(targetValue),
+        isActive: true,
+        isTriggered: false,
+        notifyChannels: notifyChannels || null,
       },
     });
 
@@ -67,24 +76,17 @@ export async function POST(request: NextRequest) {
 
 /**
  * PATCH /api/alerts
- * Update alert status
- * Body: { id, status }
+ * Update alert (activate/deactivate/trigger)
+ * Body: { id, isActive?, isTriggered?, currentValue? }
  */
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, status } = body;
+    const { id, isActive, isTriggered, currentValue } = body;
 
-    if (!id || !status) {
+    if (!id) {
       return NextResponse.json(
-        { error: 'id and status are required' },
-        { status: 400 }
-      );
-    }
-
-    if (!['ACTIVE', 'TRIGGERED', 'EXPIRED'].includes(status)) {
-      return NextResponse.json(
-        { error: 'Status must be ACTIVE, TRIGGERED, or EXPIRED' },
+        { error: 'id is required' },
         { status: 400 }
       );
     }
@@ -98,9 +100,17 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const data: Record<string, unknown> = {};
+    if (isActive !== undefined) data.isActive = Boolean(isActive);
+    if (isTriggered !== undefined) {
+      data.isTriggered = Boolean(isTriggered);
+      if (isTriggered) data.triggeredAt = new Date();
+    }
+    if (currentValue !== undefined) data.currentValue = parseFloat(currentValue);
+
     const alert = await db.alert.update({
       where: { id },
-      data: { status },
+      data,
     });
 
     return NextResponse.json(alert);

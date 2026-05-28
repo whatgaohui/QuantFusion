@@ -1,0 +1,13 @@
+name: MA Golden Cross
+id: ma_crossover
+type: trend
+description: 均线金叉策略 - 短期均线上穿长期均线
+parameters:
+  short_period: 5
+  long_period: 20
+  ma_type: SMA
+entry_condition: short_ma crosses above long_ma AND volume_ratio > 1.5
+exit_condition: short_ma crosses below long_ma
+risk_management:
+  stop_loss_pct: 0.05
+  take_profit_pct: 0.15

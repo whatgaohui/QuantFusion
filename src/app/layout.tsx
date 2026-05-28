@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "QuantFlow - Trading Dashboard",
-  description: "Professional quantitative trading dashboard with signal scanning, portfolio management, and market analytics.",
+  title: "QuantFusion — AI-Powered Trading Platform",
+  description: "Professional AI-powered quantitative trading platform with multi-agent analysis, intelligent signal scanning, portfolio management, and market analytics.",
   icons: {
     icon: "/logo.svg",
   },

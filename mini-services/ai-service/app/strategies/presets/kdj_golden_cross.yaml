@@ -1,0 +1,15 @@
+name: KDJ Golden Cross
+id: kdj_golden_cross
+type: oscillator
+description: KDJ金叉策略 - K线上穿D线且J值超卖时买入
+parameters:
+  k_period: 9
+  d_period: 3
+  j_smooth: 3
+  oversold_j: 20
+  overbought_j: 80
+entry_condition: k_line crosses above d_line AND j_value < oversold_j
+exit_condition: k_line crosses below d_line AND j_value > overbought_j
+risk_management:
+  stop_loss_pct: 0.06
+  take_profit_pct: 0.15

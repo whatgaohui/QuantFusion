@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { DEFAULT_USER_ID, ensureDefaultUser } from '@/lib/auth-utils';
 
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || '';
 
 /**
  * GET /api/portfolio/check
- * Check all ACTIVE positions for take-profit, stop-loss, and expiry conditions
+ * Check all open positions for take-profit and stop-loss conditions
  */
 export async function GET() {
   try {
+    await ensureDefaultUser();
+
     const positions = await db.position.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: 'open', userId: DEFAULT_USER_ID },
     });
 
     if (positions.length === 0) {
@@ -23,15 +26,15 @@ export async function GET() {
       currentPrice: number;
       profitPct: number;
       holdingDays: number;
-      status: 'OK' | 'TAKE_PROFIT' | 'STOP_LOSS' | 'EXPIRED';
+      status: 'OK' | 'TAKE_PROFIT' | 'STOP_LOSS';
       reason?: string;
     }> = [];
 
     const autoClosed: Array<{
       id: string;
       symbol: string;
-      sellPrice: number;
-      sellReason: string;
+      closePrice: number;
+      reason: string;
       profitPct: number;
     }> = [];
 
@@ -73,27 +76,22 @@ export async function GET() {
           continue;
         }
 
-        const profitPct = ((currentPrice - position.buyPrice) / position.buyPrice) * 100;
-        const holdingMs = now.getTime() - new Date(position.buyDate).getTime();
+        const profitPct = ((currentPrice - position.avgCost) / position.avgCost) * 100;
+        const holdingMs = now.getTime() - new Date(position.openedAt).getTime();
         const holdingDays = Math.floor(holdingMs / (1000 * 60 * 60 * 24));
 
-        let status: 'OK' | 'TAKE_PROFIT' | 'STOP_LOSS' | 'EXPIRED' = 'OK';
+        let status: 'OK' | 'TAKE_PROFIT' | 'STOP_LOSS' = 'OK';
         let reason: string | undefined;
 
-        // Check take-profit
-        if (profitPct >= position.takeProfitPct * 100) {
+        // Check take-profit (takeProfit is an absolute price value)
+        if (position.takeProfit !== null && currentPrice >= position.takeProfit) {
           status = 'TAKE_PROFIT';
-          reason = `Profit ${profitPct.toFixed(2)}% >= take-profit ${position.takeProfitPct * 100}%`;
+          reason = `Price ${currentPrice.toFixed(2)} >= take-profit ${position.takeProfit.toFixed(2)}`;
         }
-        // Check stop-loss
-        else if (profitPct <= -(position.stopLossPct * 100)) {
+        // Check stop-loss (stopLoss is an absolute price value)
+        else if (position.stopLoss !== null && currentPrice <= position.stopLoss) {
           status = 'STOP_LOSS';
-          reason = `Loss ${profitPct.toFixed(2)}% <= stop-loss ${position.stopLossPct * 100}%`;
-        }
-        // Check expiry
-        else if (position.cycleDays > 0 && holdingDays >= position.cycleDays) {
-          status = 'EXPIRED';
-          reason = `Holding ${holdingDays} days >= cycle ${position.cycleDays} days`;
+          reason = `Price ${currentPrice.toFixed(2)} <= stop-loss ${position.stopLoss.toFixed(2)}`;
         }
 
         results.push({
@@ -108,34 +106,40 @@ export async function GET() {
 
         // Auto-close positions that meet conditions
         if (status !== 'OK') {
+          const realizedPnl = (currentPrice - position.avgCost) * position.quantity;
+
           await db.position.update({
             where: { id: position.id },
             data: {
-              status: 'CLOSED',
-              sellPrice: currentPrice,
-              sellDate: now,
-              sellReason: status,
+              status: 'closed',
+              currentPrice,
+              realizedPnl,
+              closedAt: now,
             },
           });
 
           // Log the trade
           await db.tradeLog.create({
             data: {
+              userId: position.userId,
               symbol: position.symbol,
-              name: position.name,
-              action: 'SELL',
+              market: position.market,
+              side: 'sell',
               price: currentPrice,
               quantity: position.quantity,
-              reason: status,
-              profitPct: parseFloat(profitPct.toFixed(2)),
+              totalAmount: currentPrice * position.quantity,
+              commission: 0,
+              tradeTime: now,
+              source: 'strategy',
+              notes: status,
             },
           });
 
           autoClosed.push({
             id: position.id,
             symbol: position.symbol,
-            sellPrice: currentPrice,
-            sellReason: status,
+            closePrice: currentPrice,
+            reason: status,
             profitPct: parseFloat(profitPct.toFixed(2)),
           });
         }

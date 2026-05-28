@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { DEFAULT_USER_ID, ensureDefaultUser } from '@/lib/auth-utils';
 
 /**
  * GET /api/portfolio/positions
- * Get all ACTIVE positions
+ * Get all open positions
  */
 export async function GET() {
   try {
     const positions = await db.position.findMany({
-      where: { status: 'ACTIVE' },
-      orderBy: { createdAt: 'desc' },
+      where: { status: 'open', userId: DEFAULT_USER_ID },
+      orderBy: { openedAt: 'desc' },
+      include: { lots: true },
     });
 
     return NextResponse.json(positions);
@@ -25,50 +27,63 @@ export async function GET() {
 /**
  * POST /api/portfolio/positions
  * Create a new position (buy stock)
- * Body: { symbol, name, buyPrice, quantity, cycleDays?, stopLossPct?, takeProfitPct? }
+ * Body: { symbol, market, side, avgCost, quantity, stopLoss?, takeProfit?, notes? }
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { symbol, name, buyPrice, quantity, cycleDays, stopLossPct, takeProfitPct } = body;
+    const { symbol, market, side, avgCost, quantity, stopLoss, takeProfit, notes } = body;
 
-    if (!symbol || buyPrice === undefined || quantity === undefined) {
+    if (!symbol || avgCost === undefined || quantity === undefined) {
       return NextResponse.json(
-        { error: 'symbol, buyPrice, and quantity are required' },
+        { error: 'symbol, avgCost, and quantity are required' },
         { status: 400 }
       );
     }
 
-    if (buyPrice <= 0 || quantity <= 0) {
+    if (avgCost <= 0 || quantity <= 0) {
       return NextResponse.json(
-        { error: 'buyPrice and quantity must be positive' },
+        { error: 'avgCost and quantity must be positive' },
         { status: 400 }
       );
     }
+
+    await ensureDefaultUser();
+
+    const avgCostNum = parseFloat(avgCost);
+    const quantityNum = parseInt(quantity, 10);
 
     const position = await db.position.create({
       data: {
+        userId: DEFAULT_USER_ID,
         symbol: symbol.toUpperCase(),
-        name: name || symbol.toUpperCase(),
-        buyPrice: parseFloat(buyPrice),
-        quantity: parseInt(quantity, 10),
-        buyDate: new Date(),
-        cycleDays: cycleDays ? parseInt(cycleDays, 10) : 7,
-        stopLossPct: stopLossPct !== undefined ? parseFloat(stopLossPct) : 0.08,
-        takeProfitPct: takeProfitPct !== undefined ? parseFloat(takeProfitPct) : 0.15,
-        status: 'ACTIVE',
+        market: market || 'US',
+        side: side || 'long',
+        status: 'open',
+        avgCost: avgCostNum,
+        quantity: quantityNum,
+        currentPrice: avgCostNum,
+        stopLoss: stopLoss !== undefined ? parseFloat(stopLoss) : null,
+        takeProfit: takeProfit !== undefined ? parseFloat(takeProfit) : null,
+        openedAt: new Date(),
+        notes: notes || null,
       },
     });
 
     // Log the trade
     await db.tradeLog.create({
       data: {
+        userId: DEFAULT_USER_ID,
         symbol: position.symbol,
-        name: position.name,
-        action: 'BUY',
-        price: position.buyPrice,
-        quantity: position.quantity,
-        reason: 'NEW_POSITION',
+        market: position.market,
+        side: 'buy',
+        price: avgCostNum,
+        quantity: quantityNum,
+        totalAmount: avgCostNum * quantityNum,
+        commission: 0,
+        tradeTime: new Date(),
+        source: 'manual',
+        notes: 'NEW_POSITION',
       },
     });
 
@@ -85,16 +100,16 @@ export async function POST(request: NextRequest) {
 /**
  * DELETE /api/portfolio/positions
  * Close a position (sell stock)
- * Body: { id, sellPrice, sellReason }
+ * Body: { id, closePrice }
  */
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, sellPrice, sellReason } = body;
+    const { id, closePrice } = body;
 
-    if (!id || sellPrice === undefined) {
+    if (!id || closePrice === undefined) {
       return NextResponse.json(
-        { error: 'id and sellPrice are required' },
+        { error: 'id and closePrice are required' },
         { status: 400 }
       );
     }
@@ -108,36 +123,40 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    if (position.status !== 'ACTIVE') {
+    if (position.status !== 'open') {
       return NextResponse.json(
         { error: 'Position is already closed' },
         { status: 400 }
       );
     }
 
-    const sellPriceNum = parseFloat(sellPrice);
-    const profitPct = ((sellPriceNum - position.buyPrice) / position.buyPrice) * 100;
+    const closePriceNum = parseFloat(closePrice);
+    const realizedPnl = (closePriceNum - position.avgCost) * position.quantity;
 
     const updatedPosition = await db.position.update({
       where: { id },
       data: {
-        status: 'CLOSED',
-        sellPrice: sellPriceNum,
-        sellDate: new Date(),
-        sellReason: sellReason || 'MANUAL',
+        status: 'closed',
+        currentPrice: closePriceNum,
+        realizedPnl,
+        closedAt: new Date(),
       },
     });
 
     // Log the trade
     await db.tradeLog.create({
       data: {
+        userId: position.userId,
         symbol: position.symbol,
-        name: position.name,
-        action: 'SELL',
-        price: sellPriceNum,
+        market: position.market,
+        side: 'sell',
+        price: closePriceNum,
         quantity: position.quantity,
-        reason: sellReason || 'MANUAL',
-        profitPct: parseFloat(profitPct.toFixed(2)),
+        totalAmount: closePriceNum * position.quantity,
+        commission: 0,
+        tradeTime: new Date(),
+        source: 'manual',
+        notes: 'CLOSE_POSITION',
       },
     });
 

@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import { Sidebar, type NavItem } from '@/components/dashboard/sidebar';
 import { DashboardView } from '@/components/dashboard/dashboard-view';
+import { AIAnalysisView } from '@/components/dashboard/ai-analysis-view';
+import { AgentChatView } from '@/components/dashboard/agent-chat-view';
 import { SignalScannerView } from '@/components/dashboard/signal-scanner-view';
 import { PositionsView } from '@/components/dashboard/positions-view';
 import { WatchlistView } from '@/components/dashboard/watchlist-view';
+import { StrategyCenterView } from '@/components/dashboard/strategy-center-view';
 import { MarketNewsView } from '@/components/dashboard/news-view';
 import { BacktestView } from '@/components/dashboard/backtest-view';
 import { SettingsView } from '@/components/dashboard/settings-view';
@@ -18,12 +21,18 @@ function ViewRenderer({ activeView }: { activeView: NavItem }) {
   switch (activeView) {
     case 'dashboard':
       return <DashboardView />;
+    case 'aiAnalysis':
+      return <AIAnalysisView />;
+    case 'agentChat':
+      return <AgentChatView />;
     case 'scanner':
       return <SignalScannerView />;
     case 'positions':
       return <PositionsView />;
     case 'watchlist':
       return <WatchlistView />;
+    case 'strategies':
+      return <StrategyCenterView />;
     case 'news':
       return <MarketNewsView />;
     case 'backtest':
@@ -37,9 +46,12 @@ function ViewRenderer({ activeView }: { activeView: NavItem }) {
 
 const viewTitleKeys: Record<NavItem, string> = {
   dashboard: 'sidebar.dashboard',
+  aiAnalysis: 'sidebar.aiAnalysis',
+  agentChat: 'sidebar.agentChat',
   scanner: 'sidebar.scanner',
   positions: 'sidebar.positions',
   watchlist: 'sidebar.watchlist',
+  strategies: 'sidebar.strategies',
   news: 'sidebar.news',
   backtest: 'sidebar.backtest',
   settings: 'sidebar.settings',

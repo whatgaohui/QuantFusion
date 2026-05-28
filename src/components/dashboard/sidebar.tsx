@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import {
   LayoutDashboard,
+  Brain,
+  MessageSquare,
   Radar,
   Briefcase,
   Eye,
+  Target,
   Newspaper,
   FlaskConical,
   Settings,
@@ -22,21 +25,25 @@ import {
 } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { useLanguage, type Language } from '@/lib/i18n';
+import { useLanguage } from '@/lib/i18n';
 
-export type NavItem = 'dashboard' | 'scanner' | 'positions' | 'watchlist' | 'news' | 'backtest' | 'settings';
+export type NavItem = 'dashboard' | 'aiAnalysis' | 'agentChat' | 'scanner' | 'positions' | 'watchlist' | 'strategies' | 'news' | 'backtest' | 'settings';
 
 interface NavConfig {
   id: NavItem;
   labelKey: string;
   icon: React.ElementType;
+  accent?: boolean;
 }
 
 const navItems: NavConfig[] = [
   { id: 'dashboard', labelKey: 'sidebar.dashboard', icon: LayoutDashboard },
+  { id: 'aiAnalysis', labelKey: 'sidebar.aiAnalysis', icon: Brain, accent: true },
+  { id: 'agentChat', labelKey: 'sidebar.agentChat', icon: MessageSquare, accent: true },
   { id: 'scanner', labelKey: 'sidebar.scanner', icon: Radar },
   { id: 'positions', labelKey: 'sidebar.positions', icon: Briefcase },
   { id: 'watchlist', labelKey: 'sidebar.watchlist', icon: Eye },
+  { id: 'strategies', labelKey: 'sidebar.strategies', icon: Target },
   { id: 'news', labelKey: 'sidebar.news', icon: Newspaper },
   { id: 'backtest', labelKey: 'sidebar.backtest', icon: FlaskConical },
   { id: 'settings', labelKey: 'sidebar.settings', icon: Settings },
@@ -69,13 +76,13 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
-              <h1 className="text-lg font-bold gradient-text whitespace-nowrap">QuantFlow</h1>
+              <h1 className="text-lg font-bold gradient-text whitespace-nowrap">QuantFusion</h1>
             </div>
           )}
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto custom-scrollbar">
+        <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto custom-scrollbar">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeItem === item.id;
@@ -86,9 +93,11 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
                 onClick={() => onItemChange(item.id)}
                 className={cn(
                   'w-full flex items-center gap-3 rounded-lg transition-all duration-200 group',
-                  collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5',
+                  collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2',
                   isActive
-                    ? 'bg-emerald-600/15 text-emerald-400 shadow-sm'
+                    ? item.accent
+                      ? 'bg-emerald-600/20 text-emerald-400 shadow-sm shadow-emerald-600/10'
+                      : 'bg-emerald-600/15 text-emerald-400 shadow-sm'
                     : 'text-zinc-400 hover:bg-[#1a1a2e] hover:text-zinc-200'
                 )}
               >

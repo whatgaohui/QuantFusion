@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { DEFAULT_USER_ID, ensureDefaultUser } from '@/lib/auth-utils';
 
 /**
  * GET /api/watchlist
@@ -7,8 +8,11 @@ import { db } from '@/lib/db';
  */
 export async function GET() {
   try {
+    await ensureDefaultUser();
+
     const items = await db.watchlistItem.findMany({
-      orderBy: { addedAt: 'desc' },
+      where: { userId: DEFAULT_USER_ID },
+      orderBy: { sortOrder: 'asc' },
     });
 
     return NextResponse.json(items);
@@ -24,12 +28,12 @@ export async function GET() {
 /**
  * POST /api/watchlist
  * Add item to watchlist
- * Body: { symbol, name }
+ * Body: { symbol, name?, market?, groupName?, sortOrder? }
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { symbol, name } = body;
+    const { symbol, name, market, groupName, sortOrder } = body;
 
     if (!symbol) {
       return NextResponse.json(
@@ -38,9 +42,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if already exists
+    const upperSymbol = symbol.toUpperCase();
+
+    await ensureDefaultUser();
+
+    // Check if already exists for this user
     const existing = await db.watchlistItem.findUnique({
-      where: { symbol: symbol.toUpperCase() },
+      where: { userId_symbol: { userId: DEFAULT_USER_ID, symbol: upperSymbol } },
     });
 
     if (existing) {
@@ -52,8 +60,12 @@ export async function POST(request: NextRequest) {
 
     const item = await db.watchlistItem.create({
       data: {
-        symbol: symbol.toUpperCase(),
-        name: name || symbol.toUpperCase(),
+        userId: DEFAULT_USER_ID,
+        symbol: upperSymbol,
+        name: name || upperSymbol,
+        market: market || 'US',
+        groupName: groupName || null,
+        sortOrder: sortOrder || 0,
       },
     });
 
@@ -70,22 +82,38 @@ export async function POST(request: NextRequest) {
 /**
  * DELETE /api/watchlist
  * Remove item from watchlist
- * Body: { symbol }
+ * Body: { symbol } or { id }
  */
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
-    const { symbol } = body;
+    const { symbol, id } = body;
 
-    if (!symbol) {
+    if (!symbol && !id) {
       return NextResponse.json(
-        { error: 'Symbol is required' },
+        { error: 'Symbol or id is required' },
         { status: 400 }
       );
     }
 
+    if (id) {
+      const existing = await db.watchlistItem.findUnique({ where: { id } });
+
+      if (!existing) {
+        return NextResponse.json(
+          { error: 'Item not found in watchlist' },
+          { status: 404 }
+        );
+      }
+
+      await db.watchlistItem.delete({ where: { id } });
+      return NextResponse.json({ message: 'Removed from watchlist', id });
+    }
+
+    // Delete by symbol for the default user
+    const upperSymbol = symbol.toUpperCase();
     const existing = await db.watchlistItem.findUnique({
-      where: { symbol: symbol.toUpperCase() },
+      where: { userId_symbol: { userId: DEFAULT_USER_ID, symbol: upperSymbol } },
     });
 
     if (!existing) {
@@ -96,10 +124,10 @@ export async function DELETE(request: NextRequest) {
     }
 
     await db.watchlistItem.delete({
-      where: { symbol: symbol.toUpperCase() },
+      where: { userId_symbol: { userId: DEFAULT_USER_ID, symbol: upperSymbol } },
     });
 
-    return NextResponse.json({ message: 'Removed from watchlist', symbol: symbol.toUpperCase() });
+    return NextResponse.json({ message: 'Removed from watchlist', symbol: upperSymbol });
   } catch (error) {
     console.error('Delete watchlist error:', error);
     return NextResponse.json(

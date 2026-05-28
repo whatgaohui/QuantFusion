@@ -1,0 +1,13 @@
+name: MACD Signal
+id: macd_signal
+type: trend
+description: MACD信号策略 - MACD金叉买入，死叉卖出
+parameters:
+  fast_period: 12
+  slow_period: 26
+  signal_period: 9
+entry_condition: macd_line crosses above signal_line AND macd_histogram > 0
+exit_condition: macd_line crosses below signal_line AND macd_histogram < 0
+risk_management:
+  stop_loss_pct: 0.05
+  take_profit_pct: 0.18

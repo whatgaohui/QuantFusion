@@ -6,8 +6,11 @@ import {
   ExternalLink,
   RefreshCw,
   Clock,
-  Globe,
   Filter,
+  Brain,
+  TrendingUp,
+  TrendingDown,
+  Minus,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +33,8 @@ interface NewsArticle {
   image: string;
   summary: string;
   category: string;
+  sentiment: 'bullish' | 'bearish' | 'neutral';
+  relatedStocks: string[];
   timestamp: string;
 }
 
@@ -42,6 +47,8 @@ const mockNews: NewsArticle[] = [
     image: '',
     summary: 'The benchmark index climbed to a record close as strong earnings from major technology companies boosted investor sentiment across the board.',
     category: 'general',
+    sentiment: 'bullish',
+    relatedStocks: ['AAPL', 'NVDA', 'MSFT'],
     timestamp: '2024-01-15T14:30:00Z',
   },
   {
@@ -52,6 +59,8 @@ const mockNews: NewsArticle[] = [
     image: '',
     summary: 'The chipmaker raised its revenue guidance for the current quarter, citing unprecedented demand for its AI training and inference processors.',
     category: 'general',
+    sentiment: 'bullish',
+    relatedStocks: ['NVDA', 'AMD'],
     timestamp: '2024-01-15T12:15:00Z',
   },
   {
@@ -62,6 +71,8 @@ const mockNews: NewsArticle[] = [
     image: '',
     summary: 'Fed officials indicated that inflation data has been moving in the right direction, opening the door for possible interest rate reductions.',
     category: 'general',
+    sentiment: 'bullish',
+    relatedStocks: [],
     timestamp: '2024-01-15T10:45:00Z',
   },
   {
@@ -72,6 +83,8 @@ const mockNews: NewsArticle[] = [
     image: '',
     summary: 'Newly approved spot Bitcoin ETFs attracted over $4.6 billion in trading volume on their debut, marking the most successful ETF launch in history.',
     category: 'crypto',
+    sentiment: 'bullish',
+    relatedStocks: ['COIN'],
     timestamp: '2024-01-15T09:00:00Z',
   },
   {
@@ -82,6 +95,8 @@ const mockNews: NewsArticle[] = [
     image: '',
     summary: 'The greenback fell sharply against the euro and yen as traders priced in a higher probability of rate cuts in the first half of the year.',
     category: 'forex',
+    sentiment: 'neutral',
+    relatedStocks: [],
     timestamp: '2024-01-14T16:30:00Z',
   },
   {
@@ -92,6 +107,8 @@ const mockNews: NewsArticle[] = [
     image: '',
     summary: 'The pharmaceutical giant will acquire Seagen to bolster its oncology pipeline, in one of the largest healthcare deals in recent years.',
     category: 'merger',
+    sentiment: 'neutral',
+    relatedStocks: ['PFE', 'SGEN'],
     timestamp: '2024-01-14T14:00:00Z',
   },
   {
@@ -102,6 +119,8 @@ const mockNews: NewsArticle[] = [
     image: '',
     summary: 'Crude oil futures traded in a narrow range after OPEC+ reaffirmed its commitment to supply restrictions through the end of Q1.',
     category: 'general',
+    sentiment: 'neutral',
+    relatedStocks: ['XOM', 'CVX'],
     timestamp: '2024-01-14T11:30:00Z',
   },
   {
@@ -112,7 +131,21 @@ const mockNews: NewsArticle[] = [
     image: '',
     summary: 'Arbitrum and Optimism processed a combined 5 million transactions in 24 hours, driven by increased DeFi activity and lower fees.',
     category: 'crypto',
+    sentiment: 'bullish',
+    relatedStocks: [],
     timestamp: '2024-01-14T09:15:00Z',
+  },
+  {
+    id: '9',
+    headline: 'Tesla Faces Increased Competition in China EV Market',
+    source: 'Nikkei Asia',
+    url: '#',
+    image: '',
+    summary: 'Domestic EV makers are capturing growing market share, pressuring Tesla to cut prices and accelerate new model launches.',
+    category: 'general',
+    sentiment: 'bearish',
+    relatedStocks: ['TSLA'],
+    timestamp: '2024-01-13T16:00:00Z',
   },
 ];
 
@@ -125,12 +158,11 @@ function getCategoryColor(category: string): string {
   }
 }
 
-function getCategoryIcon(category: string) {
-  switch (category) {
-    case 'crypto': return '₿';
-    case 'forex': return '💱';
-    case 'merger': return '🤝';
-    default: return '📊';
+function getSentimentConfig(sentiment: string): { color: string; icon: React.ReactNode; labelKey: string } {
+  switch (sentiment) {
+    case 'bullish': return { color: 'bg-emerald-600/15 text-emerald-400', icon: <TrendingUp className="w-3 h-3" />, labelKey: 'news.bullish' };
+    case 'bearish': return { color: 'bg-red-600/15 text-red-400', icon: <TrendingDown className="w-3 h-3" />, labelKey: 'news.bearish' };
+    default: return { color: 'bg-yellow-600/15 text-yellow-400', icon: <Minus className="w-3 h-3" />, labelKey: 'news.neutral' };
   }
 }
 
@@ -152,6 +184,7 @@ export function MarketNewsView() {
   const [news, setNews] = useState<NewsArticle[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
 
   const categories = [
     { value: 'all', label: t('news.allCategories') },
@@ -250,46 +283,70 @@ export function MarketNewsView() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredNews.map((article) => (
-            <Card
-              key={article.id}
-              className="bg-[#111118] border-[#1e1e2e] rounded-xl hover:border-[#2e2e3e] transition-all duration-300 group cursor-pointer"
-              onClick={() => window.open(article.url, '_blank', 'noopener,noreferrer')}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    {/* Category + Source */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge className={`${getCategoryColor(article.category)} border text-[10px] px-1.5 py-0`}>
-                        {getCategoryIcon(article.category)} {article.category.toUpperCase()}
-                      </Badge>
-                      <span className="text-[10px] text-zinc-500">{article.source}</span>
-                    </div>
-
-                    {/* Headline */}
-                    <h4 className="text-sm font-semibold text-white leading-snug mb-2 group-hover:text-emerald-400 transition-colors line-clamp-2">
-                      {article.headline}
-                    </h4>
-
-                    {/* Summary */}
-                    <p className="text-xs text-zinc-400 leading-relaxed line-clamp-2 mb-3">
-                      {article.summary}
-                    </p>
-
-                    {/* Meta */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1 text-zinc-500">
-                        <Clock className="w-3 h-3" />
-                        <span className="text-[10px]">{timeAgo(article.timestamp)}</span>
+          {filteredNews.map((article) => {
+            const sentimentCfg = getSentimentConfig(article.sentiment);
+            return (
+              <Card
+                key={article.id}
+                className="bg-[#111118] border-[#1e1e2e] rounded-xl hover:border-[#2e2e3e] transition-all duration-300 group cursor-pointer"
+                onClick={() => window.open(article.url, '_blank', 'noopener,noreferrer')}
+              >
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      {/* Category + Source + Sentiment */}
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <Badge className={`${getCategoryColor(article.category)} border text-[10px] px-1.5 py-0`}>
+                          {article.category.toUpperCase()}
+                        </Badge>
+                        <Badge className={`${sentimentCfg.color} text-[10px] px-1.5 py-0 flex items-center gap-0.5`}>
+                          {sentimentCfg.icon}
+                          {t(sentimentCfg.labelKey)}
+                        </Badge>
+                        <span className="text-[10px] text-zinc-500">{article.source}</span>
                       </div>
-                      <ExternalLink className="w-3.5 h-3.5 text-zinc-600 group-hover:text-emerald-400 transition-colors" />
+
+                      {/* Headline */}
+                      <h4 className="text-sm font-semibold text-white leading-snug mb-2 group-hover:text-emerald-400 transition-colors line-clamp-2">
+                        {article.headline}
+                      </h4>
+
+                      {/* Summary */}
+                      <p className="text-xs text-zinc-400 leading-relaxed line-clamp-2 mb-3">
+                        {article.summary}
+                      </p>
+
+                      {/* Related Stocks */}
+                      {article.relatedStocks && article.relatedStocks.length > 0 && (
+                        <div className="flex items-center gap-1.5 mb-3">
+                          <span className="text-[10px] text-zinc-500">{t('news.analyzeStock')}:</span>
+                          {article.relatedStocks.map((stock) => (
+                            <button
+                              key={stock}
+                              onClick={(e) => { e.stopPropagation(); }}
+                              className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600/20 transition-colors flex items-center gap-0.5"
+                            >
+                              {stock}
+                              <Brain className="w-2.5 h-2.5" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Meta */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1 text-zinc-500">
+                          <Clock className="w-3 h-3" />
+                          <span className="text-[10px]">{timeAgo(article.timestamp)}</span>
+                        </div>
+                        <ExternalLink className="w-3.5 h-3.5 text-zinc-600 group-hover:text-emerald-400 transition-colors" />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

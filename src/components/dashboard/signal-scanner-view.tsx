@@ -13,6 +13,7 @@ import {
   Loader2,
   Brain,
   Sparkles,
+  Globe,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -158,6 +159,7 @@ export function SignalScannerView() {
   const [scanScores, setScanScores] = useState<Record<string, { score: number; signalType: string; price: number }>>({});
   const [sentiment, setSentiment] = useState<SentimentResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [market, setMarket] = useState<'A' | 'HK' | 'US'>('US');
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const fetchStockData = useCallback(async (symbol: string) => {
@@ -371,6 +373,21 @@ export function SignalScannerView() {
               ))}
             </div>
           )}
+        </div>
+        <div className="flex items-center gap-1 bg-[#111118] border border-[#1e1e2e] rounded-lg p-1">
+          {(['US', 'HK', 'A'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMarket(m)}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                market === m
+                  ? 'bg-emerald-600/20 text-emerald-400'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              {t(`scanner.market${m}`)}
+            </button>
+          ))}
         </div>
         <Button
           onClick={handleRescan}

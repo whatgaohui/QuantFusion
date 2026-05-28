@@ -19,6 +19,21 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
   LineChart,
   Line,
   XAxis,
@@ -32,6 +47,7 @@ import {
 import { useLanguage } from '@/lib/i18n';
 
 interface BacktestConfig {
+  strategy: string;
   initialCapital: number;
   positionSizePct: number;
   stopLossPct: number;
@@ -39,6 +55,19 @@ interface BacktestConfig {
   cycleDays: number;
   startDate: string;
   endDate: string;
+}
+
+interface TradeRecord {
+  id: string;
+  symbol: string;
+  side: 'BUY' | 'SELL';
+  entryDate: string;
+  exitDate: string;
+  entryPrice: number;
+  exitPrice: number;
+  quantity: number;
+  pnl: number;
+  pnlPercent: number;
 }
 
 interface BacktestResult {
@@ -49,7 +78,18 @@ interface BacktestResult {
   sharpeRatio: number;
   totalTrades: number;
   equityCurve: { date: string; equity: number }[];
+  trades: TradeRecord[];
 }
+
+const strategies = [
+  { value: 'ma-golden-cross', label: 'MA Golden Cross' },
+  { value: 'rsi-divergence', label: 'RSI Divergence' },
+  { value: 'macd-momentum', label: 'MACD Momentum' },
+  { value: 'bollinger-breakout', label: 'Bollinger Breakout' },
+  { value: 'kdj-golden-cross', label: 'KDJ Golden Cross' },
+  { value: 'volume-breakout', label: 'Volume Breakout' },
+  { value: 'channel-breakout', label: 'Channel Breakout' },
+];
 
 function generateEquityCurve(startEquity: number): { date: string; equity: number }[] {
   const data: { date: string; equity: number }[] = [];
@@ -68,7 +108,36 @@ function generateEquityCurve(startEquity: number): { date: string; equity: numbe
   return data;
 }
 
+function generateTrades(): TradeRecord[] {
+  const symbols = ['AAPL', 'NVDA', 'MSFT', 'TSLA', 'AMZN', 'META', 'GOOGL'];
+  const trades: TradeRecord[] = [];
+  for (let i = 0; i < 12; i++) {
+    const symbol = symbols[i % symbols.length];
+    const side = i % 3 === 0 ? 'SELL' : 'BUY';
+    const entryPrice = 100 + Math.random() * 300;
+    const pnlPercent = (Math.random() - 0.35) * 15;
+    const exitPrice = entryPrice * (1 + pnlPercent / 100);
+    const entryDate = new Date(2023, 6, 1 + i * 14);
+    const exitDate = new Date(2023, 6, 8 + i * 14);
+    const qty = Math.floor(10 + Math.random() * 40);
+    trades.push({
+      id: String(i + 1),
+      symbol,
+      side: side as 'BUY' | 'SELL',
+      entryDate: entryDate.toISOString().split('T')[0],
+      exitDate: exitDate.toISOString().split('T')[0],
+      entryPrice: Number(entryPrice.toFixed(2)),
+      exitPrice: Number(exitPrice.toFixed(2)),
+      quantity: qty,
+      pnl: Number(((exitPrice - entryPrice) * qty).toFixed(2)),
+      pnlPercent: Number(pnlPercent.toFixed(2)),
+    });
+  }
+  return trades;
+}
+
 const defaultConfig: BacktestConfig = {
+  strategy: 'ma-golden-cross',
   initialCapital: 100000,
   positionSizePct: 10,
   stopLossPct: 8,
@@ -87,7 +156,7 @@ export function BacktestView() {
   const handleRunBacktest = async () => {
     setRunning(true);
     try {
-      const res = await fetch('/api/backtest', {
+      const res = await fetch('/api/fusion/backtest/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
@@ -97,7 +166,6 @@ export function BacktestView() {
         const data = await res.json();
         setResult(data);
       } else {
-        // Use mock result
         const equityCurve = generateEquityCurve(config.initialCapital);
         const finalEquity = equityCurve[equityCurve.length - 1].equity;
         setResult({
@@ -108,6 +176,7 @@ export function BacktestView() {
           sharpeRatio: 1.47,
           totalTrades: 47,
           equityCurve,
+          trades: generateTrades(),
         });
       }
     } catch {
@@ -121,6 +190,7 @@ export function BacktestView() {
         sharpeRatio: 1.47,
         totalTrades: 47,
         equityCurve,
+        trades: generateTrades(),
       });
     } finally {
       setRunning(false);
@@ -143,8 +213,24 @@ export function BacktestView() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Strategy Selector */}
+          <div className="space-y-2 max-w-xs">
+            <Label className="text-zinc-300 text-sm">{t('back.strategy')}</Label>
+            <Select value={config.strategy} onValueChange={(v) => setConfig({ ...config, strategy: v })}>
+              <SelectTrigger className="bg-[#0a0a0f] border-[#1e1e2e] text-white">
+                <SelectValue placeholder={t('back.selectStrategy')} />
+              </SelectTrigger>
+              <SelectContent className="bg-[#111118] border-[#1e1e2e]">
+                {strategies.map((s) => (
+                  <SelectItem key={s.value} value={s.value} className="text-zinc-300 focus:text-white focus:bg-[#1a1a2e]">
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Initial Capital */}
             <div className="space-y-2">
               <Label className="text-zinc-300 text-sm">{t('back.initialCapital')}</Label>
               <Input
@@ -154,8 +240,6 @@ export function BacktestView() {
                 className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
               />
             </div>
-
-            {/* Position Size */}
             <div className="space-y-2">
               <Label className="text-zinc-300 text-sm">{t('back.positionSize')}</Label>
               <Input
@@ -165,8 +249,6 @@ export function BacktestView() {
                 className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
               />
             </div>
-
-            {/* Stop Loss */}
             <div className="space-y-2">
               <Label className="text-zinc-300 text-sm">{t('back.stopLoss')}</Label>
               <Input
@@ -176,8 +258,6 @@ export function BacktestView() {
                 className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
               />
             </div>
-
-            {/* Take Profit */}
             <div className="space-y-2">
               <Label className="text-zinc-300 text-sm">{t('back.takeProfit')}</Label>
               <Input
@@ -187,8 +267,6 @@ export function BacktestView() {
                 className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
               />
             </div>
-
-            {/* Cycle Days */}
             <div className="space-y-2">
               <Label className="text-zinc-300 text-sm">{t('back.cycleDays')}</Label>
               <Input
@@ -198,8 +276,6 @@ export function BacktestView() {
                 className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
               />
             </div>
-
-            {/* Date Range */}
             <div className="space-y-2">
               <Label className="text-zinc-300 text-sm">{t('back.startDate')}</Label>
               <Input
@@ -260,7 +336,6 @@ export function BacktestView() {
                 </p>
               </CardContent>
             </Card>
-
             <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-1">
@@ -276,7 +351,6 @@ export function BacktestView() {
                 </p>
               </CardContent>
             </Card>
-
             <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-1">
@@ -288,19 +362,15 @@ export function BacktestView() {
                 </p>
               </CardContent>
             </Card>
-
             <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <TrendingDown className="w-3.5 h-3.5 text-red-400" />
                   <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('back.maxDrawdown')}</span>
                 </div>
-                <p className="text-lg font-bold text-red-400">
-                  {result.maxDrawdown.toFixed(1)}%
-                </p>
+                <p className="text-lg font-bold text-red-400">{result.maxDrawdown.toFixed(1)}%</p>
               </CardContent>
             </Card>
-
             <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-1">
@@ -312,16 +382,13 @@ export function BacktestView() {
                 </p>
               </CardContent>
             </Card>
-
             <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
                   <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('back.totalTrades')}</span>
                 </div>
-                <p className="text-lg font-bold text-white">
-                  {result.totalTrades}
-                </p>
+                <p className="text-lg font-bold text-white">{result.totalTrades}</p>
               </CardContent>
             </Card>
           </div>
@@ -342,43 +409,62 @@ export function BacktestView() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
-                    <XAxis
-                      dataKey="date"
-                      stroke="#71717a"
-                      tick={{ fontSize: 10 }}
-                      tickLine={false}
-                      axisLine={{ stroke: '#1e1e2e' }}
-                      interval={29}
-                    />
-                    <YAxis
-                      stroke="#71717a"
-                      tick={{ fontSize: 10 }}
-                      tickLine={false}
-                      axisLine={{ stroke: '#1e1e2e' }}
-                      tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                    />
+                    <XAxis dataKey="date" stroke="#71717a" tick={{ fontSize: 10 }} tickLine={false} axisLine={{ stroke: '#1e1e2e' }} interval={29} />
+                    <YAxis stroke="#71717a" tick={{ fontSize: 10 }} tickLine={false} axisLine={{ stroke: '#1e1e2e' }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                     <RechartsTooltip
-                      contentStyle={{
-                        backgroundColor: '#1a1a2e',
-                        border: '1px solid #2e2e3e',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                      }}
+                      contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #2e2e3e', borderRadius: '8px', fontSize: '12px' }}
                       itemStyle={{ color: '#10b981' }}
                       formatter={(value: number) => [`$${value.toLocaleString()}`, 'Equity']}
                     />
-                    <Area
-                      type="monotone"
-                      dataKey="equity"
-                      stroke="#10b981"
-                      strokeWidth={2}
-                      fill="url(#equityGradient)"
-                    />
+                    <Area type="monotone" dataKey="equity" stroke="#10b981" strokeWidth={2} fill="url(#equityGradient)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
+
+          {/* Trade List */}
+          {result.trades && result.trades.length > 0 && (
+            <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold text-white">{t('back.tradeList')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-[#1e1e2e] hover:bg-transparent">
+                        <TableHead className="text-zinc-400 text-xs">Symbol</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">Side</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">Entry</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">Exit</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">{t('back.tradePnl')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {result.trades.map((trade) => (
+                        <TableRow key={trade.id} className="border-[#1e1e2e] hover:bg-[#1a1a2e]/50">
+                          <TableCell className="text-sm font-medium text-white">{trade.symbol}</TableCell>
+                          <TableCell>
+                            <Badge className={`text-[10px] px-1.5 py-0 ${trade.side === 'BUY' ? 'bg-emerald-600/15 text-emerald-400' : 'bg-red-600/15 text-red-400'}`}>
+                              {trade.side}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-zinc-300">${trade.entryPrice.toFixed(2)}</TableCell>
+                          <TableCell className="text-sm text-zinc-300">${trade.exitPrice.toFixed(2)}</TableCell>
+                          <TableCell>
+                            <span className={`text-sm font-medium ${trade.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(2)} ({trade.pnlPercent >= 0 ? '+' : ''}{trade.pnlPercent.toFixed(1)}%)
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 

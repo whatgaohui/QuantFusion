@@ -12,6 +12,8 @@ import {
   BellRing,
   RefreshCw,
   X,
+  Brain,
+  Globe,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -437,6 +439,14 @@ export function WatchlistView() {
                   className="h-6 w-6 p-0 text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-zinc-600 hover:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title={t('watch.quickAnalyze')}
+                >
+                  <Brain className="w-3.5 h-3.5" />
                 </Button>
               </div>
 

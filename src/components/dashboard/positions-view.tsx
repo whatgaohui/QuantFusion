@@ -12,6 +12,10 @@ import {
   ChevronUp,
   RefreshCw,
   Loader2,
+  Shield,
+  Activity,
+  Layers,
+  Timer,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -59,6 +63,7 @@ interface Position {
   holdingDays: number;
   remainingDays: number;
   status: 'ACTIVE' | 'CLOSED';
+  lots?: { buyDate: string; qty: number; price: number }[];
 }
 
 interface PositionSummary {
@@ -74,26 +79,31 @@ const mockActivePositions: Position[] = [
     id: '1', symbol: 'AAPL', name: 'Apple Inc.', buyPrice: 182.50, currentPrice: 189.45,
     quantity: 50, buyDate: '2024-01-10', cycleDays: 7, pnl: 347.50, pnlPercent: 3.81,
     holdingDays: 4, remainingDays: 3, status: 'ACTIVE',
+    lots: [{ buyDate: '2024-01-10', qty: 30, price: 181.00 }, { buyDate: '2024-01-11', qty: 20, price: 184.75 }],
   },
   {
     id: '2', symbol: 'NVDA', name: 'NVIDIA Corp.', buyPrice: 598.30, currentPrice: 615.20,
     quantity: 20, buyDate: '2024-01-12', cycleDays: 7, pnl: 338.00, pnlPercent: 2.82,
     holdingDays: 2, remainingDays: 5, status: 'ACTIVE',
+    lots: [{ buyDate: '2024-01-12', qty: 20, price: 598.30 }],
   },
   {
     id: '3', symbol: 'TSLA', name: 'Tesla Inc.', buyPrice: 252.10, currentPrice: 245.80,
     quantity: 30, buyDate: '2024-01-09', cycleDays: 7, pnl: -189.00, pnlPercent: -2.50,
     holdingDays: 5, remainingDays: 2, status: 'ACTIVE',
+    lots: [{ buyDate: '2024-01-09', qty: 30, price: 252.10 }],
   },
   {
     id: '4', symbol: 'MSFT', name: 'Microsoft Corp.', buyPrice: 380.20, currentPrice: 388.50,
     quantity: 25, buyDate: '2024-01-13', cycleDays: 7, pnl: 207.50, pnlPercent: 2.18,
     holdingDays: 1, remainingDays: 6, status: 'ACTIVE',
+    lots: [{ buyDate: '2024-01-13', qty: 25, price: 380.20 }],
   },
   {
     id: '5', symbol: 'AMZN', name: 'Amazon.com', buyPrice: 175.80, currentPrice: 178.25,
     quantity: 40, buyDate: '2024-01-08', cycleDays: 7, pnl: 98.00, pnlPercent: 1.39,
     holdingDays: 6, remainingDays: 1, status: 'ACTIVE',
+    lots: [{ buyDate: '2024-01-08', qty: 40, price: 175.80 }],
   },
 ];
 
@@ -131,6 +141,7 @@ export function PositionsView() {
   const [loading, setLoading] = useState(true);
   const [closedOpen, setClosedOpen] = useState(false);
   const [closingId, setClosingId] = useState<string | null>(null);
+  const [expandedLotId, setExpandedLotId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -158,7 +169,6 @@ export function PositionsView() {
 
       if (summaryRes.status === 'fulfilled' && summaryRes.value.ok) {
         const data = await summaryRes.value.json();
-        // Map API response fields to frontend interface
         setSummary({
           totalInvested: data.totalInvested ?? data.totalCost ?? 0,
           totalPnl: data.totalPnl ?? data.totalProfit ?? 0,
@@ -224,7 +234,7 @@ export function PositionsView() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-zinc-400">{t('pos.totalInvested')}</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-600/10 flex items-center justify-center">
@@ -236,7 +246,7 @@ export function PositionsView() {
         </Card>
 
         <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-zinc-400">{t('pos.totalPnl')}</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-600/10 flex items-center justify-center">
@@ -254,7 +264,7 @@ export function PositionsView() {
         </Card>
 
         <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-zinc-400">{t('pos.avgHoldingDays')}</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-600/10 flex items-center justify-center">
@@ -262,6 +272,40 @@ export function PositionsView() {
               </div>
             </div>
             <p className="text-2xl font-bold text-white">{avgDays.toFixed(1)} {t('pos.days')}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Risk Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Shield className="w-3.5 h-3.5 text-yellow-400" />
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('pos.var')}</span>
+            </div>
+            <p className="text-lg font-bold text-yellow-400">-$2,450</p>
+            <p className="text-[10px] text-zinc-600">1-day 95% confidence</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Activity className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('pos.sharpe')}</span>
+            </div>
+            <p className="text-lg font-bold text-emerald-400">1.47</p>
+            <p className="text-[10px] text-zinc-600">Annualized</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingDown className="w-3.5 h-3.5 text-red-400" />
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('pos.maxDrawdown')}</span>
+            </div>
+            <p className="text-lg font-bold text-red-400">-8.3%</p>
+            <p className="text-[10px] text-zinc-600">Portfolio level</p>
           </CardContent>
         </Card>
       </div>
@@ -302,9 +346,8 @@ export function PositionsView() {
                     <TableHead className="text-zinc-400 text-xs">{t('pos.buyPrice')}</TableHead>
                     <TableHead className="text-zinc-400 text-xs">{t('pos.current')}</TableHead>
                     <TableHead className="text-zinc-400 text-xs">{t('pos.pnlPercent')}</TableHead>
-                    <TableHead className="text-zinc-400 text-xs">{t('pos.days')}</TableHead>
-                    <TableHead className="text-zinc-400 text-xs">{t('pos.remaining')}</TableHead>
-                    <TableHead className="text-zinc-400 text-xs text-right">{t('pos.action')}</TableHead>
+                    <TableHead className="text-zinc-400 text-xs">{t('pos.cycleCountdown')}</TableHead>
+                    <TableHead className="text-zinc-400 text-xs">{t('pos.action')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -312,7 +355,14 @@ export function PositionsView() {
                     <TableRow key={pos.id} className="border-[#1e1e2e] hover:bg-[#1a1a2e]/50">
                       <TableCell>
                         <div>
-                          <p className="text-sm font-semibold text-white">{pos.symbol}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-white">{pos.symbol}</p>
+                            {pos.lots && pos.lots.length > 1 && (
+                              <button onClick={() => setExpandedLotId(expandedLotId === pos.id ? null : pos.id)}>
+                                <Layers className={`w-3 h-3 text-zinc-500 hover:text-emerald-400 transition-colors ${expandedLotId === pos.id ? 'text-emerald-400' : ''}`} />
+                              </button>
+                            )}
+                          </div>
                           <p className="text-xs text-zinc-500">{pos.name}</p>
                         </div>
                       </TableCell>
@@ -330,11 +380,13 @@ export function PositionsView() {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-zinc-300">{pos.holdingDays}d</TableCell>
                       <TableCell>
                         <div className="space-y-1">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs text-zinc-400">{pos.remainingDays}d {t('pos.left')}</span>
+                            <div className="flex items-center gap-1">
+                              <Timer className="w-3 h-3 text-zinc-500" />
+                              <span className="text-xs text-zinc-400">{pos.remainingDays}d {t('pos.left')}</span>
+                            </div>
                             <span className="text-[10px] text-zinc-600">{pos.cycleDays}d {t('pos.cycle')}</span>
                           </div>
                           <Progress

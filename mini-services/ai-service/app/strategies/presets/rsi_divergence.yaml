@@ -1,0 +1,14 @@
+name: RSI Divergence
+id: rsi_divergence
+type: reversal
+description: RSI背离策略 - 价格与RSI指标出现底背离时买入
+parameters:
+  rsi_period: 14
+  oversold_threshold: 30
+  overbought_threshold: 70
+  divergence_bars: 20
+entry_condition: price makes lower low AND rsi makes higher low (bullish divergence) AND rsi < oversold_threshold
+exit_condition: rsi > overbought_threshold OR price hits stop_loss
+risk_management:
+  stop_loss_pct: 0.07
+  take_profit_pct: 0.20

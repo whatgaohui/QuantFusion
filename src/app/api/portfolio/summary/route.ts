@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { DEFAULT_USER_ID, ensureDefaultUser } from '@/lib/auth-utils';
 
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || '';
 
@@ -9,8 +10,10 @@ const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || '';
  */
 export async function GET() {
   try {
+    await ensureDefaultUser();
+
     const positions = await db.position.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: 'open', userId: DEFAULT_USER_ID },
     });
 
     if (positions.length === 0) {
@@ -32,7 +35,7 @@ export async function GET() {
     const positionSummaries = [];
 
     for (const position of positions) {
-      const cost = position.buyPrice * position.quantity;
+      const cost = position.avgCost * position.quantity;
       totalCost += cost;
 
       try {
@@ -54,11 +57,21 @@ export async function GET() {
           totalValue += currentValue;
           todayPnl += dayPnl;
 
+          // Update currentPrice and unrealizedPnl in DB
+          await db.position.update({
+            where: { id: position.id },
+            data: {
+              currentPrice,
+              unrealizedPnl: profit,
+            },
+          });
+
           positionSummaries.push({
             id: position.id,
             symbol: position.symbol,
-            name: position.name,
-            buyPrice: position.buyPrice,
+            market: position.market,
+            side: position.side,
+            avgCost: position.avgCost,
             currentPrice,
             quantity: position.quantity,
             cost,
@@ -73,9 +86,10 @@ export async function GET() {
           positionSummaries.push({
             id: position.id,
             symbol: position.symbol,
-            name: position.name,
-            buyPrice: position.buyPrice,
-            currentPrice: position.buyPrice,
+            market: position.market,
+            side: position.side,
+            avgCost: position.avgCost,
+            currentPrice: position.avgCost,
             quantity: position.quantity,
             cost,
             currentValue: cost,
@@ -90,9 +104,10 @@ export async function GET() {
         positionSummaries.push({
           id: position.id,
           symbol: position.symbol,
-          name: position.name,
-          buyPrice: position.buyPrice,
-          currentPrice: position.buyPrice,
+          market: position.market,
+          side: position.side,
+          avgCost: position.avgCost,
+          currentPrice: position.avgCost,
           quantity: position.quantity,
           cost,
           currentValue: cost,

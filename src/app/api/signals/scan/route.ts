@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
 import {
   calculateRSI,
   calculateMACD,
@@ -87,7 +86,7 @@ async function fetchCandleData(symbol: string): Promise<CandleData | null> {
   return generateMockCandleData(150, 90);
 }
 
-function analyzeSignals(candleData: CandleData, symbol: string, name?: string) {
+function analyzeSignals(candleData: CandleData, symbol: string) {
   const closes = candleData.c;
   const highs = candleData.h;
   const lows = candleData.l;
@@ -151,7 +150,6 @@ function analyzeSignals(candleData: CandleData, symbol: string, name?: string) {
 
   return {
     symbol: symbol.toUpperCase(),
-    name: name || symbol.toUpperCase(),
     score,
     signalType,
     rsi: parseFloat(rsi.toFixed(2)),
@@ -163,6 +161,7 @@ function analyzeSignals(candleData: CandleData, symbol: string, name?: string) {
     kdj: kdjResult,
     volumeRatio: parseFloat(volumeRatio.toFixed(2)),
     price: currentPrice,
+    scannedAt: new Date().toISOString(),
   };
 }
 
@@ -174,15 +173,12 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const symbol = searchParams.get('symbol');
-    const name = searchParams.get('name') || undefined;
 
     if (!symbol) {
-      // Return recent scan results
-      const recent = await db.signalResult.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-      });
-      return NextResponse.json(recent);
+      return NextResponse.json(
+        { error: 'Symbol query parameter is required' },
+        { status: 400 }
+      );
     }
 
     const candleData = await fetchCandleData(symbol);
@@ -193,25 +189,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const result = analyzeSignals(candleData, symbol, name);
-
-    // Save to database
-    const saved = await db.signalResult.create({
-      data: {
-        symbol: result.symbol,
-        name: result.name,
-        score: result.score,
-        signalType: result.signalType,
-        rsi: result.rsi,
-        macdSignal: result.macdSignal,
-        bollingerSignal: result.bollingerSignal,
-        kdjSignal: result.kdjSignal,
-        volumeRatio: result.volumeRatio,
-        price: result.price,
-      },
-    });
-
-    return NextResponse.json({ ...result, id: saved.id, createdAt: saved.createdAt });
+    const result = analyzeSignals(candleData, symbol);
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Signal scan error:', error);
     return NextResponse.json(
@@ -228,10 +207,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { symbol, candleData, name } = body as {
+    const { symbol, candleData } = body as {
       symbol: string;
-      candleData: CandleData;
-      name?: string;
+      candleData?: CandleData;
     };
 
     if (!symbol) {
@@ -239,24 +217,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (candleData && candleData.c && candleData.c.length >= 30) {
-      const result = analyzeSignals(candleData, symbol, name);
-
-      const saved = await db.signalResult.create({
-        data: {
-          symbol: result.symbol,
-          name: result.name,
-          score: result.score,
-          signalType: result.signalType,
-          rsi: result.rsi,
-          macdSignal: result.macdSignal,
-          bollingerSignal: result.bollingerSignal,
-          kdjSignal: result.kdjSignal,
-          volumeRatio: result.volumeRatio,
-          price: result.price,
-        },
-      });
-
-      return NextResponse.json({ ...result, id: saved.id, createdAt: saved.createdAt });
+      const result = analyzeSignals(candleData, symbol);
+      return NextResponse.json(result);
     }
 
     // No candle data provided, auto-fetch
@@ -265,24 +227,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not enough data' }, { status: 400 });
     }
 
-    const result = analyzeSignals(data, symbol, name);
-
-    const saved = await db.signalResult.create({
-      data: {
-        symbol: result.symbol,
-        name: result.name,
-        score: result.score,
-        signalType: result.signalType,
-        rsi: result.rsi,
-        macdSignal: result.macdSignal,
-        bollingerSignal: result.bollingerSignal,
-        kdjSignal: result.kdjSignal,
-        volumeRatio: result.volumeRatio,
-        price: result.price,
-      },
-    });
-
-    return NextResponse.json({ ...result, id: saved.id, createdAt: saved.createdAt });
+    const result = analyzeSignals(data, symbol);
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Signal scan error:', error);
     return NextResponse.json({ error: 'Failed to run signal scan' }, { status: 500 });

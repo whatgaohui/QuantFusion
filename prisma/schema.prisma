@@ -7,67 +7,384 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================
+// User & Auth (from OpenStock)
+// ============================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions       Session[]
+  accounts       Account[]
+  watchlistItems WatchlistItem[]
+  positions      Position[]
+  tradeLogs      TradeLog[]
+  alerts         Alert[]
+  analysisReports   AnalysisReport[]
+  agentConversations AgentConversation[]
+  notificationLogs  NotificationLog[]
+  notifyChannelConfigs NotifyChannelConfig[]
+
+  @@index([email])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Account {
+  id                String @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// ============================================================
+// Watchlist (merged from all projects)
+// ============================================================
+
 model WatchlistItem {
   id        String   @id @default(cuid())
+  userId    String
   symbol    String
+  market    String   // A / HK / US
   name      String?
-  addedAt   DateTime @default(now())
-  
-  @@unique([symbol])
+  groupName String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, symbol])
+  @@index([userId])
+  @@index([userId, groupName])
+  @@index([market])
 }
+
+// ============================================================
+// Portfolio (from daily_stock_analysis FIFO tracking)
+// ============================================================
 
 model Position {
-  id            String   @id @default(cuid())
-  symbol        String
-  name          String?
-  buyPrice      Float
-  quantity       Int
-  buyDate       DateTime
-  cycleDays     Int      @default(7)
-  stopLossPct   Float    @default(0.08)
-  takeProfitPct Float    @default(0.15)
-  status        String   @default("ACTIVE")  // ACTIVE, CLOSED, STOPPED
-  sellPrice     Float?
-  sellDate      DateTime?
-  sellReason    String?   // TAKE_PROFIT, STOP_LOSS, EXPIRED, MANUAL
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String    @id @default(cuid())
+  userId       String
+  symbol       String
+  market       String    // A / HK / US
+  side         String    // long / short
+  status       String    // open / closed
+  avgCost      Float     @default(0)
+  quantity     Int       @default(0)
+  currentPrice Float     @default(0)
+  unrealizedPnl Float    @default(0)
+  realizedPnl  Float     @default(0)
+  stopLoss     Float?
+  takeProfit   Float?
+  openedAt     DateTime  @default(now())
+  closedAt     DateTime?
+  notes        String?
+
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lots  PositionLot[]
+
+  @@index([userId])
+  @@index([symbol])
+  @@index([status])
+  @@index([userId, status])
 }
 
-model Alert {
-  id          String   @id @default(cuid())
-  symbol      String
-  targetPrice Float
-  condition   String   // ABOVE, BELOW
-  status      String   @default("ACTIVE") // ACTIVE, TRIGGERED, EXPIRED
-  expiresAt   DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model PositionLot {
+  id          String    @id @default(cuid())
+  positionId  String
+  quantity    Int
+  costPrice   Float
+  openDate    DateTime  @default(now())
+  closeDate   DateTime?
+  closePrice  Float?
+  realizedPnl Float     @default(0)
+
+  position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@index([positionId])
 }
+
+// ============================================================
+// Trading
+// ============================================================
 
 model TradeLog {
   id          String   @id @default(cuid())
+  userId      String
   symbol      String
-  name        String?
-  action      String   // BUY, SELL
+  market      String   // A / HK / US
+  side        String   // buy / sell
+  quantity    Int
   price       Float
-  quantity     Int
-  reason      String?
-  profitPct   Float?
-  createdAt   DateTime @default(now())
+  totalAmount Float    @default(0)
+  commission  Float    @default(0)
+  tradeTime   DateTime @default(now())
+  source      String   @default("manual") // manual / strategy / ai
+  strategyId  String?
+  notes       String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([symbol])
+  @@index([tradeTime])
+  @@index([userId, symbol])
 }
 
-model SignalResult {
+// ============================================================
+// Alerts (merged from daily_stock_analysis + OpenStock)
+// ============================================================
+
+model Alert {
+  id             String    @id @default(cuid())
+  userId         String
+  symbol         String
+  alertType      String    // price_above / price_below / volume / rsi / macd / custom
+  targetValue    Float
+  currentValue   Float?
+  isActive       Boolean   @default(true)
+  isTriggered    Boolean   @default(false)
+  triggeredAt    DateTime?
+  notifyChannels String?   // JSON string: e.g. ["wechat","email"]
+  createdAt      DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([symbol])
+  @@index([isActive])
+  @@index([userId, isActive])
+}
+
+// ============================================================
+// AI Analysis (merged from daily_stock_analysis + TradingAgents-CN)
+// ============================================================
+
+model AnalysisReport {
+  id            String   @id @default(cuid())
+  userId        String
+  symbol        String
+  market        String   // A / HK / US
+  analysisMode  String   // quick / standard / full / debate
+  agentsUsed    String?  // JSON string: e.g. ["warren_buffett","peter_lynch"]
+  summary       String?
+  detail        String?  // JSON string: full analysis detail
+  score         Int      @default(0) // 0-100
+  recommendation String? // strong_buy / buy / hold / sell / strong_sell
+  tokenUsage    Int      @default(0)
+  llmModel      String?
+  durationMs    Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([symbol])
+  @@index([createdAt])
+  @@index([userId, symbol])
+}
+
+model AgentConversation {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?
+  messages  String   // JSON string: array of message objects
+  agentMode String?  // debate / single / multi
+  status    String   @default("active") // active / archived
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model LLMCallLog {
+  id              String   @id @default(cuid())
+  provider        String   // openai / anthropic / deepseek / etc.
+  model           String
+  callType        String?  // chat / completion / embedding
+  promptTokens    Int      @default(0)
+  completionTokens Int     @default(0)
+  totalTokens     Int      @default(0)
+  costUsd         Float    @default(0)
+  latencyMs       Int      @default(0)
+  status          String   // success / error
+  errorMessage    String?
+  agentName       String?
+  sessionId       String?
+  createdAt       DateTime @default(now())
+
+  @@index([provider])
+  @@index([model])
+  @@index([createdAt])
+  @@index([sessionId])
+}
+
+// ============================================================
+// Strategies (from daily_stock_analysis YAML)
+// ============================================================
+
+model Strategy {
   id          String   @id @default(cuid())
-  symbol      String
-  name        String?
-  score       Int
-  signalType  String   // BUY, SELL, HOLD
-  rsi         Float?
-  macdSignal  String?
-  bollingerSignal String?
-  kdjSignal   String?
-  volumeRatio Float?
-  price       Float?
+  name        String
+  description String?
+  type        String   // trend / pattern / volume / event / fundamental / framework
+  config      String   // JSON string: strategy configuration
+  isBuiltin   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdBy   String?
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  backtestResults BacktestResult[]
+
+  @@index([type])
+  @@index([isActive])
+  @@index([createdBy])
+}
+
+// ============================================================
+// Backtest
+// ============================================================
+
+model BacktestResult {
+  id             String   @id @default(cuid())
+  userId         String
+  strategyId     String
+  symbol         String
+  startDate      DateTime
+  endDate        DateTime
+  initialCapital Float    @default(0)
+  finalCapital   Float    @default(0)
+  totalReturn    Float    @default(0)
+  maxDrawdown    Float    @default(0)
+  sharpeRatio    Float    @default(0)
+  winRate        Float    @default(0)
+  totalTrades    Int      @default(0)
+  equityCurve    String?  // JSON string: array of equity data points
+  tradeDetails   String?  // JSON string: array of trade detail objects
+  createdAt      DateTime @default(now())
+
+  strategy Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+
+  @@index([strategyId])
+  @@index([symbol])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// Scheduling (merged from all projects)
+// ============================================================
+
+model ScheduledJob {
+  id          String    @id @default(cuid())
+  name        String
+  cronExpr    String
+  jobType     String    // analysis / market_scan / data_sync / notification / news_fetch / custom
+  config      String?   // JSON string: job configuration
+  isActive    Boolean   @default(true)
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  lastStatus  String?   // success / failed / running
+  lastError   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([jobType])
+  @@index([isActive])
+  @@index([nextRunAt])
+}
+
+// ============================================================
+// Notifications (from daily_stock_analysis)
+// ============================================================
+
+model NotificationLog {
+  id          String    @id @default(cuid())
+  userId      String
+  channel     String    // wechat / feishu / telegram / email / discord / slack / etc.
+  title       String
+  content     String
+  status      String    @default("pending") // pending / sent / failed
+  errorMessage String?
+  relatedType String?   // alert / analysis / trade / etc.
+  relatedId   String?
+  createdAt   DateTime  @default(now())
+  sentAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([channel])
+  @@index([createdAt])
+}
+
+model NotifyChannelConfig {
+  id         String   @id @default(cuid())
+  userId     String
+  channelType String  // wechat / feishu / telegram / email / discord / slack / pushover / ntfy / gotify / pushplus / serverchan / webhook / astrbot
+  config     String  // JSON string: channel-specific configuration
+  isEnabled  Boolean @default(true)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channelType])
+  @@index([userId])
+}
+
+// ============================================================
+// System
+// ============================================================
+
+model SystemConfig {
+  key         String   @id
+  value       String
+  category    String?
+  description String?
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+}
+
+model DataSourceHealth {
+  sourceName          String   @id
+  market              String?  // A / HK / US / GLOBAL
+  status              String   @default("unknown") // healthy / degraded / down / unknown
+  latencyMs           Int      @default(0)
+  lastSuccessAt       DateTime?
+  lastError           String?
+  consecutiveFailures Int      @default(0)
+  updatedAt           DateTime @updatedAt
+
+  @@index([market])
+  @@index([status])
 }
