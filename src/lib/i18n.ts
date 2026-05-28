@@ -737,9 +737,23 @@ const translations: Record<Language, Record<string, string>> = {
   },
 };
 
+const getInitialLanguage = (): Language => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('quantfusion-lang');
+    if (saved === 'en' || saved === 'zh') return saved;
+  }
+  return 'zh';
+};
+
 export const useLanguage = create<LanguageState>((set, get) => ({
-  language: 'en',
-  setLanguage: (lang: Language) => set({ language: lang }),
+  language: getInitialLanguage(),
+  setLanguage: (lang: Language) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('quantfusion-lang', lang);
+      document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    }
+    set({ language: lang });
+  },
   t: (key: string): string => {
     const lang = get().language;
     const dict = translations[lang];
