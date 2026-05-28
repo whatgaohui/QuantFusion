@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getQuote, getQuotes } from '@/lib/data-service/quotes';
+import { getMockQuote, getMockQuotes } from '@/lib/mock-api-data';
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         );
       }
-      const result = await getQuotes(symbolList);
+      const result = getMockQuotes(symbolList);
       return NextResponse.json(result, { status: result.success ? 200 : 502 });
     }
 
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const result = await getQuote(symbol);
+    const result = getMockQuote(symbol);
     return NextResponse.json(result, { status: result.success ? 200 : 404 });
   } catch (error) {
     console.error('Fusion quote API error:', error);

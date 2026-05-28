@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSectors } from '@/lib/data-service/sectors';
+import { getMockSectors } from '@/lib/mock-api-data';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const market = searchParams.get('market') || 'A';
 
-    const result = await getSectors(market);
+    const result = getMockSectors(market);
     return NextResponse.json(result, { status: result.success ? 200 : 502 });
   } catch (error) {
     console.error('Fusion sectors API error:', error);

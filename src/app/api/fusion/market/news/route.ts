@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getNews } from '@/lib/data-service/news';
+import { getMockNews } from '@/lib/mock-api-data';
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     const market = searchParams.get('market') || 'general';
     const count = parseInt(searchParams.get('count') || '20', 10);
 
-    const result = await getNews(market, count);
+    const result = getMockNews(market, count);
     return NextResponse.json(result, { status: result.success ? 200 : 502 });
   } catch (error) {
     console.error('Fusion news API error:', error);

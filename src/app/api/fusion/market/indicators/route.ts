@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getIndicators } from '@/lib/data-service/indicators-api';
+import { getMockIndicators } from '@/lib/mock-api-data';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const result = await getIndicators(symbol);
+    const result = getMockIndicators(symbol);
     return NextResponse.json(result, { status: result.success ? 200 : 404 });
   } catch (error) {
     console.error('Fusion indicators API error:', error);
