@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Sparkles,
   Bell,
+  AlertTriangle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -62,6 +63,16 @@ interface MarketIndex {
   market: string;
 }
 
+interface AlertItem {
+  id: string;
+  symbol: string;
+  alertType: string;
+  targetValue: number;
+  isActive: boolean;
+  isTriggered: boolean;
+  createdAt: string;
+}
+
 interface Trade {
   id: string;
   symbol: string;
@@ -85,12 +96,12 @@ const defaultSummary: PortfolioSummary = {
 };
 
 const defaultIndices: MarketIndex[] = [
-  { symbol: '000001', name: 'SSE Composite', price: 3156.28, change: 12.45, changePercent: 0.40, market: 'A' },
-  { symbol: '399001', name: 'SZSE Component', price: 10245.67, change: 53.21, changePercent: 0.52, market: 'A' },
+  { symbol: 'SH000001', name: 'SSE Composite', price: 3156.28, change: 12.45, changePercent: 0.40, market: 'A' },
+  { symbol: 'SZ399001', name: 'SZSE Component', price: 10245.67, change: 53.21, changePercent: 0.52, market: 'A' },
   { symbol: 'HSI', name: 'Hang Seng', price: 18942.35, change: 154.32, changePercent: 0.82, market: 'HK' },
-  { symbol: '^GSPC', name: 'S&P 500', price: 5248.32, change: 28.45, changePercent: 0.54, market: 'US' },
-  { symbol: '^IXIC', name: 'NASDAQ', price: 16742.39, change: 156.78, changePercent: 0.94, market: 'US' },
-  { symbol: '^DJI', name: 'DOW', price: 39142.23, change: -45.12, changePercent: -0.12, market: 'US' },
+  { symbol: 'AAPL', name: 'Apple Inc.', price: 189.45, change: 1.23, changePercent: 0.65, market: 'US' },
+  { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 142.65, change: 0.89, changePercent: 0.63, market: 'US' },
+  { symbol: 'MSFT', name: 'Microsoft Corp.', price: 388.50, change: 2.15, changePercent: 0.56, market: 'US' },
 ];
 
 const defaultTrades: Trade[] = [
@@ -101,10 +112,10 @@ const defaultTrades: Trade[] = [
   { id: '5', symbol: 'META', name: 'Meta Platforms', side: 'SELL', price: 374.20, quantity: 15, total: 5613.00, timestamp: '2024-01-13T15:45:00Z' },
 ];
 
-const defaultAlerts = [
-  { id: '1', symbol: 'NVDA', message: 'Signal score above 70', type: 'signal', time: '2m ago' },
-  { id: '2', symbol: 'AAPL', message: 'Price target $195 reached', type: 'price', time: '15m ago' },
-  { id: '3', symbol: 'TSLA', message: 'Position cycle expiring in 1d', type: 'position', time: '1h ago' },
+const defaultAlerts: AlertItem[] = [
+  { id: '1', symbol: 'NVDA', alertType: 'price_above', targetValue: 650, isActive: true, isTriggered: false, createdAt: '2024-01-15T10:00:00Z' },
+  { id: '2', symbol: 'AAPL', alertType: 'price_above', targetValue: 195, isActive: true, isTriggered: true, createdAt: '2024-01-14T09:00:00Z' },
+  { id: '3', symbol: 'TSLA', alertType: 'price_below', targetValue: 240, isActive: true, isTriggered: false, createdAt: '2024-01-13T15:00:00Z' },
 ];
 
 const miniSparklineData = [
@@ -121,12 +132,26 @@ function formatPercent(value: number | undefined | null): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
 }
 
+function getAlertTypeLabel(alertType: string): string {
+  switch (alertType) {
+    case 'price_above': return 'price';
+    case 'price_below': return 'price';
+    case 'volume': return 'signal';
+    case 'rsi': return 'signal';
+    case 'macd': return 'signal';
+    default: return 'signal';
+  }
+}
+
 export function DashboardView() {
   const { t } = useLanguage();
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [indices, setIndices] = useState<MarketIndex[] | null>(null);
   const [trades, setTrades] = useState<Trade[] | null>(null);
+  const [alerts, setAlerts] = useState<AlertItem[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const allocationData = [
@@ -137,95 +162,144 @@ export function DashboardView() {
     { name: t('alloc.consumer'), value: 12, color: '#8b5cf6' },
   ];
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+
     try {
-      const [summaryRes, sp500Res, nasdaqRes, dowRes, tradesRes] = await Promise.allSettled([
+      // Fetch indices via fusion batch quote API
+      // A-share indices: SH000001, SZ399001
+      // HK index: HSI
+      // US stocks as proxy for US market (free Finnhub doesn't have index quotes)
+      const indexSymbols = 'SH000001,SZ399001,HSI,AAPL,GOOGL,MSFT';
+
+      const [summaryRes, indicesRes, alertsRes] = await Promise.allSettled([
         fetch('/api/portfolio/summary'),
-        fetch('/api/market/quote?symbol=^GSPC'),
-        fetch('/api/market/quote?symbol=^IXIC'),
-        fetch('/api/market/quote?symbol=^DJI'),
-        fetch('/api/trades'),
+        fetch(`/api/fusion/market/quote?symbols=${indexSymbols}`),
+        fetch('/api/alerts'),
       ]);
 
+      // Process portfolio summary
       if (summaryRes.status === 'fulfilled' && summaryRes.value.ok) {
-        const data = await summaryRes.value.json();
-        setSummary({
-          totalValue: data.totalValue ?? 0,
-          todayPnl: data.todayPnl ?? 0,
-          todayPnlPercent: data.todayPnlPercent ?? data.totalProfitPct ?? 0,
-          totalPnl: data.totalPnl ?? data.totalProfit ?? 0,
-          totalPnlPercent: data.totalPnlPercent ?? 0,
-          activePositions: data.activePositions ?? 0,
-          winRate: data.winRate ?? 0,
-          totalInvested: data.totalInvested ?? data.totalCost ?? 0,
-        });
+        try {
+          const data = await summaryRes.value.json();
+          setSummary({
+            totalValue: data.totalValue ?? 0,
+            todayPnl: data.todayPnl ?? 0,
+            todayPnlPercent: data.todayPnlPercent ?? data.totalProfitPct ?? 0,
+            totalPnl: data.totalPnl ?? data.totalProfit ?? 0,
+            totalPnlPercent: data.totalPnlPercent ?? 0,
+            activePositions: data.activePositions ?? 0,
+            winRate: data.winRate ?? 0,
+            totalInvested: data.totalInvested ?? data.totalCost ?? 0,
+          });
+        } catch {
+          setSummary(defaultSummary);
+        }
       } else {
         setSummary(defaultSummary);
       }
 
-      const indexResults: MarketIndex[] = [];
-      const indexData = [
-        { res: sp500Res, symbol: '^GSPC', name: 'S&P 500', market: 'US' },
-        { res: nasdaqRes, symbol: '^IXIC', name: 'NASDAQ', market: 'US' },
-        { res: dowRes, symbol: '^DJI', name: 'DOW', market: 'US' },
-      ];
-      for (const idx of indexData) {
-        if (idx.res.status === 'fulfilled' && idx.res.value.ok) {
-          try {
-            const data = await idx.res.value.json();
-            indexResults.push({
-              symbol: idx.symbol,
-              name: idx.name,
-              price: data.currentPrice || data.c || 0,
-              change: data.change || data.d || 0,
-              changePercent: data.changePercent || data.dp || 0,
-              market: idx.market,
-            });
-          } catch {
-            const def = defaultIndices.find(d => d.symbol === idx.symbol);
-            if (def) indexResults.push(def);
+      // Process indices from fusion batch quote
+      if (indicesRes.status === 'fulfilled' && indicesRes.value.ok) {
+        try {
+          const result = await indicesRes.value.json();
+          if (result.success && Array.isArray(result.data) && result.data.length > 0) {
+            const indexResults: MarketIndex[] = result.data.map((q: { symbol: string; name: string; currentPrice: number; change: number; changePercent: number; market: string }) => ({
+              symbol: q.symbol,
+              name: q.name || q.symbol,
+              price: q.currentPrice || 0,
+              change: q.change || 0,
+              changePercent: q.changePercent || 0,
+              market: q.market || 'US',
+            }));
+            setIndices(indexResults);
+          } else {
+            setIndices(defaultIndices);
           }
-        } else {
-          const def = defaultIndices.find(d => d.symbol === idx.symbol);
-          if (def) indexResults.push(def);
+        } catch {
+          setIndices(defaultIndices);
+        }
+      } else {
+        setIndices(defaultIndices);
+        if (indicesRes.status === 'rejected') {
+          setError(t('dash.fetchError'));
         }
       }
-      setIndices(indexResults.length > 0 ? indexResults : defaultIndices);
 
-      if (tradesRes.status === 'fulfilled' && tradesRes.value.ok) {
-        const data = await tradesRes.value.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setTrades(data.map((tradeItem: { symbol: string; name: string; action: string; price: number; quantity: number; profitPct?: number; reason?: string; createdAt: string }) => ({
-            id: tradeItem.symbol + tradeItem.createdAt,
-            symbol: tradeItem.symbol,
-            name: tradeItem.name || tradeItem.symbol,
-            side: (tradeItem.action || 'BUY') as 'BUY' | 'SELL',
-            price: tradeItem.price,
-            quantity: tradeItem.quantity,
-            total: tradeItem.price * tradeItem.quantity,
-            timestamp: tradeItem.createdAt,
-          })));
+      // Process alerts
+      if (alertsRes.status === 'fulfilled' && alertsRes.value.ok) {
+        try {
+          const data = await alertsRes.value.json();
+          if (Array.isArray(data) && data.length > 0) {
+            const mappedAlerts: AlertItem[] = data.slice(0, 5).map((a: { id: string; symbol: string; alertType: string; targetValue: number; isActive: boolean; isTriggered: boolean; createdAt: string }) => ({
+              id: a.id,
+              symbol: a.symbol,
+              alertType: a.alertType || 'custom',
+              targetValue: a.targetValue || 0,
+              isActive: a.isActive ?? true,
+              isTriggered: a.isTriggered ?? false,
+              createdAt: a.createdAt || new Date().toISOString(),
+            }));
+            setAlerts(mappedAlerts);
+          } else {
+            setAlerts(defaultAlerts);
+          }
+        } catch {
+          setAlerts(defaultAlerts);
+        }
+      } else {
+        setAlerts(defaultAlerts);
+      }
+
+      // Fetch recent trades (from trade logs)
+      try {
+        const tradesRes = await fetch('/api/portfolio/positions');
+        if (tradesRes.ok) {
+          const data = await tradesRes.json();
+          if (Array.isArray(data) && data.length > 0) {
+            // Map positions as recent trades (open positions represent recent activity)
+            const recentTrades: Trade[] = data.slice(0, 5).map((p: { id: string; symbol: string; market: string; side: string; avgCost: number; quantity: number; openedAt: string }) => ({
+              id: p.id,
+              symbol: p.symbol,
+              name: p.symbol,
+              side: (p.side === 'long' ? 'BUY' : 'SELL') as 'BUY' | 'SELL',
+              price: p.avgCost || 0,
+              quantity: p.quantity || 0,
+              total: (p.avgCost || 0) * (p.quantity || 0),
+              timestamp: p.openedAt || new Date().toISOString(),
+            }));
+            setTrades(recentTrades.length > 0 ? recentTrades : defaultTrades);
+          } else {
+            setTrades(defaultTrades);
+          }
         } else {
           setTrades(defaultTrades);
         }
-      } else {
+      } catch {
         setTrades(defaultTrades);
       }
 
       setLastUpdated(new Date());
     } catch {
+      setError(t('dash.fetchError'));
       setSummary(defaultSummary);
       setIndices(defaultIndices);
       setTrades(defaultTrades);
+      setAlerts(defaultAlerts);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000);
+    const interval = setInterval(() => fetchData(true), 30000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
@@ -286,6 +360,22 @@ export function DashboardView() {
 
   return (
     <div className="space-y-6">
+      {/* Error Banner */}
+      {error && (
+        <div className="flex items-center gap-2 p-3 bg-yellow-600/10 border border-yellow-600/20 rounded-lg">
+          <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+          <p className="text-xs text-yellow-400">{error}</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => fetchData()}
+            className="ml-auto h-6 px-2 text-yellow-400 hover:text-yellow-300 text-xs"
+          >
+            {t('common.retry')}
+          </Button>
+        </div>
+      )}
+
       {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {metricCards.map((card) => {
@@ -331,15 +421,16 @@ export function DashboardView() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={fetchData}
+                onClick={() => fetchData(true)}
+                disabled={refreshing}
                 className="h-7 px-2 text-zinc-400 hover:text-white"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {(indices || defaultIndices).map((index) => (
                 <div
                   key={index.symbol}
@@ -355,7 +446,8 @@ export function DashboardView() {
                         'bg-emerald-600/15 text-emerald-400'
                       }`}
                     >
-                      {index.market}
+                      {index.market === 'A' ? t('dash.marketA') :
+                       index.market === 'HK' ? t('dash.marketHK') : t('dash.marketUS')}
                     </Badge>
                   </div>
                   <p className="text-sm font-bold text-white">{index.price.toLocaleString()}</p>
@@ -502,27 +594,45 @@ export function DashboardView() {
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            {defaultAlerts.map((alert) => (
-              <div key={alert.id} className="flex items-start gap-3 p-2 bg-[#0a0a0f] rounded-lg border border-[#1e1e2e]">
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  alert.type === 'signal' ? 'bg-emerald-600/10' :
-                  alert.type === 'price' ? 'bg-yellow-600/10' :
-                  'bg-purple-600/10'
-                }`}>
-                  {alert.type === 'signal' ? <Zap className="w-3.5 h-3.5 text-emerald-400" /> :
-                   alert.type === 'price' ? <TrendingUp className="w-3.5 h-3.5 text-yellow-400" /> :
-                   <Briefcase className="w-3.5 h-3.5 text-purple-400" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-white">{alert.symbol}</span>
-                    <ChevronRight className="w-3 h-3 text-zinc-600" />
+            {(alerts || defaultAlerts).map((alert) => {
+              const alertType = getAlertTypeLabel(alert.alertType);
+              const timeAgo = (() => {
+                const diff = Date.now() - new Date(alert.createdAt).getTime();
+                const mins = Math.floor(diff / 60000);
+                if (mins < 60) return `${mins}m ago`;
+                const hours = Math.floor(mins / 60);
+                if (hours < 24) return `${hours}h ago`;
+                return `${Math.floor(hours / 24)}d ago`;
+              })();
+              return (
+                <div key={alert.id} className="flex items-start gap-3 p-2 bg-[#0a0a0f] rounded-lg border border-[#1e1e2e]">
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    alertType === 'signal' ? 'bg-emerald-600/10' :
+                    alertType === 'price' ? 'bg-yellow-600/10' :
+                    'bg-purple-600/10'
+                  }`}>
+                    {alertType === 'signal' ? <Zap className="w-3.5 h-3.5 text-emerald-400" /> :
+                     alertType === 'price' ? <TrendingUp className="w-3.5 h-3.5 text-yellow-400" /> :
+                     <Briefcase className="w-3.5 h-3.5 text-purple-400" />}
                   </div>
-                  <p className="text-[11px] text-zinc-400 truncate">{alert.message}</p>
-                  <p className="text-[10px] text-zinc-600">{alert.time}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-white">{alert.symbol}</span>
+                      <ChevronRight className="w-3 h-3 text-zinc-600" />
+                    </div>
+                    <p className="text-[11px] text-zinc-400 truncate">
+                      {alert.alertType === 'price_above' ? `${t('watch.priceGoesAbove')} $${alert.targetValue.toFixed(2)}` :
+                       alert.alertType === 'price_below' ? `${t('watch.priceGoesBelow')} $${alert.targetValue.toFixed(2)}` :
+                       `${alert.alertType}: ${alert.targetValue}`}
+                    </p>
+                    <p className="text-[10px] text-zinc-600">{timeAgo}</p>
+                  </div>
+                  {alert.isTriggered && (
+                    <Badge className="bg-emerald-600/15 text-emerald-400 text-[8px] px-1 py-0">Triggered</Badge>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       </div>

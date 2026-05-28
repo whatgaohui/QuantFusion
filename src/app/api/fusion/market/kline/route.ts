@@ -1,20 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getKline } from '@/lib/data-service';
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const symbol = searchParams.get('symbol') || '';
-  const resolution = searchParams.get('resolution') || 'D';
-  const from = searchParams.get('from') || '';
-  const to = searchParams.get('to') || '';
-  
   try {
-    const params = new URLSearchParams({ symbol, resolution });
-    if (from) params.set('from', from);
-    if (to) params.set('to', to);
-    const res = await fetch(`http://localhost:8080/api/kline?${params.toString()}`);
-    const data = await res.json();
-    return NextResponse.json(data);
-  } catch {
-    return NextResponse.json({ error: 'Failed to fetch kline' }, { status: 502 });
+    const { searchParams } = new URL(request.url);
+    const symbol = searchParams.get('symbol');
+    const period = searchParams.get('period') || 'D';
+    const count = parseInt(searchParams.get('count') || '90', 10);
+
+    if (!symbol) {
+      return NextResponse.json(
+        { success: false, data: null, error: 'Symbol parameter is required' },
+        { status: 400 }
+      );
+    }
+
+    const result = await getKline(symbol, period, count);
+    return NextResponse.json(result, { status: result.success ? 200 : 404 });
+  } catch (error) {
+    console.error('Fusion kline API error:', error);
+    return NextResponse.json(
+      { success: false, data: null, error: 'Failed to fetch kline data' },
+      { status: 500 }
+    );
   }
 }

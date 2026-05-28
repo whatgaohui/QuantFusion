@@ -17,7 +17,15 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useLanguage } from '@/lib/i18n';
 
-function ViewRenderer({ activeView }: { activeView: NavItem }) {
+function ViewRenderer({
+  activeView,
+  onBacktest,
+  backtestStrategy,
+}: {
+  activeView: NavItem;
+  onBacktest: (strategyId: string) => void;
+  backtestStrategy: string;
+}) {
   switch (activeView) {
     case 'dashboard':
       return <DashboardView />;
@@ -32,11 +40,11 @@ function ViewRenderer({ activeView }: { activeView: NavItem }) {
     case 'watchlist':
       return <WatchlistView />;
     case 'strategies':
-      return <StrategyCenterView />;
+      return <StrategyCenterView onBacktest={onBacktest} />;
     case 'news':
       return <MarketNewsView />;
     case 'backtest':
-      return <BacktestView />;
+      return <BacktestView initialStrategy={backtestStrategy} />;
     case 'settings':
       return <SettingsView />;
     default:
@@ -60,7 +68,13 @@ const viewTitleKeys: Record<NavItem, string> = {
 export default function HomePage() {
   const [activeView, setActiveView] = useState<NavItem>('dashboard');
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [backtestStrategy, setBacktestStrategy] = useState('');
   const { t, language } = useLanguage();
+
+  const handleBacktest = (strategyId: string) => {
+    setBacktestStrategy(strategyId);
+    setActiveView('backtest');
+  };
 
   return (
     <div className="min-h-screen flex bg-[#0a0a0f]">
@@ -107,7 +121,7 @@ export default function HomePage() {
 
         {/* View Content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6">
-          <ViewRenderer activeView={activeView} />
+          <ViewRenderer activeView={activeView} onBacktest={handleBacktest} backtestStrategy={backtestStrategy} />
         </div>
 
         {/* Footer */}

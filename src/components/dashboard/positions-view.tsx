@@ -16,6 +16,7 @@ import {
   Activity,
   Layers,
   Timer,
+  AlertTriangle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,6 +50,16 @@ import {
 } from '@/components/ui/collapsible';
 import { useLanguage } from '@/lib/i18n';
 
+interface PositionLot {
+  id: string;
+  quantity: number;
+  costPrice: number;
+  openDate: string;
+  closeDate?: string | null;
+  closePrice?: number | null;
+  realizedPnl: number;
+}
+
 interface Position {
   id: string;
   symbol: string;
@@ -63,7 +74,8 @@ interface Position {
   holdingDays: number;
   remainingDays: number;
   status: 'ACTIVE' | 'CLOSED';
-  lots?: { buyDate: string; qty: number; price: number }[];
+  lots?: PositionLot[];
+  market?: string;
 }
 
 interface PositionSummary {
@@ -74,36 +86,42 @@ interface PositionSummary {
   closedCount: number;
 }
 
+interface RiskMetrics {
+  var95: number;
+  sharpeRatio: number;
+  maxDrawdown: number;
+}
+
 const mockActivePositions: Position[] = [
   {
     id: '1', symbol: 'AAPL', name: 'Apple Inc.', buyPrice: 182.50, currentPrice: 189.45,
     quantity: 50, buyDate: '2024-01-10', cycleDays: 7, pnl: 347.50, pnlPercent: 3.81,
     holdingDays: 4, remainingDays: 3, status: 'ACTIVE',
-    lots: [{ buyDate: '2024-01-10', qty: 30, price: 181.00 }, { buyDate: '2024-01-11', qty: 20, price: 184.75 }],
+    lots: [{ id: 'l1', buyDate: '2024-01-10', qty: 30, price: 181.00, openDate: '2024-01-10', quantity: 30, costPrice: 181.00, realizedPnl: 0 }, { id: 'l2', buyDate: '2024-01-11', qty: 20, price: 184.75, openDate: '2024-01-11', quantity: 20, costPrice: 184.75, realizedPnl: 0 }],
   },
   {
     id: '2', symbol: 'NVDA', name: 'NVIDIA Corp.', buyPrice: 598.30, currentPrice: 615.20,
     quantity: 20, buyDate: '2024-01-12', cycleDays: 7, pnl: 338.00, pnlPercent: 2.82,
     holdingDays: 2, remainingDays: 5, status: 'ACTIVE',
-    lots: [{ buyDate: '2024-01-12', qty: 20, price: 598.30 }],
+    lots: [{ id: 'l3', buyDate: '2024-01-12', qty: 20, price: 598.30, openDate: '2024-01-12', quantity: 20, costPrice: 598.30, realizedPnl: 0 }],
   },
   {
     id: '3', symbol: 'TSLA', name: 'Tesla Inc.', buyPrice: 252.10, currentPrice: 245.80,
     quantity: 30, buyDate: '2024-01-09', cycleDays: 7, pnl: -189.00, pnlPercent: -2.50,
     holdingDays: 5, remainingDays: 2, status: 'ACTIVE',
-    lots: [{ buyDate: '2024-01-09', qty: 30, price: 252.10 }],
+    lots: [{ id: 'l4', buyDate: '2024-01-09', qty: 30, price: 252.10, openDate: '2024-01-09', quantity: 30, costPrice: 252.10, realizedPnl: 0 }],
   },
   {
     id: '4', symbol: 'MSFT', name: 'Microsoft Corp.', buyPrice: 380.20, currentPrice: 388.50,
     quantity: 25, buyDate: '2024-01-13', cycleDays: 7, pnl: 207.50, pnlPercent: 2.18,
     holdingDays: 1, remainingDays: 6, status: 'ACTIVE',
-    lots: [{ buyDate: '2024-01-13', qty: 25, price: 380.20 }],
+    lots: [{ id: 'l5', buyDate: '2024-01-13', qty: 25, price: 380.20, openDate: '2024-01-13', quantity: 25, costPrice: 380.20, realizedPnl: 0 }],
   },
   {
     id: '5', symbol: 'AMZN', name: 'Amazon.com', buyPrice: 175.80, currentPrice: 178.25,
     quantity: 40, buyDate: '2024-01-08', cycleDays: 7, pnl: 98.00, pnlPercent: 1.39,
     holdingDays: 6, remainingDays: 1, status: 'ACTIVE',
-    lots: [{ buyDate: '2024-01-08', qty: 40, price: 175.80 }],
+    lots: [{ id: 'l6', buyDate: '2024-01-08', qty: 40, price: 175.80, openDate: '2024-01-08', quantity: 40, costPrice: 175.80, realizedPnl: 0 }],
   },
 ];
 
@@ -128,9 +146,52 @@ const mockSummary: PositionSummary = {
   closedCount: 2,
 };
 
+const mockRiskMetrics: RiskMetrics = {
+  var95: -2450,
+  sharpeRatio: 1.47,
+  maxDrawdown: -8.3,
+};
+
 function formatCurrency(value: number | undefined | null): string {
   if (value == null || isNaN(value)) return '$0.00';
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+}
+
+function calculateRiskMetrics(positions: Position[]): RiskMetrics {
+  if (positions.length === 0) return mockRiskMetrics;
+
+  const totalValue = positions.reduce((sum, p) => sum + p.currentPrice * p.quantity, 0);
+  const returns = positions.map(p => p.pnlPercent / 100);
+  const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
+  const stdDev = Math.sqrt(variance);
+
+  // VaR 95% (1-day, parametric)
+  const var95 = -(totalValue * 1.65 * stdDev / Math.sqrt(252));
+
+  // Sharpe Ratio (annualized, assuming risk-free rate of 5%)
+  const annualReturn = avgReturn * 252;
+  const annualStdDev = stdDev * Math.sqrt(252);
+  const sharpeRatio = annualStdDev > 0 ? (annualReturn - 0.05) / annualStdDev : 0;
+
+  // Max Drawdown (from positions)
+  const pnlValues = positions.map(p => p.pnl);
+  let peak = 0;
+  let maxDrawdown = 0;
+  let cumulative = 0;
+  for (const pnl of pnlValues) {
+    cumulative += pnl;
+    if (cumulative > peak) peak = cumulative;
+    const drawdown = peak - cumulative;
+    if (drawdown > maxDrawdown) maxDrawdown = drawdown;
+  }
+  const maxDrawdownPercent = totalValue > 0 ? -(maxDrawdown / totalValue) * 100 : 0;
+
+  return {
+    var95: parseFloat(var95.toFixed(0)),
+    sharpeRatio: parseFloat(sharpeRatio.toFixed(2)),
+    maxDrawdown: parseFloat(maxDrawdownPercent.toFixed(1)),
+  };
 }
 
 export function PositionsView() {
@@ -138,33 +199,153 @@ export function PositionsView() {
   const [positions, setPositions] = useState<Position[] | null>(null);
   const [closedPositions, setClosedPositions] = useState<Position[] | null>(null);
   const [summary, setSummary] = useState<PositionSummary | null>(null);
+  const [riskMetrics, setRiskMetrics] = useState<RiskMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [closedOpen, setClosedOpen] = useState(false);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [expandedLotId, setExpandedLotId] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+
     try {
       const [positionsRes, summaryRes] = await Promise.allSettled([
         fetch('/api/portfolio/positions'),
         fetch('/api/portfolio/summary'),
       ]);
 
+      let activePositions: Position[] = [];
+      let closedPositionsList: Position[] = [];
+
       if (positionsRes.status === 'fulfilled' && positionsRes.value.ok) {
         const data = await positionsRes.value.json();
         if (Array.isArray(data) && data.length > 0) {
-          const active = data.filter((p: Position) => p.status === 'ACTIVE');
-          const closed = data.filter((p: Position) => p.status === 'CLOSED');
-          setPositions(active.length > 0 ? active : mockActivePositions);
-          setClosedPositions(closed.length > 0 ? closed : mockClosedPositions);
+          // Map DB positions to our Position interface
+          const allPositions: Position[] = data.map((p: {
+            id: string;
+            symbol: string;
+            market?: string;
+            side?: string;
+            avgCost: number;
+            quantity: number;
+            currentPrice: number;
+            unrealizedPnl: number;
+            realizedPnl: number;
+            openedAt: string;
+            closedAt?: string | null;
+            status: string;
+            lots?: PositionLot[];
+            notes?: string | null;
+          }) => {
+            const cost = p.avgCost * p.quantity;
+            const currentValue = p.currentPrice * p.quantity;
+            const pnl = p.unrealizedPnl || (currentValue - cost);
+            const pnlPercent = cost > 0 ? (pnl / cost) * 100 : 0;
+            const openedAt = new Date(p.openedAt);
+            const now = new Date();
+            const holdingDays = Math.floor((now.getTime() - openedAt.getTime()) / 86400000);
+            const cycleDays = 7; // Default cycle
+            const remainingDays = Math.max(0, cycleDays - holdingDays);
+
+            return {
+              id: p.id,
+              symbol: p.symbol,
+              name: p.symbol,
+              buyPrice: p.avgCost,
+              currentPrice: p.currentPrice || p.avgCost,
+              quantity: p.quantity,
+              buyDate: openedAt.toISOString().split('T')[0],
+              cycleDays,
+              pnl: parseFloat(pnl.toFixed(2)),
+              pnlPercent: parseFloat(pnlPercent.toFixed(2)),
+              holdingDays,
+              remainingDays,
+              status: p.status === 'open' ? 'ACTIVE' as const : 'CLOSED' as const,
+              lots: p.lots || undefined,
+              market: p.market,
+            };
+          });
+
+          activePositions = allPositions.filter(p => p.status === 'ACTIVE');
+          closedPositionsList = allPositions.filter(p => p.status === 'CLOSED');
+
+          setPositions(activePositions.length > 0 ? activePositions : mockActivePositions);
+          setClosedPositions(closedPositionsList.length > 0 ? closedPositionsList : mockClosedPositions);
         } else {
           setPositions(mockActivePositions);
           setClosedPositions(mockClosedPositions);
+          activePositions = mockActivePositions;
         }
       } else {
         setPositions(mockActivePositions);
         setClosedPositions(mockClosedPositions);
+        activePositions = mockActivePositions;
+      }
+
+      // Fetch current prices from fusion API for active positions
+      if (activePositions.length > 0) {
+        try {
+          const symbols = activePositions.map(p => p.symbol).join(',');
+          const quoteRes = await fetch(`/api/fusion/market/quote?symbols=${encodeURIComponent(symbols)}`);
+          if (quoteRes.ok) {
+            const quoteResult = await quoteRes.json();
+            if (quoteResult.success && Array.isArray(quoteResult.data)) {
+              const quoteMap = new Map<string, { currentPrice: number; change: number; changePercent: number }>();
+              for (const q of quoteResult.data) {
+                quoteMap.set(q.symbol, {
+                  currentPrice: q.currentPrice,
+                  change: q.change,
+                  changePercent: q.changePercent,
+                });
+              }
+
+              setPositions(prev => {
+                if (!prev) return prev;
+                return prev.map(pos => {
+                  const quote = quoteMap.get(pos.symbol);
+                  if (quote && quote.currentPrice > 0) {
+                    const cost = pos.buyPrice * pos.quantity;
+                    const currentValue = quote.currentPrice * pos.quantity;
+                    const pnl = currentValue - cost;
+                    const pnlPercent = cost > 0 ? (pnl / cost) * 100 : 0;
+                    return {
+                      ...pos,
+                      currentPrice: quote.currentPrice,
+                      pnl: parseFloat(pnl.toFixed(2)),
+                      pnlPercent: parseFloat(pnlPercent.toFixed(2)),
+                    };
+                  }
+                  return pos;
+                });
+              });
+
+              // Recalculate risk metrics with updated prices
+              const updatedPositions = activePositions.map(pos => {
+                const quote = quoteMap.get(pos.symbol);
+                if (quote && quote.currentPrice > 0) {
+                  const cost = pos.buyPrice * pos.quantity;
+                  const currentValue = quote.currentPrice * pos.quantity;
+                  const pnl = currentValue - cost;
+                  const pnlPercent = cost > 0 ? (pnl / cost) * 100 : 0;
+                  return { ...pos, currentPrice: quote.currentPrice, pnl, pnlPercent };
+                }
+                return pos;
+              });
+              setRiskMetrics(calculateRiskMetrics(updatedPositions));
+            }
+          }
+        } catch {
+          setRiskMetrics(calculateRiskMetrics(activePositions));
+        }
+      } else {
+        setRiskMetrics(mockRiskMetrics);
       }
 
       if (summaryRes.status === 'fulfilled' && summaryRes.value.ok) {
@@ -173,34 +354,41 @@ export function PositionsView() {
           totalInvested: data.totalInvested ?? data.totalCost ?? 0,
           totalPnl: data.totalPnl ?? data.totalProfit ?? 0,
           avgHoldingDays: data.avgHoldingDays ?? 4.2,
-          activeCount: data.activePositions ?? data.activeCount ?? 0,
-          closedCount: data.closedCount ?? 0,
+          activeCount: data.activePositions ?? data.activeCount ?? activePositions.length,
+          closedCount: data.closedCount ?? closedPositionsList.length,
         });
       } else {
         setSummary(mockSummary);
       }
     } catch {
+      setError(t('pos.pricesError'));
       setPositions(mockActivePositions);
       setClosedPositions(mockClosedPositions);
       setSummary(mockSummary);
+      setRiskMetrics(mockRiskMetrics);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000);
+    const interval = setInterval(() => fetchData(true), 30000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
   const handleClosePosition = async (positionId: string) => {
     setClosingId(positionId);
     try {
+      // Find the position to get current price
+      const pos = positions?.find(p => p.id === positionId);
+      const closePrice = pos?.currentPrice || 0;
+
       const res = await fetch('/api/portfolio/positions', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: positionId }),
+        body: JSON.stringify({ id: positionId, closePrice }),
       });
       if (res.ok) {
         setPositions((prev) => prev?.filter((p) => p.id !== positionId) || null);
@@ -228,9 +416,26 @@ export function PositionsView() {
   const totalInvested = summary?.totalInvested || mockSummary.totalInvested;
   const totalPnl = summary?.totalPnl || mockSummary.totalPnl;
   const avgDays = summary?.avgHoldingDays || mockSummary.avgHoldingDays;
+  const currentRisk = riskMetrics || mockRiskMetrics;
 
   return (
     <div className="space-y-6">
+      {/* Error Banner */}
+      {error && (
+        <div className="flex items-center gap-2 p-3 bg-yellow-600/10 border border-yellow-600/20 rounded-lg">
+          <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+          <p className="text-xs text-yellow-400">{error}</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => fetchData()}
+            className="ml-auto h-6 px-2 text-yellow-400 hover:text-yellow-300 text-xs"
+          >
+            {t('common.retry')}
+          </Button>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300">
@@ -284,8 +489,8 @@ export function PositionsView() {
               <Shield className="w-3.5 h-3.5 text-yellow-400" />
               <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('pos.var')}</span>
             </div>
-            <p className="text-lg font-bold text-yellow-400">-$2,450</p>
-            <p className="text-[10px] text-zinc-600">1-day 95% confidence</p>
+            <p className="text-lg font-bold text-yellow-400">{formatCurrency(currentRisk.var95)}</p>
+            <p className="text-[10px] text-zinc-600">{t('pos.confidence95')}</p>
           </CardContent>
         </Card>
         <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
@@ -294,8 +499,10 @@ export function PositionsView() {
               <Activity className="w-3.5 h-3.5 text-emerald-400" />
               <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('pos.sharpe')}</span>
             </div>
-            <p className="text-lg font-bold text-emerald-400">1.47</p>
-            <p className="text-[10px] text-zinc-600">Annualized</p>
+            <p className={`text-lg font-bold ${currentRisk.sharpeRatio >= 1 ? 'text-emerald-400' : currentRisk.sharpeRatio >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>
+              {currentRisk.sharpeRatio.toFixed(2)}
+            </p>
+            <p className="text-[10px] text-zinc-600">{t('pos.annualized')}</p>
           </CardContent>
         </Card>
         <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
@@ -304,8 +511,8 @@ export function PositionsView() {
               <TrendingDown className="w-3.5 h-3.5 text-red-400" />
               <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('pos.maxDrawdown')}</span>
             </div>
-            <p className="text-lg font-bold text-red-400">-8.3%</p>
-            <p className="text-[10px] text-zinc-600">Portfolio level</p>
+            <p className="text-lg font-bold text-red-400">{currentRisk.maxDrawdown.toFixed(1)}%</p>
+            <p className="text-[10px] text-zinc-600">{t('pos.portfolioLevel')}</p>
           </CardContent>
         </Card>
       </div>
@@ -323,10 +530,11 @@ export function PositionsView() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={fetchData}
+              onClick={() => fetchData(true)}
+              disabled={refreshing}
               className="h-7 px-2 text-zinc-400 hover:text-white"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </CardHeader>
@@ -362,8 +570,32 @@ export function PositionsView() {
                                 <Layers className={`w-3 h-3 text-zinc-500 hover:text-emerald-400 transition-colors ${expandedLotId === pos.id ? 'text-emerald-400' : ''}`} />
                               </button>
                             )}
+                            {pos.market && (
+                              <Badge
+                                variant="secondary"
+                                className={`text-[8px] px-1 py-0 ${
+                                  pos.market === 'A' ? 'bg-red-600/15 text-red-400' :
+                                  pos.market === 'HK' ? 'bg-yellow-600/15 text-yellow-400' :
+                                  'bg-emerald-600/15 text-emerald-400'
+                                }`}
+                              >
+                                {pos.market}
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-xs text-zinc-500">{pos.name}</p>
+                          {/* Expanded Lot Detail */}
+                          {expandedLotId === pos.id && pos.lots && pos.lots.length > 1 && (
+                            <div className="mt-2 space-y-1 pl-2 border-l-2 border-emerald-600/20">
+                              {pos.lots.map((lot, idx) => (
+                                <div key={lot.id || idx} className="flex items-center gap-3 text-[10px] text-zinc-400">
+                                  <span>{lot.openDate ? new Date(lot.openDate).toLocaleDateString() : lot.buyDate}</span>
+                                  <span>{lot.quantity || (lot as { qty?: number }).qty} shares</span>
+                                  <span>@ ${(lot.costPrice || (lot as { price?: number }).price || 0).toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-zinc-300">${pos.buyPrice.toFixed(2)}</TableCell>

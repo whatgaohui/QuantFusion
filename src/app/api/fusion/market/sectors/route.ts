@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSectors } from '@/lib/data-service';
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const market = searchParams.get('market') || 'A';
-  
   try {
-    const res = await fetch(`http://localhost:8080/api/sectors?market=${encodeURIComponent(market)}`);
-    const data = await res.json();
-    return NextResponse.json(data);
-  } catch {
-    return NextResponse.json({ error: 'Failed to fetch sectors' }, { status: 502 });
+    const { searchParams } = new URL(request.url);
+    const market = searchParams.get('market') || 'A';
+
+    const result = await getSectors(market);
+    return NextResponse.json(result, { status: result.success ? 200 : 502 });
+  } catch (error) {
+    console.error('Fusion sectors API error:', error);
+    return NextResponse.json(
+      { success: false, data: null, error: 'Failed to fetch sectors data' },
+      { status: 500 }
+    );
   }
 }

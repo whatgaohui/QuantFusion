@@ -12,6 +12,8 @@ import {
   Loader2,
   Zap,
   Brain,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,6 +37,7 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  isOffline?: boolean;
 }
 
 interface ChatSession {
@@ -50,52 +53,276 @@ const suggestedPrompts = [
   { key: 'chat.quickPrompt3', icon: '💎' },
 ];
 
-const mockResponseMap: Record<string, string> = {
-  'chat.quickPrompt1': `## 贵州茅台 (SH600519) 技术分析
+// --- Smart mock response generators ---
 
-**当前价格**: ¥1,856.00
+const stockSymbols = [
+  'AAPL', 'NVDA', 'TSLA', 'MSFT', 'GOOGL', 'AMZN', 'META',
+  '600519', '000858', '601318', '300750', '600036',
+  '00700', '09988', '03690', '01810',
+];
+
+function detectSymbol(msg: string): string | null {
+  const upper = msg.toUpperCase();
+  for (const sym of stockSymbols) {
+    if (upper.includes(sym)) return sym;
+  }
+  // Check for common patterns
+  const shMatch = upper.match(/(SH|SZ)?(\d{6})/);
+  if (shMatch) return shMatch[0];
+  return null;
+}
+
+function isMarketTrendQuery(msg: string): boolean {
+  const keywords = ['市场', '大盘', '走势', '趋势', '行情', '指数', 'market', 'trend', 'index', 'overview', 'outlook'];
+  return keywords.some(k => msg.toLowerCase().includes(k));
+}
+
+function isStrategyQuery(msg: string): boolean {
+  const keywords = ['策略', '推荐', '建议', '选股', '配置', 'strategy', 'recommend', 'suggest', 'portfolio', 'undervalued', '低估值', '高股息'];
+  return keywords.some(k => msg.toLowerCase().includes(k));
+}
+
+function generateStockResponse(sym: string, lang: 'en' | 'zh'): string {
+  const aShareNames: Record<string, string> = {
+    '600519': '贵州茅台', '000858': '五粮液', '601318': '中国平安',
+    '300750': '宁德时代', '600036': '招商银行',
+  };
+  const usNames: Record<string, string> = {
+    'AAPL': 'Apple Inc.', 'NVDA': 'NVIDIA Corp.', 'TSLA': 'Tesla Inc.',
+    'MSFT': 'Microsoft Corp.', 'GOOGL': 'Alphabet Inc.', 'AMZN': 'Amazon.com Inc.',
+    'META': 'Meta Platforms',
+  };
+  const hkNames: Record<string, string> = {
+    '00700': '腾讯控股', '09988': '阿里巴巴', '03690': '美团', '01810': '小米集团',
+  };
+
+  const name = aShareNames[sym] || usNames[sym] || hkNames[sym] || sym;
+  const isAShare = aShareNames[sym];
+  const isHK = hkNames[sym];
+  const price = isAShare ? (1500 + Math.random() * 500).toFixed(2) : (100 + Math.random() * 300).toFixed(2);
+  const change = (Math.random() * 6 - 3).toFixed(2);
+  const rsi = (40 + Math.random() * 30).toFixed(1);
+  const pe = (10 + Math.random() * 40).toFixed(1);
+  const changeSign = parseFloat(change) >= 0 ? '+' : '';
+
+  if (lang === 'zh') {
+    return `## ${name}(${sym}) 分析报告
+
+**当前价格**: ¥${price} (${changeSign}${change}%)
 
 ### 技术指标
-- **MA5 > MA10 > MA20**: 多头排列，短期趋势向上
-- **RSI(14)**: 62.3，处于中性偏多区域
-- **MACD**: DIF线在DEA线上方，红柱扩大
-- **布林带**: 价格位于中轨与上轨之间
+- **RSI(14)**: ${rsi}，${parseFloat(rsi) > 65 ? '接近超买区域' : parseFloat(rsi) < 35 ? '超卖区域' : '中性偏多区域'}
+- **MACD**: ${parseFloat(change) >= 0 ? '红柱扩大，多头动能增强' : '绿柱收敛，空头动能减弱'}
+- **均线系统**: ${parseFloat(change) >= 0 ? 'MA5 > MA10，短期趋势向上' : 'MA5 < MA10，短期承压'}
+- **成交量**: ${Math.random() > 0.5 ? '温和放大，量价配合良好' : '略有萎缩，关注后续放量'}
 
-### 总结
-短期趋势偏多，建议关注 ¥1,880 压力位突破情况。若突破则看 ¥1,920，下方支撑 ¥1,820。`,
-  'chat.quickPrompt2': `## 大盘走势分析
+### 基本面
+- **市盈率**: ${pe}x
+- **行业地位**: ${isAShare ? 'A股龙头企业，品牌护城河深厚' : isHK ? '港股科技龙头，生态体系完善' : '行业标杆企业，创新驱动力强'}
+- **盈利能力**: 毛利率稳定，ROE处于行业前列
+
+### 投资建议
+${parseFloat(change) >= 0 ? '短期趋势偏多，建议关注上方阻力位突破情况，若有效突破可适当加仓。' : '短期面临调整压力，建议观望等待企稳信号，可关注支撑位附近低吸机会。'}风险提示：注意控制仓位，设置止损。
+
+---
+*💡 需要更详细的分析吗？可以切换到"深度"模式获取完整的多智能体分析报告。*`;
+  }
+
+  return `## ${name}(${sym}) Analysis Report
+
+**Current Price**: $${price} (${changeSign}${change}%)
+
+### Technical Indicators
+- **RSI(14)**: ${rsi}, ${parseFloat(rsi) > 65 ? 'approaching overbought territory' : parseFloat(rsi) < 35 ? 'oversold zone' : 'neutral-bullish zone'}
+- **MACD**: ${parseFloat(change) >= 0 ? 'Histogram expanding, bullish momentum increasing' : 'Histogram contracting, bearish momentum fading'}
+- **Moving Averages**: ${parseFloat(change) >= 0 ? 'MA5 > MA10, short-term uptrend intact' : 'MA5 < MA10, short-term pressure'}
+- **Volume**: ${Math.random() > 0.5 ? 'Moderate increase with healthy price-volume confirmation' : 'Slight decrease, watch for follow-through'}
+
+### Fundamentals
+- **P/E Ratio**: ${pe}x
+- **Market Position**: ${isAShare ? 'Leading A-share company with strong brand moat' : isHK ? 'HK tech leader with comprehensive ecosystem' : 'Industry benchmark with strong innovation drive'}
+- **Profitability**: Stable gross margin, ROE at industry-leading levels
+
+### Recommendation
+${parseFloat(change) >= 0 ? 'Short-term trend is bullish. Watch for resistance breakout for potential position addition.' : 'Short-term correction pressure. Wait for stabilization signals; consider accumulating near support.'} Risk notice: Manage position sizing and set stop-loss levels.
+
+---
+*💡 Want a deeper analysis? Switch to "Deep" mode for a full multi-agent analysis report.*`;
+}
+
+function generateMarketResponse(lang: 'en' | 'zh'): string {
+  const shComp = (3100 + Math.random() * 200).toFixed(2);
+  const szComp = (9800 + Math.random() * 800).toFixed(2);
+  const hsi = (17000 + Math.random() * 3000).toFixed(2);
+  const sp500 = (5000 + Math.random() * 500).toFixed(2);
+  const nasdaq = (15000 + Math.random() * 2000).toFixed(2);
+
+  if (lang === 'zh') {
+    return `## 大盘走势分析
 
 ### A股市场
-- **上证指数**: 3,156.28 (+0.35%)
-- **深证成指**: 10,245.67 (+0.52%)
-- 市场整体呈现震荡上行格局
+- **上证指数**: ${shComp} (${Math.random() > 0.5 ? '+' : ''}${(Math.random() * 2 - 0.5).toFixed(2)}%)
+- **深证成指**: ${szComp} (${Math.random() > 0.5 ? '+' : ''}${(Math.random() * 2 - 0.5).toFixed(2)}%)
+- 市场整体呈现震荡${Math.random() > 0.5 ? '上行' : '整理'}格局
+- 成交量${Math.random() > 0.5 ? '温和放大' : '略有萎缩'}，${Math.random() > 0.5 ? '增量资金入场' : '存量博弈特征明显'}
 
 ### 港股市场
-- **恒生指数**: 18,942.35 (+0.82%)
-- 科技股表现活跃，受外围利好带动
+- **恒生指数**: ${hsi} (${Math.random() > 0.5 ? '+' : ''}${(Math.random() * 2 - 0.5).toFixed(2)}%)
+- ${Math.random() > 0.5 ? '科技股表现活跃，受外围利好带动' : '金融板块承压，关注政策面变化'}
 
 ### 美股市场
-- **S&P 500**: 5,248.32 (+0.54%)
-- 科技板块领涨，AI概念持续火热
+- **S&P 500**: ${sp500} (${Math.random() > 0.5 ? '+' : ''}${(Math.random() * 1.5 - 0.3).toFixed(2)}%)
+- **纳斯达克**: ${nasdaq} (${Math.random() > 0.5 ? '+' : ''}${(Math.random() * 2 - 0.5).toFixed(2)}%)
+- ${Math.random() > 0.5 ? '科技板块领涨，AI概念持续火热' : '市场等待经济数据指引，波动率有所上升'}
 
-### 展望
-短期市场情绪偏积极，关注周五非农数据。建议控制仓位，逢低布局优质标的。`,
-  'chat.quickPrompt3': `## 低估值股票推荐
+### 展望与建议
+短期市场情绪${Math.random() > 0.5 ? '偏积极' : '谨慎'}，${Math.random() > 0.5 ? '关注周五非农数据。建议控制仓位，逢低布局优质标的。' : '建议保持防御性配置，关注低估值蓝筹的配置价值。'}
 
-基于 PB/PE/G 估值模型筛选：
+---
+*💡 想了解某只股票的详细分析？直接输入股票代码即可！*`;
+  }
 
-| 代码 | 名称 | PE | PB | 股息率 | 行业 |
-|------|------|-----|-----|--------|------|
-| 601398 | 工商银行 | 5.2 | 0.6 | 5.8% | 银行 |
-| 601288 | 农业银行 | 4.8 | 0.5 | 6.1% | 银行 |
-| 600028 | 中国石化 | 8.3 | 0.8 | 5.2% | 石化 |
-| 601088 | 中国神华 | 7.1 | 1.0 | 6.5% | 煤炭 |
+  return `## Market Trend Overview
 
-### 策略建议
-1. 高股息策略在当前环境下具有防御价值
-2. 关注央企改革主题带来的估值修复机会
-3. 建议分散配置，单一行业不超过30%`,
-};
+### A-Share Market
+- **Shanghai Composite**: ${shComp} (${(Math.random() * 2 - 0.5).toFixed(2)}%)
+- **Shenzhen Component**: ${szComp} (${(Math.random() * 2 - 0.5).toFixed(2)}%)
+- Overall market showing ${Math.random() > 0.5 ? 'upward momentum' : 'consolidation pattern'}
+- Volume ${Math.random() > 0.5 ? 'moderately increasing' : 'slightly declining'}, ${Math.random() > 0.5 ? 'with incremental capital entering' : 'indicative of range-bound trading'}
+
+### Hong Kong Market
+- **Hang Seng Index**: ${hsi} (${(Math.random() * 2 - 0.5).toFixed(2)}%)
+- ${Math.random() > 0.5 ? 'Tech stocks active, supported by positive external cues' : 'Financial sector under pressure, watch for policy developments'}
+
+### US Market
+- **S&P 500**: ${sp500} (${(Math.random() * 1.5 - 0.3).toFixed(2)}%)
+- **NASDAQ**: ${nasdaq} (${(Math.random() * 2 - 0.5).toFixed(2)}%)
+- ${Math.random() > 0.5 ? 'Tech sector leading gains, AI theme remains hot' : 'Market awaiting economic data guidance, volatility rising'}
+
+### Outlook & Strategy
+Short-term market sentiment is ${Math.random() > 0.5 ? 'positive' : 'cautious'}. ${Math.random() > 0.5 ? 'Monitor upcoming economic data. Consider selective positioning in quality names on pullbacks.' : 'Maintain defensive positioning; consider value-oriented allocation in blue-chip stocks.'}
+
+---
+*💡 Want detailed analysis on a specific stock? Just type the ticker symbol!*`;
+}
+
+function generateStrategyResponse(lang: 'en' | 'zh'): string {
+  if (lang === 'zh') {
+    return `## 投资策略推荐
+
+### 1. 高股息防御策略
+- **适用场景**: 震荡市、防御性配置
+- **核心标的**: 工商银行(601398)、农业银行(601288)、中国神华(601088)
+- **预期收益**: 股息率5-6% + 资本增值
+- **风险等级**: 低
+
+### 2. 成长动量策略
+- **适用场景**: 上升行情、趋势明确
+- **核心标的**: 宁德时代(300750)、立讯精密(002475)
+- **预期收益**: 年化15-25%
+- **风险等级**: 中高
+
+### 3. 估值修复策略
+- **适用场景**: 市场底部、政策催化
+- **筛选条件**: PE < 行业均值 & PB < 1
+- **关注行业**: 银行、地产、基建
+- **风险等级**: 中
+
+### 配置建议
+| 策略 | 配置比例 | 持有周期 |
+|------|----------|----------|
+| 高股息 | 40% | 6-12月 |
+| 成长动量 | 35% | 3-6月 |
+| 估值修复 | 25% | 3-9月 |
+
+---
+*💡 对某个策略感兴趣？我可以进一步分析具体标的和入场时机。*`;
+  }
+
+  return `## Investment Strategy Recommendations
+
+### 1. High Dividend Defensive Strategy
+- **Best for**: Range-bound markets, defensive positioning
+- **Core holdings**: JPMorgan (JPM), Visa (V), Procter & Gamble (PG)
+- **Expected return**: 4-5% dividend yield + capital appreciation
+- **Risk level**: Low
+
+### 2. Growth Momentum Strategy
+- **Best for**: Bull markets, clear uptrend
+- **Core holdings**: NVIDIA (NVDA), Apple (AAPL), Microsoft (MSFT)
+- **Expected return**: 15-25% annualized
+- **Risk level**: Medium-High
+
+### 3. Value Recovery Strategy
+- **Best for**: Market bottoms, policy catalysts
+- **Screening criteria**: PE < sector avg & PB < 1
+- **Focus sectors**: Banking, Real Estate, Infrastructure
+- **Risk level**: Medium
+
+### Allocation Recommendation
+| Strategy | Allocation | Holding Period |
+|----------|-----------|----------------|
+| High Dividend | 40% | 6-12 months |
+| Growth Momentum | 35% | 3-6 months |
+| Value Recovery | 25% | 3-9 months |
+
+---
+*💡 Interested in a specific strategy? I can analyze specific entry points and timing in detail.*`;
+}
+
+function generateDefaultResponse(msg: string, lang: 'en' | 'zh'): string {
+  if (lang === 'zh') {
+    return `## 分析结果
+
+感谢您的提问。关于"${msg.slice(0, 30)}"，以下是我的分析：
+
+### 关键要点
+- 当前市场环境需要谨慎应对，建议关注基本面扎实、估值合理的标的
+- 技术面和资金面信号需要综合判断，单一指标不足以作为决策依据
+- 风险管理是投资的首要原则，建议严格控制单笔仓位不超过总资金的10%
+
+### 建议操作
+1. 明确投资目标和风险承受能力
+2. 做好充分的研究和尽职调查
+3. 分批建仓，设置止损位
+4. 定期复盘，及时调整策略
+
+---
+*💡 您可以：
+- 输入股票代码获取详细分析（如：AAPL、600519）
+- 询问市场趋势（如：大盘走势如何）
+- 咨询投资策略（如：推荐低估值股票）*`;
+  }
+
+  return `## Analysis Result
+
+Thank you for your question. Regarding "${msg.slice(0, 30)}", here is my analysis:
+
+### Key Takeaways
+- Current market conditions warrant a cautious approach; focus on fundamentally sound, reasonably valued names
+- Technical and capital flow signals should be assessed holistically; single indicators are insufficient for decision-making
+- Risk management is paramount — limit single position size to no more than 10% of total capital
+
+### Suggested Actions
+1. Define your investment objectives and risk tolerance
+2. Conduct thorough research and due diligence
+3. Scale into positions gradually with stop-loss levels
+4. Review regularly and adjust strategy as needed
+
+---
+*💡 You can:
+- Type a stock symbol for detailed analysis (e.g., AAPL, 600519)
+- Ask about market trends (e.g., How is the market trend?)
+- Inquire about strategies (e.g., Recommend undervalued stocks)*`;
+}
+
+function generateMockResponse(msg: string, lang: 'en' | 'zh'): string {
+  const symbol = detectSymbol(msg);
+  if (symbol) return generateStockResponse(symbol, lang);
+  if (isMarketTrendQuery(msg)) return generateMarketResponse(lang);
+  if (isStrategyQuery(msg)) return generateStrategyResponse(lang);
+  return generateDefaultResponse(msg, lang);
+}
 
 function formatMarkdown(text: string): React.ReactNode[] {
   const lines = text.split('\n');
@@ -110,10 +337,11 @@ function formatMarkdown(text: string): React.ReactNode[] {
     } else if (line.startsWith('- ')) {
       elements.push(<li key={i} className="text-sm text-zinc-300 ml-4 leading-relaxed">{formatInline(line.slice(2))}</li>);
     } else if (line.startsWith('| ')) {
-      // Simple table handling - just render as text
       elements.push(<p key={i} className="text-xs text-zinc-400 font-mono leading-relaxed">{line}</p>);
     } else if (line.startsWith('**') && line.endsWith('**')) {
       elements.push(<p key={i} className="text-sm text-zinc-300 font-semibold mt-1">{line.slice(2, -2)}</p>);
+    } else if (line.startsWith('---')) {
+      elements.push(<Separator key={i} className="bg-[#1e1e2e] my-2" />);
     } else if (line.trim() === '') {
       elements.push(<div key={i} className="h-1" />);
     } else {
@@ -125,7 +353,6 @@ function formatMarkdown(text: string): React.ReactNode[] {
 }
 
 function formatInline(text: string): React.ReactNode {
-  // Simple bold formatting
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
@@ -136,7 +363,7 @@ function formatInline(text: string): React.ReactNode {
 }
 
 export function AgentChatView() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [sessions, setSessions] = useState<ChatSession[]>([
     {
       id: '1',
@@ -150,6 +377,7 @@ export function AgentChatView() {
   const [chatMode, setChatMode] = useState<ChatMode>('quick');
   const [sending, setSending] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
@@ -185,6 +413,7 @@ export function AgentChatView() {
     );
 
     // Try real API first, fallback to mock
+    let usedOffline = false;
     try {
       const res = await fetch('/api/fusion/agent/chat', {
         method: 'POST',
@@ -193,47 +422,45 @@ export function AgentChatView() {
       });
       if (res.ok) {
         const data = await res.json();
-        const assistantMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: data.content || data.message || data.response || 'Analysis complete.',
-          timestamp: new Date().toISOString(),
-        };
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === activeSessionId
-              ? { ...s, messages: [...s.messages, assistantMessage] }
-              : s
-          )
-        );
-        setSending(false);
-        return;
+        const content = data?.data?.content || data?.data?.message || data?.content || data?.message || data?.response;
+        if (content) {
+          const assistantMessage: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: typeof content === 'string' ? content : JSON.stringify(content),
+            timestamp: new Date().toISOString(),
+            isOffline: false,
+          };
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === activeSessionId
+                ? { ...s, messages: [...s.messages, assistantMessage] }
+                : s
+            )
+          );
+          setIsOfflineMode(false);
+          setSending(false);
+          return;
+        }
       }
+      usedOffline = true;
     } catch {
-      // Use mock response
+      usedOffline = true;
     }
 
-    // Mock response
-    await new Promise((resolve) => setTimeout(resolve, 1500 + Math.random() * 1000));
-    const mockContent = mockResponseMap[
-      suggestedPrompts.find(p => t(p.key) === msg)?.key || ''
-    ] || `Based on your query about "${msg}", here is my analysis:
-
-### Key Findings
-- The current market conditions suggest a cautious approach
-- Technical indicators are showing mixed signals
-- Consider monitoring the key support and resistance levels
-
-### Recommendation
-I recommend further research before making any investment decisions. Would you like me to perform a deeper analysis on any specific aspect?`;
+    // Mock response with a small delay for realism
+    await new Promise((resolve) => setTimeout(resolve, 800 + Math.random() * 700));
+    const mockContent = generateMockResponse(msg, language);
 
     const assistantMessage: ChatMessage = {
       id: (Date.now() + 1).toString(),
       role: 'assistant',
       content: mockContent,
       timestamp: new Date().toISOString(),
+      isOffline: true,
     };
 
+    setIsOfflineMode(usedOffline);
     setSessions((prev) =>
       prev.map((s) =>
         s.id === activeSessionId
@@ -242,7 +469,7 @@ I recommend further research before making any investment decisions. Would you l
       )
     );
     setSending(false);
-  }, [inputValue, sending, chatMode, activeSessionId, t]);
+  }, [inputValue, sending, chatMode, activeSessionId, language]);
 
   const handleNewChat = () => {
     const newSession: ChatSession = {
@@ -272,6 +499,18 @@ I recommend further research before making any investment decisions. Would you l
           <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[10px]">
             {t(chatMode === 'quick' ? 'chat.modeQuick' : 'chat.modeDeep')}
           </Badge>
+          {isOfflineMode && (
+            <div className="flex items-center gap-1">
+              <WifiOff className="w-3 h-3 text-yellow-500" />
+              <span className="text-[10px] text-yellow-500">{t('chat.offlineMode')}</span>
+            </div>
+          )}
+          {!isOfflineMode && activeSession && activeSession.messages.some(m => !m.isOffline) && (
+            <div className="flex items-center gap-1">
+              <Wifi className="w-3 h-3 text-emerald-500" />
+              <span className="text-[10px] text-emerald-500">{t('chat.realtimeMode')}</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Select value={chatMode} onValueChange={(v) => setChatMode(v as ChatMode)}>
@@ -372,7 +611,15 @@ I recommend further research before making any investment decisions. Would you l
                       : 'bg-[#0a0a0f] border border-[#1e1e2e]'
                   }`}>
                     {msg.role === 'assistant' ? (
-                      <div className="space-y-0.5">{formatMarkdown(msg.content)}</div>
+                      <div className="space-y-0.5">
+                        {formatMarkdown(msg.content)}
+                        {msg.isOffline && (
+                          <div className="flex items-center gap-1 mt-2 pt-1 border-t border-[#1e1e2e]">
+                            <WifiOff className="w-2.5 h-2.5 text-yellow-500/60" />
+                            <span className="text-[9px] text-yellow-500/60">{t('chat.offlineMode')}</span>
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <p className="text-sm text-white">{msg.content}</p>
                     )}
@@ -396,7 +643,7 @@ I recommend further research before making any investment decisions. Would you l
                     <div className="flex items-center gap-2">
                       <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
                       <span className="text-sm text-zinc-400">
-                        {chatMode === 'deep' ? 'Deep analysis in progress...' : 'Thinking...'}
+                        {t(chatMode === 'deep' ? 'chat.deepThinking' : 'chat.thinking')}
                       </span>
                     </div>
                   </div>

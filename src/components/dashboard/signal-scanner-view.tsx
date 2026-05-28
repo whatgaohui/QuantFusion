@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   Search,
   Radar,
@@ -14,6 +14,10 @@ import {
   Brain,
   Sparkles,
   Globe,
+  AlertTriangle,
+  WifiOff,
+  Wifi,
+  Zap,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,7 +39,11 @@ import {
 } from 'recharts';
 import { useLanguage } from '@/lib/i18n';
 
+// ==================== Types ====================
+
 interface StockQuote {
+  symbol: string;
+  name: string;
   currentPrice: number;
   change: number;
   changePercent: number;
@@ -43,6 +51,8 @@ interface StockQuote {
   low: number;
   open: number;
   prevClose: number;
+  volume: number;
+  market: string;
 }
 
 interface CandleData {
@@ -55,62 +65,83 @@ interface CandleData {
 }
 
 interface TechnicalIndicators {
-  rsi: number;
-  macd: number;
-  macdSignal: number;
-  macdHist: number;
-  bollingerUpper: number;
-  bollingerMiddle: number;
-  bollingerLower: number;
-  kdjK: number;
-  kdjD: number;
-  kdjJ: number;
+  ma: Record<string, number>;
+  rsi: Record<string, number>;
+  macd: { macd: number; signal: number; histogram: number };
+  bollinger: { upper: number; middle: number; lower: number; pricePosition: number };
+  kdj: { k: number; d: number; j: number };
 }
 
-interface SignalResult {
-  symbol: string;
-  score: number;
-  signalType: 'BUY' | 'HOLD' | 'SELL';
-  rsi: number;
-  macdSignal: string;
-  bollingerSignal: string;
-  kdjSignal: string;
-  volumeRatio: number;
-  price: number;
-  macd?: { macd: number; signal: number; histogram: number };
-  bollingerBands?: { upper: number; middle: number; lower: number };
-  kdj?: { k: number; d: number; j: number };
-}
-
-interface SearchResult {
-  symbol: string;
-  description: string;
-  type: string;
-}
-
-interface SentimentResult {
+interface ScanSignal {
   symbol: string;
   name: string;
+  price: number;
+  changePercent: number;
+  signalType: 'BUY' | 'SELL' | 'HOLD';
+  strength: 'strong' | 'medium' | 'weak';
+  indicators: {
+    maCross: 'golden' | 'death' | 'none';
+    rsiSignal: 'overbought' | 'oversold' | 'neutral';
+    macdCross: 'golden' | 'death' | 'none';
+    bollingerBreak: 'upper' | 'lower' | 'none';
+    kdjCross: 'golden' | 'death' | 'none';
+  };
   score: number;
-  label: string;
-  factors: string[];
-  riskLevel: string;
-  shortTermOutlook: string;
-  summary: string;
-  newsCount: number;
-  analyzedAt: string;
+  sector: string;
 }
 
-const popularStocks = [
-  { symbol: 'AAPL', name: 'Apple Inc.' },
-  { symbol: 'NVDA', name: 'NVIDIA Corp.' },
-  { symbol: 'TSLA', name: 'Tesla Inc.' },
-  { symbol: 'MSFT', name: 'Microsoft Corp.' },
-  { symbol: 'AMZN', name: 'Amazon.com' },
-  { symbol: 'META', name: 'Meta Platforms' },
-  { symbol: 'GOOGL', name: 'Alphabet Inc.' },
-  { symbol: 'AMD', name: 'AMD Inc.' },
-];
+interface SectorInfo {
+  name: string;
+  change: number;
+  changePercent: number;
+  leadingStock: string;
+  leadingStockChange: number;
+}
+
+// ==================== Stock lists per market ====================
+
+const MARKET_STOCKS: Record<string, { symbol: string; name: string }[]> = {
+  A: [
+    { symbol: 'SH600519', name: '贵州茅台' },
+    { symbol: 'SH601318', name: '中国平安' },
+    { symbol: 'SH600036', name: '招商银行' },
+    { symbol: 'SZ000858', name: '五粮液' },
+    { symbol: 'SH601398', name: '工商银行' },
+    { symbol: 'SZ300750', name: '宁德时代' },
+    { symbol: 'SH600276', name: '恒瑞医药' },
+    { symbol: 'SH600030', name: '中信证券' },
+    { symbol: 'SZ000333', name: '美的集团' },
+    { symbol: 'SH600900', name: '长江电力' },
+    { symbol: 'SH601899', name: '紫金矿业' },
+    { symbol: 'SZ002475', name: '立讯精密' },
+  ],
+  HK: [
+    { symbol: 'HK00700', name: '腾讯控股' },
+    { symbol: 'HK09988', name: '阿里巴巴' },
+    { symbol: 'HK03690', name: '美团' },
+    { symbol: 'HK00005', name: '汇丰控股' },
+    { symbol: 'HK00941', name: '中国移动' },
+    { symbol: 'HK01299', name: '友邦保险' },
+    { symbol: 'HK01810', name: '小米集团' },
+    { symbol: 'HK09618', name: '京东集团' },
+    { symbol: 'HK09888', name: '百度集团' },
+    { symbol: 'HK02015', name: '理想汽车' },
+  ],
+  US: [
+    { symbol: 'AAPL', name: 'Apple Inc.' },
+    { symbol: 'NVDA', name: 'NVIDIA Corp.' },
+    { symbol: 'TSLA', name: 'Tesla Inc.' },
+    { symbol: 'MSFT', name: 'Microsoft Corp.' },
+    { symbol: 'AMZN', name: 'Amazon.com' },
+    { symbol: 'META', name: 'Meta Platforms' },
+    { symbol: 'GOOGL', name: 'Alphabet Inc.' },
+    { symbol: 'AMD', name: 'AMD Inc.' },
+    { symbol: 'JPM', name: 'JPMorgan Chase' },
+    { symbol: 'V', name: 'Visa Inc.' },
+  ],
+};
+
+// ==================== Helper functions ====================
 
 function getSignalColor(score: number): string {
   if (score >= 50) return '#10b981';
@@ -143,797 +174,930 @@ function translateSignalType(signalType: string, t: (key: string) => string): st
   }
 }
 
+function getStrengthColor(strength: string): string {
+  switch (strength) {
+    case 'strong': return 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20';
+    case 'medium': return 'bg-yellow-600/15 text-yellow-400 border-yellow-600/20';
+    case 'weak': return 'bg-zinc-600/15 text-zinc-400 border-zinc-600/20';
+    default: return 'bg-zinc-600/15 text-zinc-400 border-zinc-600/20';
+  }
+}
+
+function analyzeIndicators(
+  indicators: TechnicalIndicators,
+  currentPrice: number,
+  sector: string,
+  symbol: string,
+  name: string,
+  changePercent: number,
+): ScanSignal {
+  const signals: string[] = [];
+  let buyCount = 0;
+  let sellCount = 0;
+
+  // MA crossover check
+  const ma5 = indicators.ma?.ma5 || 0;
+  const ma20 = indicators.ma?.ma20 || 0;
+  let maCross: 'golden' | 'death' | 'none' = 'none';
+  if (ma5 > 0 && ma20 > 0) {
+    if (ma5 > ma20) {
+      maCross = 'golden';
+      buyCount++;
+      signals.push('ma_golden');
+    } else {
+      maCross = 'death';
+      sellCount++;
+      signals.push('ma_death');
+    }
+  }
+
+  // RSI check
+  const rsi14 = indicators.rsi?.rsi14 || 50;
+  let rsiSignal: 'overbought' | 'oversold' | 'neutral' = 'neutral';
+  if (rsi14 > 70) {
+    rsiSignal = 'overbought';
+    sellCount++;
+    signals.push('rsi_overbought');
+  } else if (rsi14 < 30) {
+    rsiSignal = 'oversold';
+    buyCount++;
+    signals.push('rsi_oversold');
+  }
+
+  // MACD check
+  const macdVal = indicators.macd?.macd || 0;
+  const macdSignalVal = indicators.macd?.signal || 0;
+  const macdHist = indicators.macd?.histogram || 0;
+  let macdCross: 'golden' | 'death' | 'none' = 'none';
+  if (macdHist > 0 && macdVal > macdSignalVal) {
+    macdCross = 'golden';
+    buyCount++;
+    signals.push('macd_golden');
+  } else if (macdHist < 0 && macdVal < macdSignalVal) {
+    macdCross = 'death';
+    sellCount++;
+    signals.push('macd_death');
+  }
+
+  // Bollinger Bands check
+  const bollinger = indicators.bollinger;
+  let bollingerBreak: 'upper' | 'lower' | 'none' = 'none';
+  if (bollinger && bollinger.upper > 0) {
+    if (currentPrice > bollinger.upper) {
+      bollingerBreak = 'upper';
+      sellCount++;
+      signals.push('bollinger_upper');
+    } else if (currentPrice < bollinger.lower) {
+      bollingerBreak = 'lower';
+      buyCount++;
+      signals.push('bollinger_lower');
+    }
+  }
+
+  // KDJ check
+  const kdj = indicators.kdj;
+  let kdjCross: 'golden' | 'death' | 'none' = 'none';
+  if (kdj && kdj.k > 0) {
+    if (kdj.k > kdj.d && kdj.j > kdj.k) {
+      kdjCross = 'golden';
+      buyCount++;
+      signals.push('kdj_golden');
+    } else if (kdj.k < kdj.d && kdj.j < kdj.k) {
+      kdjCross = 'death';
+      sellCount++;
+      signals.push('kdj_death');
+    }
+  }
+
+  // Determine signal type
+  let signalType: 'BUY' | 'SELL' | 'HOLD';
+  if (buyCount >= 3) signalType = 'BUY';
+  else if (sellCount >= 3) signalType = 'SELL';
+  else if (buyCount > sellCount) signalType = 'BUY';
+  else if (sellCount > buyCount) signalType = 'SELL';
+  else signalType = 'HOLD';
+
+  // Calculate score (0-100)
+  const totalSignals = buyCount + sellCount;
+  const dominantCount = signalType === 'BUY' ? buyCount : signalType === 'SELL' ? sellCount : 0;
+  const baseScore = signalType === 'HOLD' ? 30 : (dominantCount / Math.max(totalSignals, 1)) * 70 + 30;
+
+  // Determine strength
+  let strength: 'strong' | 'medium' | 'weak';
+  if (dominantCount >= 4) strength = 'strong';
+  else if (dominantCount >= 2) strength = 'medium';
+  else strength = 'weak';
+
+  return {
+    symbol,
+    name,
+    price: currentPrice,
+    changePercent,
+    signalType,
+    strength,
+    indicators: {
+      maCross,
+      rsiSignal,
+      macdCross,
+      bollingerBreak,
+      kdjCross,
+    },
+    score: Math.round(baseScore),
+    sector,
+  };
+}
+
+// ==================== Component ====================
+
 export function SignalScannerView() {
   const { t, language } = useLanguage();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSymbol, setSelectedSymbol] = useState('AAPL');
-  const [selectedName, setSelectedName] = useState('Apple Inc.');
-  const [quote, setQuote] = useState<StockQuote | null>(null);
-  const [candleData, setCandleData] = useState<CandleData[]>([]);
-  const [indicators, setIndicators] = useState<TechnicalIndicators | null>(null);
-  const [signalResult, setSignalResult] = useState<SignalResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [scanning, setScanning] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [scanScores, setScanScores] = useState<Record<string, { score: number; signalType: string; price: number }>>({});
-  const [sentiment, setSentiment] = useState<SentimentResult | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
   const [market, setMarket] = useState<'A' | 'HK' | 'US'>('US');
-  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanPhase, setScanPhase] = useState<string>('');
+  const [sectors, setSectors] = useState<SectorInfo[]>([]);
+  const [signals, setSignals] = useState<ScanSignal[]>([]);
+  const [selectedSignal, setSelectedSignal] = useState<ScanSignal | null>(null);
+  const [quote, setQuote] = useState<StockQuote | null>(null);
+  const [indicators, setIndicators] = useState<TechnicalIndicators | null>(null);
+  const [candleData, setCandleData] = useState<CandleData[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
+  const abortRef = useRef<boolean>(false);
 
-  const fetchStockData = useCallback(async (symbol: string) => {
-    setLoading(true);
+  // Fetch sector data for selected market
+  const fetchSectors = useCallback(async (m: string): Promise<SectorInfo[]> => {
     try {
-      const [quoteRes, candleRes] = await Promise.allSettled([
-        fetch(`/api/market/quote?symbol=${symbol}`),
-        fetch(`/api/market/candle?symbol=${symbol}&resolution=D&from=${Math.floor(Date.now() / 1000) - 90 * 86400}&to=${Math.floor(Date.now() / 1000)}`),
-      ]);
-
-      if (quoteRes.status === 'fulfilled' && quoteRes.value.ok) {
-        const data = await quoteRes.value.json();
-        setQuote(data);
-      } else {
-        setQuote(null);
+      const res = await fetch(`/api/fusion/market/sectors?market=${m}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.data) {
+          setIsOffline(false);
+          return data.data;
+        }
       }
+      return [];
+    } catch {
+      return [];
+    }
+  }, []);
 
-      if (candleRes.status === 'fulfilled' && candleRes.value.ok) {
-        const data = await candleRes.value.json();
-        if (data.c && data.c.length > 0) {
+  // Fetch batch quotes for symbols
+  const fetchBatchQuotes = useCallback(async (symbols: string[]): Promise<StockQuote[]> => {
+    try {
+      const res = await fetch(`/api/fusion/market/quote?symbols=${symbols.join(',')}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.data) {
+          return Array.isArray(data.data) ? data.data : [data.data];
+        }
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  // Fetch indicators for a single symbol
+  const fetchIndicators = useCallback(async (symbol: string): Promise<TechnicalIndicators | null> => {
+    try {
+      const res = await fetch(`/api/fusion/market/indicators?symbol=${symbol}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.data) {
+          return data.data;
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Fetch kline data for chart
+  const fetchKline = useCallback(async (symbol: string) => {
+    try {
+      const res = await fetch(`/api/fusion/market/kline?symbol=${symbol}&period=daily&count=90`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.data && data.data.c && data.data.c.length > 0) {
           const locale = language === 'zh' ? 'zh-CN' : 'en-US';
-          const formatted: CandleData[] = data.c.map((c: number, i: number) => ({
-            time: new Date(data.t[i] * 1000).toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
-            open: data.o[i],
-            high: data.h[i],
-            low: data.l[i],
+          const formatted: CandleData[] = data.data.c.map((c: number, i: number) => ({
+            time: new Date(data.data.t[i] * 1000).toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
+            open: data.data.o[i],
+            high: data.data.h[i],
+            low: data.data.l[i],
             close: c,
-            volume: data.v[i],
+            volume: data.data.v[i],
           }));
           setCandleData(formatted);
         } else {
           setCandleData([]);
         }
-      } else {
-        setCandleData([]);
-      }
-
-      // Auto-scan on select
-      const scanRes = await fetch(`/api/signals/scan?symbol=${symbol}`);
-      if (scanRes.ok) {
-        const scanData = await scanRes.json();
-        setSignalResult(scanData);
-        setIndicators({
-          rsi: scanData.rsi || 50,
-          macd: scanData.macd?.macd || 0,
-          macdSignal: scanData.macd?.signal || 0,
-          macdHist: scanData.macd?.histogram || 0,
-          bollingerUpper: scanData.bollingerBands?.upper || 0,
-          bollingerMiddle: scanData.bollingerBands?.middle || 0,
-          bollingerLower: scanData.bollingerBands?.lower || 0,
-          kdjK: scanData.kdj?.k || 50,
-          kdjD: scanData.kdj?.d || 50,
-          kdjJ: scanData.kdj?.j || 50,
-        });
-        setScanScores(prev => ({
-          ...prev,
-          [symbol]: { score: scanData.score, signalType: scanData.signalType, price: scanData.price },
-        }));
       }
     } catch {
       setCandleData([]);
-      setIndicators(null);
-    } finally {
-      setLoading(false);
     }
   }, [language]);
 
-  useEffect(() => {
-    if (selectedSymbol) {
-      fetchStockData(selectedSymbol);
-    }
-  }, [selectedSymbol, fetchStockData]);
-
-  // Quick scan popular stocks
-  useEffect(() => {
-    const quickScan = async () => {
-      for (const stock of popularStocks) {
-        try {
-          const res = await fetch(`/api/signals/scan?symbol=${stock.symbol}`);
-          if (res.ok) {
-            const data = await res.json();
-            setScanScores(prev => ({
-              ...prev,
-              [stock.symbol]: { score: data.score, signalType: data.signalType, price: data.price },
-            }));
-          }
-        } catch {
-          // Skip
-        }
-      }
-    };
-    quickScan();
-  }, []);
-
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-
-    if (query.length < 1) {
-      setSearchResults([]);
-      return;
-    }
-
-    setSearching(true);
-    searchTimeout.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/market/search?q=${query}`);
-        if (res.ok) {
-          const data = await res.json();
-          setSearchResults(Array.isArray(data) ? data.slice(0, 10) : []);
-        }
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
-  };
-
-  const handleSelectStock = (symbol: string, name: string) => {
-    setSelectedSymbol(symbol);
-    setSelectedName(name);
-    setSearchQuery('');
-    setSearchResults([]);
-  };
-
-  const handleRescan = async () => {
-    if (!selectedSymbol) return;
+  // Main scan function
+  const handleScan = useCallback(async () => {
+    if (scanning) return;
+    abortRef.current = false;
     setScanning(true);
+    setScanError(null);
+    setSignals([]);
+    setSelectedSignal(null);
+
     try {
-      const res = await fetch(`/api/signals/scan?symbol=${selectedSymbol}&name=${encodeURIComponent(selectedName)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setSignalResult(data);
-        setIndicators({
-          rsi: data.rsi || 50,
-          macd: data.macd?.macd || 0,
-          macdSignal: data.macd?.signal || 0,
-          macdHist: data.macd?.histogram || 0,
-          bollingerUpper: data.bollingerBands?.upper || 0,
-          bollingerMiddle: data.bollingerBands?.middle || 0,
-          bollingerLower: data.bollingerBands?.lower || 0,
-          kdjK: data.kdj?.k || 50,
-          kdjD: data.kdj?.d || 50,
-          kdjJ: data.kdj?.j || 50,
-        });
-        setScanScores(prev => ({
-          ...prev,
-          [selectedSymbol]: { score: data.score, signalType: data.signalType, price: data.price },
-        }));
+      // Phase 1: Fetch sectors
+      setScanPhase(t('scanner.scanningSectors'));
+      const sectorData = await fetchSectors(market);
+      setSectors(sectorData);
+
+      if (abortRef.current) return;
+
+      // Phase 2: Get stocks for this market and fetch quotes
+      setScanPhase(t('scanner.analyzingStocks'));
+      const stockList = MARKET_STOCKS[market] || [];
+      const symbols = stockList.map(s => s.symbol);
+      const quotes = await fetchBatchQuotes(symbols);
+
+      if (abortRef.current) return;
+
+      // Phase 3: Fetch indicators for each stock and generate signals
+      setScanPhase(t('scanner.generatingSignals'));
+      const generatedSignals: ScanSignal[] = [];
+
+      for (const stock of stockList) {
+        if (abortRef.current) return;
+
+        const quoteData = quotes.find(q => q.symbol === stock.symbol);
+        const currentPrice = quoteData?.currentPrice || 0;
+        const changePercent = quoteData?.changePercent || 0;
+        const stockName = quoteData?.name || stock.name;
+
+        // Find which sector this stock belongs to
+        const stockSector = sectorData.length > 0
+          ? sectorData.reduce((best, s) => {
+              if (s.leadingStock === stockName || s.leadingStock === stock.symbol) return s.name;
+              return best;
+            }, sectorData[0]?.name || market)
+          : market;
+
+        // Try to fetch indicators
+        const indicatorData = await fetchIndicators(stock.symbol);
+
+        if (indicatorData && currentPrice > 0) {
+          const signal = analyzeIndicators(indicatorData, currentPrice, stockSector, stock.symbol, stockName, changePercent);
+          generatedSignals.push(signal);
+        } else if (currentPrice > 0) {
+          // Fallback: generate mock indicators-based signal
+          const mockSignal: ScanSignal = {
+            symbol: stock.symbol,
+            name: stockName,
+            price: currentPrice,
+            changePercent,
+            signalType: changePercent > 1 ? 'BUY' : changePercent < -1 ? 'SELL' : 'HOLD',
+            strength: Math.abs(changePercent) > 3 ? 'strong' : Math.abs(changePercent) > 1.5 ? 'medium' : 'weak',
+            indicators: {
+              maCross: changePercent > 1 ? 'golden' : changePercent < -1 ? 'death' : 'none',
+              rsiSignal: changePercent > 2 ? 'overbought' : changePercent < -2 ? 'oversold' : 'neutral',
+              macdCross: changePercent > 0.5 ? 'golden' : changePercent < -0.5 ? 'death' : 'none',
+              bollingerBreak: 'none',
+              kdjCross: 'none',
+            },
+            score: Math.round(50 + changePercent * 5),
+            sector: stockSector,
+          };
+          generatedSignals.push(mockSignal);
+        }
+      }
+
+      // Sort signals by score (best first)
+      generatedSignals.sort((a, b) => {
+        const aScore = a.signalType === 'BUY' ? a.score : a.signalType === 'SELL' ? 100 - a.score : 30;
+        const bScore = b.signalType === 'BUY' ? b.score : b.signalType === 'SELL' ? 100 - b.score : 30;
+        return bScore - aScore;
+      });
+
+      setSignals(generatedSignals);
+      if (generatedSignals.length > 0) {
+        setSelectedSignal(generatedSignals[0]);
+        // Fetch detail for first signal
+        loadSignalDetail(generatedSignals[0]);
       }
     } catch {
-      // Handle error
+      setScanError(t('scanner.scanError'));
+      setIsOffline(true);
     } finally {
       setScanning(false);
+      setScanPhase('');
     }
-  };
+  }, [market, scanning, fetchSectors, fetchBatchQuotes, fetchIndicators, t]);
 
-  const handleAnalyzeSentiment = async () => {
-    if (!selectedSymbol) return;
-    setAnalyzing(true);
-    setSentiment(null);
+  // Load detail for a selected signal
+  const loadSignalDetail = useCallback(async (signal: ScanSignal) => {
+    setLoading(true);
+    setSelectedSignal(signal);
     try {
-      const res = await fetch(`/api/ai/sentiment?symbol=${selectedSymbol}&name=${encodeURIComponent(selectedName)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setSentiment(data);
+      const [quoteRes] = await Promise.allSettled([
+        fetch(`/api/fusion/market/quote?symbol=${signal.symbol}`),
+      ]);
+
+      if (quoteRes.status === 'fulfilled' && quoteRes.value.ok) {
+        const data = await quoteRes.value.json();
+        if (data.success && data.data) {
+          setQuote(data.data);
+        }
+      }
+
+      // Fetch kline for chart
+      await fetchKline(signal.symbol);
+
+      // Fetch fresh indicators
+      const indData = await fetchIndicators(signal.symbol);
+      if (indData) {
+        setIndicators(indData);
       }
     } catch {
-      // Handle error
+      // Keep existing data
     } finally {
-      setAnalyzing(false);
+      setLoading(false);
     }
-  };
+  }, [fetchKline, fetchIndicators]);
 
-  const currentPrice = quote?.currentPrice || signalResult?.price || 0;
+  const currentPrice = quote?.currentPrice || selectedSignal?.price || 0;
   const priceChange = quote?.change || 0;
-  const priceChangePercent = quote?.changePercent || 0;
+  const priceChangePercent = quote?.changePercent || selectedSignal?.changePercent || 0;
 
   return (
     <div className="space-y-6">
-      {/* Search Bar */}
+      {/* Scan Controls */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-          <Input
-            placeholder={t('scanner.searchPlaceholder')}
-            value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="pl-9 bg-[#111118] border-[#1e1e2e] text-white placeholder:text-zinc-500 focus:border-emerald-600/50"
-          />
-          {searching && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
-            </div>
-          )}
-          {searchQuery && searchResults.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-[#111118] border border-[#1e1e2e] rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto custom-scrollbar">
-              {searchResults.map((stock) => (
-                <button
-                  key={stock.symbol}
-                  onClick={() => handleSelectStock(stock.symbol, stock.description)}
-                  className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a2e] transition-colors text-left"
-                >
-                  <div>
-                    <span className="text-sm font-medium text-white">{stock.symbol}</span>
-                    <span className="text-xs text-zinc-500 ml-2">{stock.description}</span>
-                  </div>
-                  <span className="text-xs text-zinc-600">{stock.type}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
         <div className="flex items-center gap-1 bg-[#111118] border border-[#1e1e2e] rounded-lg p-1">
           {(['US', 'HK', 'A'] as const).map((m) => (
             <button
               key={m}
-              onClick={() => setMarket(m)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+              onClick={() => { setMarket(m); setSignals([]); setSelectedSignal(null); }}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
                 market === m
                   ? 'bg-emerald-600/20 text-emerald-400'
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
+              <Globe className="w-3 h-3" />
               {t(`scanner.market${m}`)}
             </button>
           ))}
         </div>
         <Button
-          onClick={handleRescan}
-          disabled={scanning || !selectedSymbol}
+          onClick={handleScan}
+          disabled={scanning}
           className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
         >
-          <Radar className="w-4 h-4" />
-          {scanning ? t('scanner.scanning') : t('scanner.rescan')}
+          {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Radar className="w-4 h-4" />}
+          {scanning ? scanPhase : t('scanner.scanMarket')}
         </Button>
+        {isOffline && (
+          <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-xs flex items-center gap-1 self-center">
+            <WifiOff className="w-3 h-3" />
+            {t('scanner.scanError')}
+          </Badge>
+        )}
       </div>
 
-      {/* Selected Stock Detail */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Price + Chart */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Price Header */}
-          <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-xl font-bold text-white">{selectedSymbol}</h3>
-                    <span className="text-sm text-zinc-400">{selectedName}</span>
-                  </div>
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-3xl font-bold text-white">
-                      ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                    <div className={`flex items-center gap-1 ${priceChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {priceChange >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                      <span className="text-sm font-medium">
-                        {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)} ({priceChangePercent >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%)
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                {signalResult && (
-                  <div className="flex items-center gap-2">
-                    <Badge className={`${getRecommendationColor(signalResult.signalType)} border text-xs flex items-center gap-1`}>
-                      {getRecommendationIcon(signalResult.signalType)}
-                      {translateSignalType(signalResult.signalType, t)}
-                    </Badge>
-                  </div>
-                )}
+      {/* Scanning progress */}
+      {scanning && (
+        <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full border-2 border-emerald-600 border-t-transparent animate-spin" />
+              <div>
+                <p className="text-emerald-400 text-sm font-medium">{scanPhase}</p>
+                <p className="text-zinc-500 text-xs">{t('scanner.analyzingStocks')}</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-              {/* Price stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-[#1e1e2e]">
-                <div>
-                  <span className="text-xs text-zinc-500">{t('scanner.open')}</span>
-                  <p className="text-sm font-medium text-zinc-300">${(quote?.open || currentPrice).toFixed(2)}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-zinc-500">{t('scanner.high')}</span>
-                  <p className="text-sm font-medium text-zinc-300">${(quote?.high || currentPrice).toFixed(2)}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-zinc-500">{t('scanner.low')}</span>
-                  <p className="text-sm font-medium text-zinc-300">${(quote?.low || currentPrice).toFixed(2)}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-zinc-500">{t('scanner.prevClose')}</span>
-                  <p className="text-sm font-medium text-zinc-300">${(quote?.prevClose || currentPrice).toFixed(2)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Price Chart */}
-          <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-semibold text-white">{t('scanner.priceChart')}</CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => fetchStockData(selectedSymbol)}
-                  className="h-7 px-2 text-zinc-400 hover:text-white"
+      {/* Hot Sectors */}
+      {sectors.length > 0 && (
+        <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-white">{t('scanner.hotSectors')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {sectors.slice(0, 8).map((sector, i) => (
+                <Badge
+                  key={i}
+                  className={`text-xs border ${
+                    sector.changePercent > 0
+                      ? 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20'
+                      : sector.changePercent < 0
+                      ? 'bg-red-600/15 text-red-400 border-red-600/20'
+                      : 'bg-zinc-600/15 text-zinc-400 border-zinc-600/20'
+                  }`}
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-64 w-full bg-[#0a0a0f] rounded-lg" />
-              ) : candleData.length > 0 ? (
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={candleData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
-                      <XAxis
-                        dataKey="time"
-                        stroke="#71717a"
-                        tick={{ fontSize: 10 }}
-                        tickLine={false}
-                        axisLine={{ stroke: '#1e1e2e' }}
-                        interval={14}
-                      />
-                      <YAxis
-                        stroke="#71717a"
-                        tick={{ fontSize: 10 }}
-                        tickLine={false}
-                        axisLine={{ stroke: '#1e1e2e' }}
-                        domain={['auto', 'auto']}
-                        yAxisId="price"
-                      />
-                      <YAxis
-                        stroke="#71717a"
-                        tick={{ fontSize: 10 }}
-                        tickLine={false}
-                        axisLine={{ stroke: '#1e1e2e' }}
-                        orientation="right"
-                        yAxisId="volume"
-                        tickFormatter={(v: number) => `${(v / 1000000).toFixed(0)}M`}
-                      />
-                      <RechartsTooltip
-                        contentStyle={{
-                          backgroundColor: '#1a1a2e',
-                          border: '1px solid #2e2e3e',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                        }}
-                        itemStyle={{ color: '#e4e4e7' }}
-                      />
-                      <Bar
-                        dataKey="volume"
-                        fill="#1e1e2e"
-                        opacity={0.3}
-                        yAxisId="volume"
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="close"
-                        stroke="#10b981"
-                        strokeWidth={2}
-                        dot={false}
-                        activeDot={{ r: 4, fill: '#10b981' }}
-                        yAxisId="price"
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="high"
-                        stroke="#22c55e"
-                        strokeWidth={0.5}
-                        dot={false}
-                        strokeDasharray="3 3"
-                        yAxisId="price"
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="low"
-                        stroke="#ef4444"
-                        strokeWidth={0.5}
-                        dot={false}
-                        strokeDasharray="3 3"
-                        yAxisId="price"
-                      />
-                      {indicators && indicators.bollingerMiddle > 0 && (
-                        <ReferenceLine
-                          y={indicators.bollingerMiddle}
-                          stroke="#f59e0b"
-                          strokeDasharray="5 5"
-                          strokeWidth={1}
-                          yAxisId="price"
-                        />
-                      )}
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="h-64 flex items-center justify-center">
-                  <p className="text-zinc-500 text-sm">{t('scanner.noChartData')}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                  {sector.name}
+                  <span className="ml-1">{sector.changePercent >= 0 ? '+' : ''}{sector.changePercent.toFixed(2)}%</span>
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Right Panel - Signal & Indicators */}
-        <div className="space-y-4">
-          {/* Signal Score */}
-          <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-white">{t('scanner.signalScore')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col items-center">
-                <div className="relative w-32 h-32">
-                  <svg className="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#1e1e2e" strokeWidth="8" />
-                    <circle
-                      cx="60" cy="60" r="50" fill="none"
-                      stroke={getSignalColor(signalResult?.score || 0)}
-                      strokeWidth="8"
-                      strokeLinecap="round"
-                      strokeDasharray={`${((signalResult?.score || 0) / 100) * 314} 314`}
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-3xl font-bold" style={{ color: getSignalColor(signalResult?.score || 0) }}>
-                      {signalResult?.score ?? '—'}
-                    </span>
-                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('scanner.score')}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-center gap-4 text-xs">
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-red-500" />
-                  <span className="text-zinc-500">&lt;20</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                  <span className="text-zinc-500">20-49</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="text-zinc-500">{t('scanner.buySignal')}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Technical Indicators */}
-          <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-white">{t('scanner.techIndicators')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {loading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3, 4].map((i) => (
-                    <Skeleton key={i} className="h-12 w-full bg-[#0a0a0f] rounded" />
-                  ))}
-                </div>
-              ) : (
-                <>
-                  {/* RSI */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-400">{t('scanner.rsi14')}</span>
-                      <span className={`text-xs font-medium ${
-                        (indicators?.rsi || 50) > 70 ? 'text-red-400' : (indicators?.rsi || 50) < 30 ? 'text-emerald-400' : 'text-zinc-300'
-                      }`}>
-                        {(indicators?.rsi || 50).toFixed(1)}
-                      </span>
-                    </div>
-                    <Progress value={indicators?.rsi || 50} className="h-1.5 bg-[#1e1e2e]" />
-                    <div className="flex justify-between text-[10px] text-zinc-600">
-                      <span>{t('scanner.oversold')}</span>
-                      <span>{t('scanner.neutral')}</span>
-                      <span>{t('scanner.overbought')}</span>
-                    </div>
-                  </div>
-
-                  <Separator className="bg-[#1e1e2e]" />
-
-                  {/* MACD */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-400">{t('scanner.macd')}</span>
-                      <span className={`text-xs font-medium ${
-                        (indicators?.macdHist || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'
-                      }`}>
-                        {(indicators?.macd || 0).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-[10px]">
-                      <div>
-                        <span className="text-zinc-500">{t('scanner.signal')}: </span>
-                        <span className="text-zinc-300">{(indicators?.macdSignal || 0).toFixed(2)}</span>
-                      </div>
-                      <div>
-                        <span className="text-zinc-500">{t('scanner.hist')}: </span>
-                        <span className={(indicators?.macdHist || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                          {(indicators?.macdHist || 0).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                    {signalResult?.macdSignal && (
-                      <Badge className={`text-[10px] px-1.5 py-0 ${
-                        signalResult.macdSignal === 'GOLDEN_CROSS' || signalResult.macdSignal === 'BULLISH'
-                          ? 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20'
-                          : signalResult.macdSignal === 'DEATH_CROSS' || signalResult.macdSignal === 'BEARISH'
-                          ? 'bg-red-600/15 text-red-400 border-red-600/20'
-                          : 'bg-zinc-600/15 text-zinc-400 border-zinc-600/20'
-                      }`}>
-                        {signalResult.macdSignal.replace(/_/g, ' ')}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <Separator className="bg-[#1e1e2e]" />
-
-                  {/* Bollinger */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-400">{t('scanner.bollingerBands')}</span>
-                    </div>
-                    <div className="space-y-1 text-[10px]">
-                      <div className="flex justify-between">
-                        <span className="text-zinc-500">{t('scanner.upper')}</span>
-                        <span className="text-red-400">${(indicators?.bollingerUpper || 0).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-zinc-500">{t('scanner.middle')}</span>
-                        <span className="text-yellow-400">${(indicators?.bollingerMiddle || 0).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-zinc-500">{t('scanner.lower')}</span>
-                        <span className="text-emerald-400">${(indicators?.bollingerLower || 0).toFixed(2)}</span>
-                      </div>
-                    </div>
-                    {signalResult?.bollingerSignal && (
-                      <Badge className="bg-zinc-600/15 text-zinc-400 border-zinc-600/20 text-[10px] px-1.5 py-0">
-                        {signalResult.bollingerSignal.replace(/_/g, ' ')}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <Separator className="bg-[#1e1e2e]" />
-
-                  {/* KDJ */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-400">KDJ</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-[10px]">
-                      <div className="text-center">
-                        <p className="text-zinc-500">K</p>
-                        <p className="text-emerald-400 font-medium">{(indicators?.kdjK || 50).toFixed(1)}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-zinc-500">D</p>
-                        <p className="text-yellow-400 font-medium">{(indicators?.kdjD || 50).toFixed(1)}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-zinc-500">J</p>
-                        <p className="text-zinc-300 font-medium">{(indicators?.kdjJ || 50).toFixed(1)}</p>
-                      </div>
-                    </div>
-                    {signalResult?.kdjSignal && (
-                      <Badge className="bg-zinc-600/15 text-zinc-400 border-zinc-600/20 text-[10px] px-1.5 py-0">
-                        {signalResult.kdjSignal.replace(/_/g, ' ')}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <Separator className="bg-[#1e1e2e]" />
-
-                  {/* Volume */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-400">{t('scanner.volumeRatio')}</span>
-                      <span className="text-xs font-medium text-zinc-300">
-                        {(signalResult?.volumeRatio || 1).toFixed(2)}x
-                      </span>
-                    </div>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* AI Sentiment Analysis */}
-      <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Brain className="w-5 h-5 text-emerald-400" />
-              <CardTitle className="text-base font-semibold text-white">{t('scanner.aiSentiment')}</CardTitle>
-              <Badge className="bg-purple-600/15 text-purple-400 border-purple-600/20 text-[10px]">
-                <Sparkles className="w-3 h-3 mr-1" />{t('scanner.aiPowered')}
+      {/* Signal Results */}
+      {signals.length > 0 && (
+        <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold text-white">
+                {t('scanner.scanResults')}
+                <span className="ml-2 text-xs text-zinc-400">{signals.length} {t('scanner.signalsFound')}</span>
+              </CardTitle>
+              <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[10px]">
+                <Wifi className="w-3 h-3 mr-1" />
+                Live
               </Badge>
             </div>
-            <Button
-              onClick={handleAnalyzeSentiment}
-              disabled={analyzing || !selectedSymbol}
-              size="sm"
-              className="bg-purple-600 hover:bg-purple-700 text-white gap-1.5"
-            >
-              {analyzing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {analyzing ? t('scanner.analyzing') : t('scanner.analyze')}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {analyzing && !sentiment ? (
-            <div className="py-8 text-center">
-              <div className="w-10 h-10 rounded-full border-2 border-purple-600 border-t-transparent animate-spin mx-auto mb-3" />
-              <p className="text-purple-400 text-sm font-medium">{t('scanner.aiAnalyzing')} {selectedSymbol}...</p>
-              <p className="text-zinc-500 text-xs mt-1">{t('scanner.fetchingNews')}</p>
-            </div>
-          ) : sentiment ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                {/* Sentiment Score Gauge */}
-                <div className="flex flex-col items-center">
-                  <div className="relative w-20 h-20">
-                    <svg className="w-20 h-20 -rotate-90" viewBox="0 0 120 120">
-                      <circle cx="60" cy="60" r="50" fill="none" stroke="#1e1e2e" strokeWidth="8" />
-                      <circle
-                        cx="60" cy="60" r="50" fill="none"
-                        stroke={sentiment.score >= 30 ? '#10b981' : sentiment.score >= 0 ? '#f59e0b' : '#ef4444'}
-                        strokeWidth="8"
-                        strokeLinecap="round"
-                        strokeDasharray={`${((sentiment.score + 100) / 200) * 314} 314`}
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-lg font-bold" style={{ color: sentiment.score >= 30 ? '#10b981' : sentiment.score >= 0 ? '#f59e0b' : '#ef4444' }}>
-                        {sentiment.score > 0 ? '+' : ''}{sentiment.score}
-                      </span>
-                    </div>
-                  </div>
-                  <Badge className={`mt-1 text-[10px] px-1.5 py-0 ${
-                    sentiment.label === 'STRONG_BUY' || sentiment.label === 'BUY'
-                      ? 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20'
-                      : sentiment.label === 'STRONG_SELL' || sentiment.label === 'SELL'
-                      ? 'bg-red-600/15 text-red-400 border-red-600/20'
-                      : 'bg-yellow-600/15 text-yellow-400 border-yellow-600/20'
-                  }`}>
-                    {sentiment.label.replace(/_/g, ' ')}
-                  </Badge>
-                </div>
-
-                {/* Key Info */}
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-500">{t('scanner.riskLevel')}</span>
-                    <Badge className={`text-[10px] px-1.5 py-0 ${
-                      sentiment.riskLevel === 'LOW' ? 'bg-emerald-600/15 text-emerald-400' :
-                      sentiment.riskLevel === 'HIGH' ? 'bg-red-600/15 text-red-400' :
-                      'bg-yellow-600/15 text-yellow-400'
-                    }`}>
-                      {sentiment.riskLevel}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-500">{t('scanner.shortTermOutlook')}</span>
-                    <span className="text-xs text-zinc-300 font-medium">{sentiment.shortTermOutlook}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-500">{t('scanner.newsAnalyzed')}</span>
-                    <span className="text-xs text-zinc-300 font-medium">{sentiment.newsCount} {t('scanner.articles')}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Key Factors */}
-              {sentiment.factors && sentiment.factors.length > 0 && (
-                <div>
-                  <p className="text-xs text-zinc-400 font-medium mb-2">{t('scanner.keyFactors')}</p>
-                  <div className="space-y-1">
-                    {sentiment.factors.map((factor, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />
-                        <span className="text-xs text-zinc-300">{factor}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Summary */}
-              {sentiment.summary && (
-                <div className="p-3 bg-[#0a0a0f] rounded-lg border border-[#1e1e2e]">
-                  <p className="text-xs text-zinc-300 leading-relaxed">{sentiment.summary}</p>
-                </div>
-              )}
-
-              <p className="text-[10px] text-zinc-600 text-right">
-                {t('scanner.analyzed')}: {new Date(sentiment.analyzedAt).toLocaleString()}
-              </p>
-            </div>
-          ) : (
-            <div className="py-8 text-center">
-              <Brain className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
-              <p className="text-zinc-400 text-sm">{t('scanner.clickAnalyze')}</p>
-              <p className="text-zinc-500 text-xs mt-1">{t('scanner.aiWillAnalyze')} {selectedSymbol}</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Popular Stocks Grid */}
-      <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold text-white">{t('scanner.popularStocks')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-            {popularStocks.map((stock) => {
-              const scanData = scanScores[stock.symbol];
-              return (
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-96 overflow-y-auto custom-scrollbar">
+              {signals.map((signal) => (
                 <button
-                  key={stock.symbol}
-                  onClick={() => { setSelectedSymbol(stock.symbol); setSelectedName(stock.name); }}
-                  className={`text-left p-3 rounded-lg border transition-all duration-200 hover:scale-[1.02] ${
-                    selectedSymbol === stock.symbol
+                  key={signal.symbol}
+                  onClick={() => loadSignalDetail(signal)}
+                  className={`text-left p-3 rounded-lg border transition-all duration-200 hover:scale-[1.01] ${
+                    selectedSignal?.symbol === signal.symbol
                       ? 'bg-emerald-600/10 border-emerald-600/30'
                       : 'bg-[#0a0a0f] border-[#1e1e2e] hover:border-[#2e2e3e]'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-white">{stock.symbol}</span>
-                    {scanData ? (
-                      <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold"
-                        style={{
-                          backgroundColor: `${getSignalColor(scanData.score)}20`,
-                          color: getSignalColor(scanData.score),
-                        }}
-                      >
-                        {scanData.score}
-                      </div>
-                    ) : (
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center bg-zinc-800">
-                        <Loader2 className="w-3 h-3 text-zinc-500 animate-spin" />
-                      </div>
+                    <span className="text-sm font-semibold text-white">{signal.symbol}</span>
+                    <Badge className={`${getRecommendationColor(signal.signalType)} border text-[9px] flex items-center gap-0.5`}>
+                      {getRecommendationIcon(signal.signalType)}
+                      {translateSignalType(signal.signalType, t)}
+                    </Badge>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 mb-1 truncate">{signal.name}</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-zinc-300">
+                      {signal.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                    <span className={`text-xs ${signal.changePercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {signal.changePercent >= 0 ? '+' : ''}{signal.changePercent.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <Badge className={`${getStrengthColor(signal.strength)} border text-[8px]`}>
+                      {t(`scanner.${signal.strength}`)}
+                    </Badge>
+                    {signal.indicators.maCross !== 'none' && (
+                      <Badge className="bg-purple-600/15 text-purple-400 border-purple-600/20 text-[8px]">
+                        {t(`scanner.${signal.indicators.maCross === 'golden' ? 'goldenCross' : 'deathCross'}`)}
+                      </Badge>
+                    )}
+                    {signal.indicators.rsiSignal !== 'neutral' && (
+                      <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[8px]">
+                        {t(`scanner.${signal.indicators.rsiSignal === 'overbought' ? 'overboughtSignal' : 'oversoldSignal'}`)}
+                      </Badge>
                     )}
                   </div>
-                  <p className="text-[10px] text-zinc-500 mb-1 truncate">{stock.name}</p>
-                  {scanData && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-zinc-300">${scanData.price.toFixed(2)}</span>
-                      <Badge className={`text-[8px] px-1 py-0 ${
-                        scanData.signalType === 'BUY'
-                          ? 'bg-emerald-600/15 text-emerald-400'
-                          : scanData.signalType === 'SELL'
-                          ? 'bg-red-600/15 text-red-400'
-                          : 'bg-yellow-600/15 text-yellow-400'
+                  {/* Signal strength bar */}
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex-1 h-1 bg-[#1e1e2e] rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${signal.score}%`,
+                          backgroundColor: getSignalColor(signal.score),
+                        }}
+                      />
+                    </div>
+                    <span className="text-[10px] font-mono" style={{ color: getSignalColor(signal.score) }}>
+                      {signal.score}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No signals state */}
+      {!scanning && signals.length === 0 && !scanError && (
+        <Card className="bg-[#111118] border-[#1e1e2e] border-dashed rounded-xl">
+          <CardContent className="py-12 text-center">
+            <Radar className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
+            <p className="text-zinc-400 text-sm">{t('scanner.noSignals')}</p>
+            <p className="text-zinc-500 text-xs mt-1">{t('scanner.scanMarket')}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Selected Signal Detail */}
+      {selectedSignal && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Price + Chart */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Price Header */}
+            <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-xl font-bold text-white">{selectedSignal.symbol}</h3>
+                      <span className="text-sm text-zinc-400">{selectedSignal.name}</span>
+                    </div>
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-3xl font-bold text-white">
+                        ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                      <div className={`flex items-center gap-1 ${priceChangePercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {priceChangePercent >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                        <span className="text-sm font-medium">
+                          {priceChangePercent >= 0 ? '+' : ''}{priceChange.toFixed(2)} ({priceChangePercent >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className={`${getRecommendationColor(selectedSignal.signalType)} border text-xs flex items-center gap-1`}>
+                      {getRecommendationIcon(selectedSignal.signalType)}
+                      {translateSignalType(selectedSignal.signalType, t)}
+                    </Badge>
+                    <Badge className={`${getStrengthColor(selectedSignal.strength)} border text-xs flex items-center gap-1`}>
+                      <Zap className="w-3 h-3" />
+                      {t(`scanner.${selectedSignal.strength}`)}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Signal Indicators Breakdown */}
+                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-[#1e1e2e]">
+                  {selectedSignal.indicators.maCross !== 'none' && (
+                    <Badge className={`text-[10px] border ${
+                      selectedSignal.indicators.maCross === 'golden'
+                        ? 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20'
+                        : 'bg-red-600/15 text-red-400 border-red-600/20'
+                    }`}>
+                      {t('scanner.maCross')}: {t(`scanner.${selectedSignal.indicators.maCross === 'golden' ? 'goldenCross' : 'deathCross'}`)}
+                    </Badge>
+                  )}
+                  {selectedSignal.indicators.rsiSignal !== 'neutral' && (
+                    <Badge className={`text-[10px] border ${
+                      selectedSignal.indicators.rsiSignal === 'oversold'
+                        ? 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20'
+                        : 'bg-red-600/15 text-red-400 border-red-600/20'
+                    }`}>
+                      {t('scanner.rsiSignal')}: {t(`scanner.${selectedSignal.indicators.rsiSignal === 'overbought' ? 'overboughtSignal' : 'oversoldSignal'}`)}
+                    </Badge>
+                  )}
+                  {selectedSignal.indicators.macdCross !== 'none' && (
+                    <Badge className={`text-[10px] border ${
+                      selectedSignal.indicators.macdCross === 'golden'
+                        ? 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20'
+                        : 'bg-red-600/15 text-red-400 border-red-600/20'
+                    }`}>
+                      {t('scanner.macdCross')}: {t(`scanner.${selectedSignal.indicators.macdCross === 'golden' ? 'goldenCross' : 'deathCross'}`)}
+                    </Badge>
+                  )}
+                  {selectedSignal.indicators.bollingerBreak !== 'none' && (
+                    <Badge className={`text-[10px] border ${
+                      selectedSignal.indicators.bollingerBreak === 'lower'
+                        ? 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20'
+                        : 'bg-red-600/15 text-red-400 border-red-600/20'
+                    }`}>
+                      {t('scanner.bollingerBreak')}: {t(`scanner.${selectedSignal.indicators.bollingerBreak === 'upper' ? 'breakoutUp' : 'breakoutDown'}`)}
+                    </Badge>
+                  )}
+                  {selectedSignal.indicators.kdjCross !== 'none' && (
+                    <Badge className={`text-[10px] border ${
+                      selectedSignal.indicators.kdjCross === 'golden'
+                        ? 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20'
+                        : 'bg-red-600/15 text-red-400 border-red-600/20'
+                    }`}>
+                      {t('scanner.kdjCross')}: {t(`scanner.${selectedSignal.indicators.kdjCross === 'golden' ? 'goldenCross' : 'deathCross'}`)}
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Price Chart */}
+            <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base font-semibold text-white">{t('scanner.priceChart')}</CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => selectedSignal && fetchKline(selectedSignal.symbol)}
+                    className="h-7 px-2 text-zinc-400 hover:text-white"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <Skeleton className="h-64 w-full bg-[#0a0a0f] rounded-lg" />
+                ) : candleData.length > 0 ? (
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={candleData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
+                        <XAxis
+                          dataKey="time"
+                          stroke="#71717a"
+                          tick={{ fontSize: 10 }}
+                          tickLine={false}
+                          axisLine={{ stroke: '#1e1e2e' }}
+                          interval={14}
+                        />
+                        <YAxis
+                          stroke="#71717a"
+                          tick={{ fontSize: 10 }}
+                          tickLine={false}
+                          axisLine={{ stroke: '#1e1e2e' }}
+                          domain={['auto', 'auto']}
+                          yAxisId="price"
+                        />
+                        <YAxis
+                          stroke="#71717a"
+                          tick={{ fontSize: 10 }}
+                          tickLine={false}
+                          axisLine={{ stroke: '#1e1e2e' }}
+                          orientation="right"
+                          yAxisId="volume"
+                          tickFormatter={(v: number) => `${(v / 1000000).toFixed(0)}M`}
+                        />
+                        <RechartsTooltip
+                          contentStyle={{
+                            backgroundColor: '#1a1a2e',
+                            border: '1px solid #2e2e3e',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                          }}
+                          itemStyle={{ color: '#e4e4e7' }}
+                        />
+                        <Bar
+                          dataKey="volume"
+                          fill="#1e1e2e"
+                          opacity={0.3}
+                          yAxisId="volume"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="close"
+                          stroke="#10b981"
+                          strokeWidth={2}
+                          dot={false}
+                          activeDot={{ r: 4, fill: '#10b981' }}
+                          yAxisId="price"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="high"
+                          stroke="#22c55e"
+                          strokeWidth={0.5}
+                          dot={false}
+                          strokeDasharray="3 3"
+                          yAxisId="price"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="low"
+                          stroke="#ef4444"
+                          strokeWidth={0.5}
+                          dot={false}
+                          strokeDasharray="3 3"
+                          yAxisId="price"
+                        />
+                        {indicators && indicators.bollinger && indicators.bollinger.middle > 0 && (
+                          <ReferenceLine
+                            y={indicators.bollinger.middle}
+                            stroke="#f59e0b"
+                            strokeDasharray="5 5"
+                            strokeWidth={1}
+                            yAxisId="price"
+                          />
+                        )}
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-64 flex items-center justify-center">
+                    <p className="text-zinc-500 text-sm">{t('scanner.noChartData')}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Panel - Signal Score & Indicators */}
+          <div className="space-y-4">
+            {/* Signal Score */}
+            <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold text-white">{t('scanner.signalScore')}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col items-center">
+                  <div className="relative w-32 h-32">
+                    <svg className="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
+                      <circle cx="60" cy="60" r="50" fill="none" stroke="#1e1e2e" strokeWidth="8" />
+                      <circle
+                        cx="60" cy="60" r="50" fill="none"
+                        stroke={getSignalColor(selectedSignal?.score || 0)}
+                        strokeWidth="8"
+                        strokeLinecap="round"
+                        strokeDasharray={`${((selectedSignal?.score || 0) / 100) * 314} 314`}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-3xl font-bold" style={{ color: getSignalColor(selectedSignal?.score || 0) }}>
+                        {selectedSignal?.score ?? '—'}
+                      </span>
+                      <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('scanner.score')}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-center gap-4 text-xs">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                    <span className="text-zinc-500">&lt;20</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                    <span className="text-zinc-500">20-49</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className="text-zinc-500">{t('scanner.buySignal')}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Technical Indicators */}
+            <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold text-white">{t('scanner.techIndicators')}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {loading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4].map((i) => (
+                      <Skeleton key={i} className="h-12 w-full bg-[#0a0a0f] rounded" />
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    {/* RSI */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-400">{t('scanner.rsi14')}</span>
+                        <span className={`text-xs font-medium ${
+                          (indicators?.rsi?.rsi14 || 50) > 70 ? 'text-red-400' : (indicators?.rsi?.rsi14 || 50) < 30 ? 'text-emerald-400' : 'text-zinc-300'
+                        }`}>
+                          {(indicators?.rsi?.rsi14 || 50).toFixed(1)}
+                        </span>
+                      </div>
+                      <Progress value={indicators?.rsi?.rsi14 || 50} className="h-1.5 bg-[#1e1e2e]" />
+                      <div className="flex justify-between text-[10px] text-zinc-600">
+                        <span>{t('scanner.oversold')}</span>
+                        <span>{t('scanner.neutral')}</span>
+                        <span>{t('scanner.overbought')}</span>
+                      </div>
+                    </div>
+
+                    <Separator className="bg-[#1e1e2e]" />
+
+                    {/* MACD */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-400">{t('scanner.macd')}</span>
+                        <span className={`text-xs font-medium ${
+                          (indicators?.macd?.histogram || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'
+                        }`}>
+                          {(indicators?.macd?.macd || 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[10px]">
+                        <div>
+                          <span className="text-zinc-500">{t('scanner.signal')}: </span>
+                          <span className="text-zinc-300">{(indicators?.macd?.signal || 0).toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="text-zinc-500">{t('scanner.hist')}: </span>
+                          <span className={(indicators?.macd?.histogram || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                            {(indicators?.macd?.histogram || 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                      <Badge className={`text-[10px] px-1.5 py-0 ${
+                        selectedSignal.indicators.macdCross === 'golden'
+                          ? 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20'
+                          : selectedSignal.indicators.macdCross === 'death'
+                          ? 'bg-red-600/15 text-red-400 border-red-600/20'
+                          : 'bg-zinc-600/15 text-zinc-400 border-zinc-600/20'
                       }`}>
-                        {translateSignalType(scanData.signalType, t)}
+                        {selectedSignal.indicators.macdCross === 'golden'
+                          ? t('scanner.goldenCross')
+                          : selectedSignal.indicators.macdCross === 'death'
+                          ? t('scanner.deathCross')
+                          : '—'
+                        }
                       </Badge>
                     </div>
-                  )}
-                </button>
-              );
-            })}
+
+                    <Separator className="bg-[#1e1e2e]" />
+
+                    {/* Bollinger */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-400">{t('scanner.bollingerBands')}</span>
+                      </div>
+                      <div className="space-y-1 text-[10px]">
+                        <div className="flex justify-between">
+                          <span className="text-zinc-500">{t('scanner.upper')}</span>
+                          <span className="text-red-400">${(indicators?.bollinger?.upper || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-zinc-500">{t('scanner.middle')}</span>
+                          <span className="text-yellow-400">${(indicators?.bollinger?.middle || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-zinc-500">{t('scanner.lower')}</span>
+                          <span className="text-emerald-400">${(indicators?.bollinger?.lower || 0).toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <Badge className={`text-[10px] px-1.5 py-0 ${
+                        selectedSignal.indicators.bollingerBreak === 'upper'
+                          ? 'bg-red-600/15 text-red-400 border-red-600/20'
+                          : selectedSignal.indicators.bollingerBreak === 'lower'
+                          ? 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20'
+                          : 'bg-zinc-600/15 text-zinc-400 border-zinc-600/20'
+                      }`}>
+                        {selectedSignal.indicators.bollingerBreak === 'upper'
+                          ? t('scanner.breakoutUp')
+                          : selectedSignal.indicators.bollingerBreak === 'lower'
+                          ? t('scanner.breakoutDown')
+                          : '—'
+                        }
+                      </Badge>
+                    </div>
+
+                    <Separator className="bg-[#1e1e2e]" />
+
+                    {/* KDJ */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-400">KDJ</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-[10px]">
+                        <div className="text-center">
+                          <p className="text-zinc-500">K</p>
+                          <p className="text-emerald-400 font-medium">{(indicators?.kdj?.k || 50).toFixed(1)}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-zinc-500">D</p>
+                          <p className="text-yellow-400 font-medium">{(indicators?.kdj?.d || 50).toFixed(1)}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-zinc-500">J</p>
+                          <p className="text-zinc-300 font-medium">{(indicators?.kdj?.j || 50).toFixed(1)}</p>
+                        </div>
+                      </div>
+                      <Badge className={`text-[10px] px-1.5 py-0 ${
+                        selectedSignal.indicators.kdjCross === 'golden'
+                          ? 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20'
+                          : selectedSignal.indicators.kdjCross === 'death'
+                          ? 'bg-red-600/15 text-red-400 border-red-600/20'
+                          : 'bg-zinc-600/15 text-zinc-400 border-zinc-600/20'
+                      }`}>
+                        {selectedSignal.indicators.kdjCross === 'golden'
+                          ? t('scanner.goldenCross')
+                          : selectedSignal.indicators.kdjCross === 'death'
+                          ? t('scanner.deathCross')
+                          : '—'
+                        }
+                      </Badge>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
     </div>
   );
 }

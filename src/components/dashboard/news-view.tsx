@@ -11,6 +11,8 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Globe,
+  AlertTriangle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -111,42 +113,6 @@ const mockNews: NewsArticle[] = [
     relatedStocks: ['PFE', 'SGEN'],
     timestamp: '2024-01-14T14:00:00Z',
   },
-  {
-    id: '7',
-    headline: 'Oil Prices Steady as OPEC+ Maintains Production Cuts',
-    source: 'MarketWatch',
-    url: '#',
-    image: '',
-    summary: 'Crude oil futures traded in a narrow range after OPEC+ reaffirmed its commitment to supply restrictions through the end of Q1.',
-    category: 'general',
-    sentiment: 'neutral',
-    relatedStocks: ['XOM', 'CVX'],
-    timestamp: '2024-01-14T11:30:00Z',
-  },
-  {
-    id: '8',
-    headline: 'Ethereum Layer 2 Solutions See Surge in Transaction Volume',
-    source: 'The Block',
-    url: '#',
-    image: '',
-    summary: 'Arbitrum and Optimism processed a combined 5 million transactions in 24 hours, driven by increased DeFi activity and lower fees.',
-    category: 'crypto',
-    sentiment: 'bullish',
-    relatedStocks: [],
-    timestamp: '2024-01-14T09:15:00Z',
-  },
-  {
-    id: '9',
-    headline: 'Tesla Faces Increased Competition in China EV Market',
-    source: 'Nikkei Asia',
-    url: '#',
-    image: '',
-    summary: 'Domestic EV makers are capturing growing market share, pressuring Tesla to cut prices and accelerate new model launches.',
-    category: 'general',
-    sentiment: 'bearish',
-    relatedStocks: ['TSLA'],
-    timestamp: '2024-01-13T16:00:00Z',
-  },
 ];
 
 function getCategoryColor(category: string): string {
@@ -154,7 +120,17 @@ function getCategoryColor(category: string): string {
     case 'crypto': return 'bg-purple-600/15 text-purple-400 border-purple-600/20';
     case 'forex': return 'bg-cyan-600/15 text-cyan-400 border-cyan-600/20';
     case 'merger': return 'bg-orange-600/15 text-orange-400 border-orange-600/20';
+    case 'ashare': return 'bg-red-600/15 text-red-400 border-red-600/20';
+    case 'hk': return 'bg-yellow-600/15 text-yellow-400 border-yellow-600/20';
     default: return 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20';
+  }
+}
+
+function getCategoryLabel(category: string): string {
+  switch (category) {
+    case 'ashare': return 'A-SHARE';
+    case 'hk': return 'HK';
+    default: return category.toUpperCase();
   }
 }
 
@@ -170,6 +146,7 @@ function timeAgo(timestamp: string): string {
   const now = new Date();
   const then = new Date(timestamp);
   const diffMs = now.getTime() - then.getTime();
+  if (diffMs < 0) return 'just now';
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
@@ -183,8 +160,17 @@ export function MarketNewsView() {
   const { t } = useLanguage();
   const [news, setNews] = useState<NewsArticle[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [market, setMarket] = useState('A');
   const [category, setCategory] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
+
+  const marketOptions = [
+    { value: 'A', label: t('news.marketA'), icon: '🇨🇳' },
+    { value: 'HK', label: t('news.marketHK'), icon: '🇭🇰' },
+    { value: 'US', label: t('news.marketUS'), icon: '🇺🇸' },
+  ];
 
   const categories = [
     { value: 'all', label: t('news.allCategories') },
@@ -194,26 +180,59 @@ export function MarketNewsView() {
     { value: 'merger', label: t('news.merger') },
   ];
 
-  const fetchNews = useCallback(async () => {
-    setLoading(true);
+  const fetchNews = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+
     try {
-      const res = await fetch(`/api/market/news?category=${category === 'all' ? 'general' : category}`);
+      // Use fusion news API with market parameter
+      const res = await fetch(`/api/fusion/market/news?market=${market}&count=20`);
       if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setNews(data);
+        const result = await res.json();
+        if (result.success && Array.isArray(result.data) && result.data.length > 0) {
+          const mapped: NewsArticle[] = result.data.map((item: {
+            id: string;
+            category: string;
+            headline: string;
+            summary: string;
+            source: string;
+            url: string;
+            image: string;
+            timestamp: string;
+            relatedStocks?: string[];
+            sentiment?: string;
+          }) => ({
+            id: item.id || String(Math.random()),
+            headline: item.headline || '',
+            source: item.source || '',
+            url: item.url || '#',
+            image: item.image || '',
+            summary: item.summary || item.headline || '',
+            category: item.category || 'general',
+            sentiment: (item.sentiment || 'neutral') as 'bullish' | 'bearish' | 'neutral',
+            relatedStocks: item.relatedStocks || [],
+            timestamp: item.timestamp || new Date().toISOString(),
+          }));
+          setNews(mapped);
         } else {
           setNews(mockNews);
         }
       } else {
+        setError(t('dash.fetchError'));
         setNews(mockNews);
       }
     } catch {
+      setError(t('dash.fetchError'));
       setNews(mockNews);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [category]);
+  }, [market, t]);
 
   useEffect(() => {
     fetchNews();
@@ -249,7 +268,25 @@ export function MarketNewsView() {
             {filteredNews.length} {t('news.articles')}
           </h3>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Market Switcher */}
+          <div className="flex items-center gap-1 bg-[#111118] rounded-lg border border-[#1e1e2e] p-0.5">
+            {marketOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setMarket(opt.value)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                  market === opt.value
+                    ? 'bg-emerald-600/20 text-emerald-400 shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-300 hover:bg-[#1a1a2e]'
+                }`}
+              >
+                <span className="mr-1">{opt.icon}</span>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           <Select value={category} onValueChange={setCategory}>
             <SelectTrigger className="w-40 bg-[#111118] border-[#1e1e2e] text-white text-sm h-9">
               <Filter className="w-3.5 h-3.5 mr-1.5 text-zinc-400" />
@@ -266,13 +303,30 @@ export function MarketNewsView() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={fetchNews}
+            onClick={() => fetchNews(true)}
+            disabled={refreshing}
             className="h-9 w-9 text-zinc-400 hover:text-white border border-[#1e1e2e]"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="flex items-center gap-2 p-3 bg-yellow-600/10 border border-yellow-600/20 rounded-lg">
+          <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+          <p className="text-xs text-yellow-400">{error}</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => fetchNews()}
+            className="ml-auto h-6 px-2 text-yellow-400 hover:text-yellow-300 text-xs"
+          >
+            {t('common.retry')}
+          </Button>
+        </div>
+      )}
 
       {/* News Grid */}
       {filteredNews.length === 0 ? (
@@ -289,7 +343,11 @@ export function MarketNewsView() {
               <Card
                 key={article.id}
                 className="bg-[#111118] border-[#1e1e2e] rounded-xl hover:border-[#2e2e3e] transition-all duration-300 group cursor-pointer"
-                onClick={() => window.open(article.url, '_blank', 'noopener,noreferrer')}
+                onClick={() => {
+                  if (article.url && article.url !== '#') {
+                    window.open(article.url, '_blank', 'noopener,noreferrer');
+                  }
+                }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">
@@ -297,7 +355,7 @@ export function MarketNewsView() {
                       {/* Category + Source + Sentiment */}
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <Badge className={`${getCategoryColor(article.category)} border text-[10px] px-1.5 py-0`}>
-                          {article.category.toUpperCase()}
+                          {getCategoryLabel(article.category)}
                         </Badge>
                         <Badge className={`${sentimentCfg.color} text-[10px] px-1.5 py-0 flex items-center gap-0.5`}>
                           {sentimentCfg.icon}
@@ -339,7 +397,9 @@ export function MarketNewsView() {
                           <Clock className="w-3 h-3" />
                           <span className="text-[10px]">{timeAgo(article.timestamp)}</span>
                         </div>
-                        <ExternalLink className="w-3.5 h-3.5 text-zinc-600 group-hover:text-emerald-400 transition-colors" />
+                        {article.url && article.url !== '#' && (
+                          <ExternalLink className="w-3.5 h-3.5 text-zinc-600 group-hover:text-emerald-400 transition-colors" />
+                        )}
                       </div>
                     </div>
                   </div>

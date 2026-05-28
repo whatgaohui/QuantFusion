@@ -111,6 +111,12 @@ const translations: Record<Language, Record<string, string>> = {
     'ai.analysisHistory': 'Analysis History',
     'ai.noHistory': 'No analysis history yet',
     'ai.noSymbol': 'Enter a stock symbol to start analysis',
+    'ai.offlineMode': 'Offline Mode — Demo Data',
+    'ai.realtimeMode': 'AI Connected',
+    'ai.riskLevel': 'Risk Level',
+    'ai.riskScore': 'Risk Score',
+    'ai.taskStarted': 'Analysis task started',
+    'ai.pollingProgress': 'Fetching analysis results...',
 
     // Agent Chat View
     'chat.title': 'AI Agent Chat',
@@ -125,6 +131,10 @@ const translations: Record<Language, Record<string, string>> = {
     'chat.modeDeep': 'Deep',
     'chat.welcomeMessage': 'Hello! I am QuantFusion AI analyst. How can I help you today?',
     'chat.sessionTitle': 'New Analysis Session',
+    'chat.thinking': 'AI is thinking...',
+    'chat.deepThinking': 'Deep analysis in progress...',
+    'chat.offlineMode': 'Offline — Demo Responses',
+    'chat.realtimeMode': 'AI Connected',
 
     // Signal Scanner View
     'scanner.searchPlaceholder': 'Search stocks by symbol or name...',
@@ -173,6 +183,30 @@ const translations: Record<Language, Record<string, string>> = {
     'scanner.marketUS': 'US',
     'scanner.scoreBreakdown': 'Score Breakdown',
     'scanner.oneClickAnalyze': 'AI Analyze',
+    'scanner.scanMarket': 'Scan Market',
+    'scanner.scanResults': 'Scan Results',
+    'scanner.hotSectors': 'Hot Sectors',
+    'scanner.signalsFound': 'signals found',
+    'scanner.noSignals': 'No signals found. Try scanning a different market.',
+    'scanner.scanError': 'Scan failed. Showing cached data.',
+    'scanner.signalStrength': 'Strength',
+    'scanner.strong': 'Strong',
+    'scanner.medium': 'Medium',
+    'scanner.weak': 'Weak',
+    'scanner.maCross': 'MA Cross',
+    'scanner.rsiSignal': 'RSI Signal',
+    'scanner.macdCross': 'MACD Cross',
+    'scanner.bollingerBreak': 'Bollinger Break',
+    'scanner.kdjCross': 'KDJ Cross',
+    'scanner.goldenCross': 'Golden Cross',
+    'scanner.deathCross': 'Death Cross',
+    'scanner.overboughtSignal': 'Overbought',
+    'scanner.oversoldSignal': 'Oversold',
+    'scanner.breakoutUp': 'Breakout Up',
+    'scanner.breakoutDown': 'Breakout Down',
+    'scanner.scanningSectors': 'Scanning sectors...',
+    'scanner.analyzingStocks': 'Analyzing stocks...',
+    'scanner.generatingSignals': 'Generating signals...',
 
     // Positions View
     'pos.totalInvested': 'Total Invested',
@@ -258,6 +292,14 @@ const translations: Record<Language, Record<string, string>> = {
     'strat.entryRule': 'Entry Rule',
     'strat.exitRule': 'Exit Rule',
     'strat.saveStrategy': 'Save Strategy',
+    'strat.aiService': 'AI Service',
+    'strat.localPresets': 'Local Presets',
+    'strat.sourceLabel': 'Source',
+    'strat.aiGenerated': 'AI Generated',
+    'strat.builtInLabel': 'Built-in',
+    'strat.customCreated': 'Custom',
+    'strat.backtestThis': 'Backtest This',
+    'strat.goToBacktest': 'Go to Backtest',
 
     // News View
     'news.articles': 'articles',
@@ -273,6 +315,33 @@ const translations: Record<Language, Record<string, string>> = {
     'news.bearish': 'Bearish',
     'news.neutral': 'Neutral',
     'news.analyzeStock': 'Analyze',
+    'news.marketA': 'A-Share',
+    'news.marketHK': 'Hong Kong',
+    'news.marketUS': 'US',
+    'news.ashare': 'A-Share',
+    'news.hk': 'HK Market',
+    'news.refreshing': 'Refreshing...',
+    'news.loadMore': 'Load More',
+
+    // Dashboard extra
+    'dash.fetchError': 'Failed to load data, showing cached values',
+    'dash.refreshing': 'Refreshing...',
+    'dash.marketA': 'A-Share',
+    'dash.marketHK': 'HK',
+    'dash.marketUS': 'US',
+
+    // Watchlist extra
+    'watch.refreshing': 'Refreshing prices...',
+    'watch.quotesError': 'Failed to fetch some quotes',
+    'watch.refreshQuotes': 'Refresh Prices',
+
+    // Positions extra
+    'pos.fetchingPrices': 'Fetching live prices...',
+    'pos.pricesError': 'Failed to fetch live prices',
+    'pos.calculatedFromData': 'Calculated from portfolio data',
+    'pos.confidence95': '1-day 95% confidence',
+    'pos.annualized': 'Annualized',
+    'pos.portfolioLevel': 'Portfolio level',
 
     // Backtest View
     'back.config': 'Backtest Configuration',
@@ -301,6 +370,17 @@ const translations: Record<Language, Record<string, string>> = {
     'back.analyzingHistorical': 'Analyzing historical data with your parameters',
     'back.tradeList': 'Trade List',
     'back.tradePnl': 'P&L',
+    'back.symbol': 'Symbol',
+    'back.offlineMode': 'Offline Mode — Simulated Results',
+    'back.realtimeMode': 'AI Backtest',
+    'back.entryDate': 'Entry Date',
+    'back.exitDate': 'Exit Date',
+    'back.entryPrice': 'Entry Price',
+    'back.exitPrice': 'Exit Price',
+    'back.quantity': 'Quantity',
+    'back.avgHoldingDays': 'Avg Hold',
+    'back.profitFactor': 'Profit Factor',
+    'back.annualReturn': 'Annual Return',
 
     // Settings View
     'settings.llmConfig': 'LLM Configuration',
@@ -474,6 +554,12 @@ const translations: Record<Language, Record<string, string>> = {
     'ai.analysisHistory': '分析历史',
     'ai.noHistory': '暂无分析历史',
     'ai.noSymbol': '输入股票代码开始分析',
+    'ai.offlineMode': '离线模式 — 演示数据',
+    'ai.realtimeMode': 'AI 已连接',
+    'ai.riskLevel': '风险等级',
+    'ai.riskScore': '风险评分',
+    'ai.taskStarted': '分析任务已启动',
+    'ai.pollingProgress': '正在获取分析结果...',
 
     // Agent Chat View
     'chat.title': 'AI 智能对话',
@@ -488,6 +574,10 @@ const translations: Record<Language, Record<string, string>> = {
     'chat.modeDeep': '深度',
     'chat.welcomeMessage': '你好！我是 QuantFusion AI 分析师，有什么可以帮助你的？',
     'chat.sessionTitle': '新分析会话',
+    'chat.thinking': 'AI思考中...',
+    'chat.deepThinking': '深度分析中...',
+    'chat.offlineMode': '离线 — 演示回复',
+    'chat.realtimeMode': 'AI 已连接',
 
     // Signal Scanner View
     'scanner.searchPlaceholder': '按代码或名称搜索股票...',
@@ -536,6 +626,30 @@ const translations: Record<Language, Record<string, string>> = {
     'scanner.marketUS': '美股',
     'scanner.scoreBreakdown': '评分分解',
     'scanner.oneClickAnalyze': 'AI 分析',
+    'scanner.scanMarket': '扫描市场',
+    'scanner.scanResults': '扫描结果',
+    'scanner.hotSectors': '热门板块',
+    'scanner.signalsFound': '个信号',
+    'scanner.noSignals': '未发现信号，请尝试扫描其他市场。',
+    'scanner.scanError': '扫描失败，显示缓存数据。',
+    'scanner.signalStrength': '强度',
+    'scanner.strong': '强',
+    'scanner.medium': '中',
+    'scanner.weak': '弱',
+    'scanner.maCross': '均线交叉',
+    'scanner.rsiSignal': 'RSI 信号',
+    'scanner.macdCross': 'MACD 交叉',
+    'scanner.bollingerBreak': '布林突破',
+    'scanner.kdjCross': 'KDJ 交叉',
+    'scanner.goldenCross': '金叉',
+    'scanner.deathCross': '死叉',
+    'scanner.overboughtSignal': '超买',
+    'scanner.oversoldSignal': '超卖',
+    'scanner.breakoutUp': '上轨突破',
+    'scanner.breakoutDown': '下轨突破',
+    'scanner.scanningSectors': '正在扫描板块...',
+    'scanner.analyzingStocks': '正在分析个股...',
+    'scanner.generatingSignals': '正在生成信号...',
 
     // Positions View
     'pos.totalInvested': '总投资额',
@@ -621,6 +735,14 @@ const translations: Record<Language, Record<string, string>> = {
     'strat.entryRule': '入场规则',
     'strat.exitRule': '出场规则',
     'strat.saveStrategy': '保存策略',
+    'strat.aiService': 'AI 服务',
+    'strat.localPresets': '本地预设',
+    'strat.sourceLabel': '来源',
+    'strat.aiGenerated': 'AI 生成',
+    'strat.builtInLabel': '内置',
+    'strat.customCreated': '自定义',
+    'strat.backtestThis': '回测此策略',
+    'strat.goToBacktest': '前往回测',
 
     // News View
     'news.articles': '篇文章',
@@ -636,6 +758,33 @@ const translations: Record<Language, Record<string, string>> = {
     'news.bearish': '利空',
     'news.neutral': '中性',
     'news.analyzeStock': '分析',
+    'news.marketA': 'A股',
+    'news.marketHK': '港股',
+    'news.marketUS': '美股',
+    'news.ashare': 'A股',
+    'news.hk': '港股',
+    'news.refreshing': '刷新中...',
+    'news.loadMore': '加载更多',
+
+    // Dashboard extra
+    'dash.fetchError': '数据加载失败，显示缓存值',
+    'dash.refreshing': '刷新中...',
+    'dash.marketA': 'A股',
+    'dash.marketHK': '港股',
+    'dash.marketUS': '美股',
+
+    // Watchlist extra
+    'watch.refreshing': '正在刷新价格...',
+    'watch.quotesError': '部分行情获取失败',
+    'watch.refreshQuotes': '刷新行情',
+
+    // Positions extra
+    'pos.fetchingPrices': '获取实时价格...',
+    'pos.pricesError': '实时价格获取失败',
+    'pos.calculatedFromData': '基于组合数据计算',
+    'pos.confidence95': '1日 95% 置信度',
+    'pos.annualized': '年化',
+    'pos.portfolioLevel': '组合级别',
 
     // Backtest View
     'back.config': '回测配置',
@@ -664,6 +813,17 @@ const translations: Record<Language, Record<string, string>> = {
     'back.analyzingHistorical': '使用您的参数分析历史数据',
     'back.tradeList': '交易列表',
     'back.tradePnl': '盈亏',
+    'back.symbol': '代码',
+    'back.offlineMode': '离线模式 — 模拟结果',
+    'back.realtimeMode': 'AI 回测',
+    'back.entryDate': '入场日期',
+    'back.exitDate': '出场日期',
+    'back.entryPrice': '入场价格',
+    'back.exitPrice': '出场价格',
+    'back.quantity': '数量',
+    'back.avgHoldingDays': '平均持仓',
+    'back.profitFactor': '盈利因子',
+    'back.annualReturn': '年化收益',
 
     // Settings View
     'settings.llmConfig': 'LLM 配置',
