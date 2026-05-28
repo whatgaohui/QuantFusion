@@ -305,7 +305,17 @@ async function finnhubFetch<T>(endpoint: string, params: Record<string, string>)
   try {
     const urlParams = new URLSearchParams({ ...params, token: FINNHUB_API_KEY });
     const url = `https://finnhub.io/api/v1/${endpoint}?${urlParams.toString()}`;
-    const response = await fetch(url, { next: { revalidate: 0 } });
+
+    // Use AbortController with 8s timeout to prevent hanging/crashing
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      next: { revalidate: 0 },
+    });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.error(`Finnhub API error: ${response.status} for ${endpoint}`);
@@ -320,7 +330,11 @@ async function finnhubFetch<T>(endpoint: string, params: Record<string, string>)
 
     return data as T;
   } catch (err) {
-    console.error(`Finnhub fetch failed for ${endpoint}:`, err);
+    if (err instanceof Error && err.name === 'AbortError') {
+      console.error(`Finnhub fetch timeout for ${endpoint}`);
+    } else {
+      console.error(`Finnhub fetch failed for ${endpoint}:`, err);
+    }
     return null;
   }
 }
@@ -482,11 +496,12 @@ export async function getQuote(symbol: string): Promise<ApiResponse<QuoteData>> 
  */
 export async function getQuotes(symbols: string[]): Promise<ApiResponse<QuoteData[]>> {
   try {
-    const results = await Promise.all(symbols.map(s => getQuote(s)));
+    // Sequential fetch to prevent memory exhaustion in resource-constrained environments
     const quotes: QuoteData[] = [];
     const errors: string[] = [];
 
-    for (const r of results) {
+    for (const s of symbols) {
+      const r = await getQuote(s);
       if (r.success && r.data) {
         quotes.push(r.data);
       } else {

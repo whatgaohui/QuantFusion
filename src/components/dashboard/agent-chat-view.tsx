@@ -574,24 +574,38 @@ export function AgentChatView() {
       <Card className="flex-1 bg-[#111118] border-[#1e1e2e] rounded-xl flex flex-col overflow-hidden">
         <ScrollArea className="flex-1 p-4">
           {activeSession && activeSession.messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full min-h-[300px]">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-600/10 flex items-center justify-center mb-4">
-                <Bot className="w-8 h-8 text-emerald-400" />
+            <div className="flex flex-col items-center justify-center h-full min-h-[300px] px-4">
+              {/* Welcome Panel */}
+              <div className="w-20 h-20 rounded-2xl bg-emerald-600/10 border border-emerald-600/20 flex items-center justify-center mb-5">
+                <Brain className="w-10 h-10 text-emerald-400" />
               </div>
-              <p className="text-zinc-300 text-sm mb-6">{t('chat.welcomeMessage')}</p>
+              <h3 className="text-lg font-semibold text-white mb-2 text-center">
+                {t('chat.welcome')}
+              </h3>
+              <p className="text-zinc-400 text-sm mb-6 text-center max-w-md leading-relaxed">
+                {t('chat.welcomeDesc')}
+              </p>
+
+              {/* Capability Tags */}
+              <div className="flex flex-wrap gap-2 justify-center mb-6 max-w-lg">
+                {['📊 Stock Analysis', '📈 Market Trends', '🎯 Trading Insights', '💡 Strategy Advice'].map((tag) => (
+                  <span key={tag} className="px-2.5 py-1 rounded-full bg-[#0a0a0f] border border-[#1e1e2e] text-[11px] text-zinc-400">
+                    {tag}
+                  </span>
+                ))}
+              </div>
 
               {/* Suggested Prompts */}
-              <div className="flex flex-wrap gap-2 justify-center max-w-lg">
+              <div className="flex flex-col gap-2 w-full max-w-sm">
                 {suggestedPrompts.map((prompt) => (
                   <Button
                     key={prompt.key}
                     variant="outline"
-                    size="sm"
                     onClick={() => handleSuggestedPrompt(prompt.key)}
-                    className="border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-emerald-600/10 hover:text-emerald-400 hover:border-emerald-600/20 gap-2"
+                    className="border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-emerald-600/10 hover:text-emerald-400 hover:border-emerald-600/20 gap-2 justify-start text-left h-auto py-2.5 px-4"
                   >
-                    <span>{prompt.icon}</span>
-                    {t(prompt.key)}
+                    <span className="text-base">{prompt.icon}</span>
+                    <span className="text-sm">{t(prompt.key)}</span>
                   </Button>
                 ))}
               </div>

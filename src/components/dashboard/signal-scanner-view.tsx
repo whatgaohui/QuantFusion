@@ -307,6 +307,65 @@ function analyzeIndicators(
   };
 }
 
+// ==================== Demo Signal Generator ====================
+
+function generateDemoSignals(market: 'A' | 'HK' | 'US'): ScanSignal[] {
+  const demoData: Record<string, Array<{
+    symbol: string;
+    name: string;
+    market: string;
+    signalType: 'BUY' | 'SELL' | 'HOLD';
+    strength: 'strong' | 'medium' | 'weak';
+    score: number;
+    indicators: ScanSignal['indicators'];
+    price: number;
+    changePercent: number;
+    sector: string;
+  }>> = {
+    A: [
+      { symbol: 'SH600519', name: '贵州茅台', market: 'A', signalType: 'BUY', strength: 'strong', score: 85, indicators: { maCross: 'golden', rsiSignal: 'oversold', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 1731.82, changePercent: 2.57, sector: '白酒' },
+      { symbol: 'SH601318', name: '中国平安', market: 'A', signalType: 'BUY', strength: 'medium', score: 72, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'golden' }, price: 48.35, changePercent: 1.85, sector: '保险' },
+      { symbol: 'SZ300750', name: '宁德时代', market: 'A', signalType: 'SELL', strength: 'medium', score: 38, indicators: { maCross: 'death', rsiSignal: 'overbought', macdCross: 'none', bollingerBreak: 'upper', kdjCross: 'death' }, price: 198.60, changePercent: -2.13, sector: '新能源' },
+      { symbol: 'SH600036', name: '招商银行', market: 'A', signalType: 'BUY', strength: 'weak', score: 62, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 35.28, changePercent: 0.92, sector: '银行' },
+      { symbol: 'SZ000858', name: '五粮液', market: 'A', signalType: 'HOLD', strength: 'weak', score: 45, indicators: { maCross: 'none', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 142.75, changePercent: 0.35, sector: '白酒' },
+      { symbol: 'SH600030', name: '中信证券', market: 'A', signalType: 'SELL', strength: 'strong', score: 25, indicators: { maCross: 'death', rsiSignal: 'overbought', macdCross: 'death', bollingerBreak: 'upper', kdjCross: 'death' }, price: 21.48, changePercent: -3.21, sector: '券商' },
+      { symbol: 'SH601899', name: '紫金矿业', market: 'A', signalType: 'BUY', strength: 'medium', score: 68, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 16.92, changePercent: 1.56, sector: '有色金属' },
+      { symbol: 'SZ002475', name: '立讯精密', market: 'A', signalType: 'BUY', strength: 'strong', score: 78, indicators: { maCross: 'golden', rsiSignal: 'oversold', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 34.15, changePercent: 2.89, sector: '电子' },
+    ],
+    HK: [
+      { symbol: 'HK00700', name: '腾讯控股', market: 'HK', signalType: 'BUY', strength: 'medium', score: 72, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 378.40, changePercent: 1.85, sector: '科技' },
+      { symbol: 'HK09988', name: '阿里巴巴', market: 'HK', signalType: 'BUY', strength: 'strong', score: 82, indicators: { maCross: 'golden', rsiSignal: 'oversold', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 82.35, changePercent: 3.42, sector: '电商' },
+      { symbol: 'HK03690', name: '美团', market: 'HK', signalType: 'SELL', strength: 'medium', score: 35, indicators: { maCross: 'death', rsiSignal: 'overbought', macdCross: 'death', bollingerBreak: 'upper', kdjCross: 'none' }, price: 128.50, changePercent: -2.15, sector: '本地生活' },
+      { symbol: 'HK00005', name: '汇丰控股', market: 'HK', signalType: 'HOLD', strength: 'weak', score: 48, indicators: { maCross: 'none', rsiSignal: 'neutral', macdCross: 'none', bollingerBreak: 'none', kdjCross: 'none' }, price: 62.15, changePercent: -0.32, sector: '银行' },
+      { symbol: 'HK01810', name: '小米集团', market: 'HK', signalType: 'BUY', strength: 'strong', score: 88, indicators: { maCross: 'golden', rsiSignal: 'oversold', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 52.80, changePercent: 4.12, sector: '消费电子' },
+      { symbol: 'HK01299', name: '友邦保险', market: 'HK', signalType: 'SELL', strength: 'weak', score: 42, indicators: { maCross: 'death', rsiSignal: 'neutral', macdCross: 'death', bollingerBreak: 'none', kdjCross: 'none' }, price: 58.30, changePercent: -1.05, sector: '保险' },
+      { symbol: 'HK09618', name: '京东集团', market: 'HK', signalType: 'BUY', strength: 'medium', score: 65, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'golden' }, price: 108.20, changePercent: 1.78, sector: '电商' },
+    ],
+    US: [
+      { symbol: 'NVDA', name: 'NVIDIA Corp.', market: 'US', signalType: 'BUY', strength: 'strong', score: 90, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 875.30, changePercent: 3.45, sector: 'Semiconductors' },
+      { symbol: 'AAPL', name: 'Apple Inc.', market: 'US', signalType: 'BUY', strength: 'medium', score: 68, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 182.50, changePercent: 1.12, sector: 'Technology' },
+      { symbol: 'TSLA', name: 'Tesla Inc.', market: 'US', signalType: 'SELL', strength: 'strong', score: 22, indicators: { maCross: 'death', rsiSignal: 'overbought', macdCross: 'death', bollingerBreak: 'upper', kdjCross: 'death' }, price: 178.25, changePercent: -4.32, sector: 'Automotive' },
+      { symbol: 'MSFT', name: 'Microsoft Corp.', market: 'US', signalType: 'HOLD', strength: 'weak', score: 52, indicators: { maCross: 'none', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 415.80, changePercent: 0.45, sector: 'Technology' },
+      { symbol: 'META', name: 'Meta Platforms', market: 'US', signalType: 'BUY', strength: 'strong', score: 80, indicators: { maCross: 'golden', rsiSignal: 'oversold', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 485.60, changePercent: 2.88, sector: 'Social Media' },
+      { symbol: 'AMD', name: 'AMD Inc.', market: 'US', signalType: 'SELL', strength: 'medium', score: 32, indicators: { maCross: 'death', rsiSignal: 'overbought', macdCross: 'death', bollingerBreak: 'none', kdjCross: 'death' }, price: 162.40, changePercent: -2.65, sector: 'Semiconductors' },
+      { symbol: 'GOOGL', name: 'Alphabet Inc.', market: 'US', signalType: 'BUY', strength: 'medium', score: 70, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'golden' }, price: 155.20, changePercent: 1.55, sector: 'Technology' },
+      { symbol: 'JPM', name: 'JPMorgan Chase', market: 'US', signalType: 'BUY', strength: 'weak', score: 58, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'none', bollingerBreak: 'none', kdjCross: 'none' }, price: 198.75, changePercent: 0.68, sector: 'Banking' },
+    ],
+  };
+
+  return (demoData[market] || demoData.US).map((d) => ({
+    symbol: d.symbol,
+    name: d.name,
+    price: d.price,
+    changePercent: d.changePercent,
+    signalType: d.signalType,
+    strength: d.strength,
+    indicators: d.indicators,
+    score: d.score,
+    sector: d.sector,
+  }));
+}
+
 // ==================== Component ====================
 
 export function SignalScannerView() {
@@ -323,6 +382,7 @@ export function SignalScannerView() {
   const [loading, setLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const abortRef = useRef<boolean>(false);
 
   // Fetch sector data for selected market
@@ -408,6 +468,7 @@ export function SignalScannerView() {
     setScanError(null);
     setSignals([]);
     setSelectedSignal(null);
+    setIsDemoMode(false);
 
     try {
       // Phase 1: Fetch sectors
@@ -481,15 +542,34 @@ export function SignalScannerView() {
         return bScore - aScore;
       });
 
-      setSignals(generatedSignals);
-      if (generatedSignals.length > 0) {
-        setSelectedSignal(generatedSignals[0]);
-        // Fetch detail for first signal
-        loadSignalDetail(generatedSignals[0]);
+      if (generatedSignals.length === 0) {
+        // No real signals found — fall back to demo signals
+        const demo = generateDemoSignals(market);
+        setSignals(demo);
+        setIsDemoMode(true);
+        setIsOffline(true);
+        if (demo.length > 0) {
+          setSelectedSignal(demo[0]);
+        }
+      } else {
+        setSignals(generatedSignals);
+        setIsDemoMode(false);
+        if (generatedSignals.length > 0) {
+          setSelectedSignal(generatedSignals[0]);
+          // Fetch detail for first signal
+          loadSignalDetail(generatedSignals[0]);
+        }
       }
     } catch {
       setScanError(t('scanner.scanError'));
       setIsOffline(true);
+      // Fall back to demo signals on error
+      const demo = generateDemoSignals(market);
+      setSignals(demo);
+      setIsDemoMode(true);
+      if (demo.length > 0) {
+        setSelectedSignal(demo[0]);
+      }
     } finally {
       setScanning(false);
       setScanPhase('');
@@ -501,12 +581,11 @@ export function SignalScannerView() {
     setLoading(true);
     setSelectedSignal(signal);
     try {
-      const [quoteRes] = await Promise.allSettled([
-        fetch(`/api/fusion/market/quote?symbol=${signal.symbol}`),
-      ]);
+      let quoteRes: Response | null = null;
+      try { quoteRes = await fetch(`/api/fusion/market/quote?symbol=${signal.symbol}`); } catch { /* ignore */ }
 
-      if (quoteRes.status === 'fulfilled' && quoteRes.value.ok) {
-        const data = await quoteRes.value.json();
+      if (quoteRes && quoteRes.ok) {
+        const data = await quoteRes.json();
         if (data.success && data.data) {
           setQuote(data.data);
         }
@@ -539,7 +618,7 @@ export function SignalScannerView() {
           {(['US', 'HK', 'A'] as const).map((m) => (
             <button
               key={m}
-              onClick={() => { setMarket(m); setSignals([]); setSelectedSignal(null); }}
+              onClick={() => { setMarket(m); setSignals([]); setSelectedSignal(null); setIsDemoMode(false); setIsOffline(false); setScanError(null); }}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
                 market === m
                   ? 'bg-emerald-600/20 text-emerald-400'
@@ -562,7 +641,7 @@ export function SignalScannerView() {
         {isOffline && (
           <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-xs flex items-center gap-1 self-center">
             <WifiOff className="w-3 h-3" />
-            {t('scanner.scanError')}
+            {t('scanner.demoMode')}
           </Badge>
         )}
       </div>
@@ -619,14 +698,29 @@ export function SignalScannerView() {
                 {t('scanner.scanResults')}
                 <span className="ml-2 text-xs text-zinc-400">{signals.length} {t('scanner.signalsFound')}</span>
               </CardTitle>
-              <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[10px]">
-                <Wifi className="w-3 h-3 mr-1" />
-                Live
-              </Badge>
+              {isDemoMode ? (
+                <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[10px]">
+                  <WifiOff className="w-3 h-3 mr-1" />
+                  {t('scanner.demoMode')}
+                </Badge>
+              ) : (
+                <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[10px]">
+                  <Wifi className="w-3 h-3 mr-1" />
+                  Live
+                </Badge>
+              )}
             </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-96 overflow-y-auto custom-scrollbar">
+              {isDemoMode && (
+                <div className="col-span-full mb-1">
+                  <p className="text-[11px] text-yellow-500/70 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    {t('scanner.demoNote')}
+                  </p>
+                </div>
+              )}
               {signals.map((signal) => (
                 <button
                   key={signal.symbol}
@@ -690,8 +784,8 @@ export function SignalScannerView() {
         </Card>
       )}
 
-      {/* No signals state */}
-      {!scanning && signals.length === 0 && !scanError && (
+      {/* No signals state (shouldn't appear anymore since we always have demo fallback) */}
+      {!scanning && signals.length === 0 && !scanError && !isDemoMode && (
         <Card className="bg-[#111118] border-[#1e1e2e] border-dashed rounded-xl">
           <CardContent className="py-12 text-center">
             <Radar className="w-12 h-12 text-zinc-600 mx-auto mb-3" />

@@ -494,6 +494,7 @@ export function StrategyCenterView({ onBacktest }: StrategyCenterViewProps) {
       </div>
 
       {/* Strategy Grid */}
+      <div className="max-h-[calc(100vh-300px)] overflow-y-auto custom-scrollbar">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredStrategies.map((strategy) => {
           const cfg = typeConfig[strategy.type];
@@ -599,6 +600,7 @@ export function StrategyCenterView({ onBacktest }: StrategyCenterViewProps) {
             </Card>
           );
         })}
+      </div>
       </div>
 
       {/* Create Strategy Dialog */}

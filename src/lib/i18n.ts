@@ -129,6 +129,8 @@ const translations: Record<Language, Record<string, string>> = {
     'chat.quickPrompt3': 'Recommend undervalued stocks',
     'chat.modeQuick': 'Quick',
     'chat.modeDeep': 'Deep',
+    'chat.welcome': '👋 Hello! I\'m QuantFusion AI Assistant',
+    'chat.welcomeDesc': 'I can help you analyze stocks, understand market trends, and provide trading insights. Try asking me about a specific stock or market trend!',
     'chat.welcomeMessage': 'Hello! I am QuantFusion AI analyst. How can I help you today?',
     'chat.sessionTitle': 'New Analysis Session',
     'chat.thinking': 'AI is thinking...',
@@ -207,6 +209,9 @@ const translations: Record<Language, Record<string, string>> = {
     'scanner.scanningSectors': 'Scanning sectors...',
     'scanner.analyzingStocks': 'Analyzing stocks...',
     'scanner.generatingSignals': 'Generating signals...',
+    'scanner.demoMode': 'Demo Mode',
+    'scanner.demoSignals': 'Demo Signals',
+    'scanner.demoNote': 'These are sample signals for demonstration. Connect to live data for real-time signals.',
 
     // Positions View
     'pos.totalInvested': 'Total Invested',
@@ -342,6 +347,8 @@ const translations: Record<Language, Record<string, string>> = {
     'pos.confidence95': '1-day 95% confidence',
     'pos.annualized': 'Annualized',
     'pos.portfolioLevel': 'Portfolio level',
+    'pos.demo': 'Demo',
+    'pos.demoRiskHint': 'Insufficient data — showing demo values',
 
     // Backtest View
     'back.config': 'Backtest Configuration',
@@ -451,6 +458,10 @@ const translations: Record<Language, Record<string, string>> = {
     'common.loading': 'Loading...',
     'common.error': 'Error',
     'common.retry': 'Retry',
+    'common.justNow': 'just now',
+    'common.minutesAgo': 'm ago',
+    'common.hoursAgo': 'h ago',
+    'common.daysAgo': 'd ago',
   },
   zh: {
     // Sidebar
@@ -572,6 +583,8 @@ const translations: Record<Language, Record<string, string>> = {
     'chat.quickPrompt3': '推荐低估值股票',
     'chat.modeQuick': '快速',
     'chat.modeDeep': '深度',
+    'chat.welcome': '👋 你好！我是QuantFusion AI助手',
+    'chat.welcomeDesc': '我可以帮你分析股票、解读市场趋势、提供交易洞察。试试问我某只股票或市场趋势！',
     'chat.welcomeMessage': '你好！我是 QuantFusion AI 分析师，有什么可以帮助你的？',
     'chat.sessionTitle': '新分析会话',
     'chat.thinking': 'AI思考中...',
@@ -650,6 +663,9 @@ const translations: Record<Language, Record<string, string>> = {
     'scanner.scanningSectors': '正在扫描板块...',
     'scanner.analyzingStocks': '正在分析个股...',
     'scanner.generatingSignals': '正在生成信号...',
+    'scanner.demoMode': '演示模式',
+    'scanner.demoSignals': '演示信号',
+    'scanner.demoNote': '这些是演示用的示例信号。连接实时数据源以获取真实信号。',
 
     // Positions View
     'pos.totalInvested': '总投资额',
@@ -785,6 +801,8 @@ const translations: Record<Language, Record<string, string>> = {
     'pos.confidence95': '1日 95% 置信度',
     'pos.annualized': '年化',
     'pos.portfolioLevel': '组合级别',
+    'pos.demo': '演示',
+    'pos.demoRiskHint': '数据不足 — 显示演示数值',
 
     // Backtest View
     'back.config': '回测配置',
@@ -894,6 +912,10 @@ const translations: Record<Language, Record<string, string>> = {
     'common.loading': '加载中...',
     'common.error': '错误',
     'common.retry': '重试',
+    'common.justNow': '刚刚',
+    'common.minutesAgo': '分钟前',
+    'common.hoursAgo': '小时前',
+    'common.daysAgo': '天前',
   },
 };
 

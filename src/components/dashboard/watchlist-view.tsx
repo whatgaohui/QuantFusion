@@ -179,15 +179,15 @@ export function WatchlistView() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [watchlistRes, alertsRes] = await Promise.allSettled([
-        fetch('/api/watchlist'),
-        fetch('/api/alerts'),
-      ]);
+      let watchlistRes: Response | null = null;
+      let alertsRes: Response | null = null;
+      try { watchlistRes = await fetch('/api/watchlist'); } catch { /* ignore */ }
+      try { alertsRes = await fetch('/api/alerts'); } catch { /* ignore */ }
 
       let watchlistItems: { symbol: string; id: string; name: string; market?: string }[] = [];
 
-      if (watchlistRes.status === 'fulfilled' && watchlistRes.value.ok) {
-        const data = await watchlistRes.value.json();
+      if (watchlistRes && watchlistRes.ok) {
+        const data = await watchlistRes.json();
         if (Array.isArray(data) && data.length > 0) {
           watchlistItems = data.map((item: { id: string; symbol: string; name?: string; market?: string }) => ({
             id: item.id,
@@ -221,8 +221,8 @@ export function WatchlistView() {
       }
 
       // Process alerts from fusion API
-      if (alertsRes.status === 'fulfilled' && alertsRes.value.ok) {
-        const data = await alertsRes.value.json();
+      if (alertsRes && alertsRes.ok) {
+        const data = await alertsRes.json();
         if (Array.isArray(data) && data.length > 0) {
           const mapped: AlertItem[] = data.map((a: FusionAlert) => ({
             id: a.id,

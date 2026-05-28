@@ -365,12 +365,12 @@ export function MarketNewsView() {
                       </div>
 
                       {/* Headline */}
-                      <h4 className="text-sm font-semibold text-white leading-snug mb-2 group-hover:text-emerald-400 transition-colors line-clamp-2">
+                      <h4 className="text-sm font-semibold text-white leading-snug mb-2 group-hover:text-emerald-400 transition-colors overflow-hidden line-clamp-2">
                         {article.headline}
                       </h4>
 
                       {/* Summary */}
-                      <p className="text-xs text-zinc-400 leading-relaxed line-clamp-2 mb-3">
+                      <p className="text-xs text-zinc-400 leading-relaxed overflow-hidden line-clamp-2 mb-3">
                         {article.summary}
                       </p>
 

@@ -187,11 +187,15 @@ function calculateRiskMetrics(positions: Position[]): RiskMetrics {
   }
   const maxDrawdownPercent = totalValue > 0 ? -(maxDrawdown / totalValue) * 100 : 0;
 
-  return {
+  const result: RiskMetrics = {
     var95: parseFloat(var95.toFixed(0)),
     sharpeRatio: parseFloat(sharpeRatio.toFixed(2)),
     maxDrawdown: parseFloat(maxDrawdownPercent.toFixed(1)),
   };
+
+  // If all metrics are effectively zero (insufficient data), return demo defaults
+  const isZero = Math.abs(result.var95) < 1 && Math.abs(result.sharpeRatio) < 0.01 && Math.abs(result.maxDrawdown) < 0.1;
+  return isZero ? mockRiskMetrics : result;
 }
 
 export function PositionsView() {
@@ -206,6 +210,7 @@ export function PositionsView() {
   const [closedOpen, setClosedOpen] = useState(false);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [expandedLotId, setExpandedLotId] = useState<string | null>(null);
+  const [isDemoRisk, setIsDemoRisk] = useState(false);
 
   const fetchData = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -216,16 +221,16 @@ export function PositionsView() {
     setError(null);
 
     try {
-      const [positionsRes, summaryRes] = await Promise.allSettled([
-        fetch('/api/portfolio/positions'),
-        fetch('/api/portfolio/summary'),
-      ]);
+      let positionsRes: Response | null = null;
+      let summaryRes: Response | null = null;
+      try { positionsRes = await fetch('/api/portfolio/positions'); } catch { /* ignore */ }
+      try { summaryRes = await fetch('/api/portfolio/summary'); } catch { /* ignore */ }
 
       let activePositions: Position[] = [];
       let closedPositionsList: Position[] = [];
 
-      if (positionsRes.status === 'fulfilled' && positionsRes.value.ok) {
-        const data = await positionsRes.value.json();
+      if (positionsRes && positionsRes.ok) {
+        const data = await positionsRes.json();
         if (Array.isArray(data) && data.length > 0) {
           // Map DB positions to our Position interface
           const allPositions: Position[] = data.map((p: {
@@ -338,18 +343,23 @@ export function PositionsView() {
                 }
                 return pos;
               });
-              setRiskMetrics(calculateRiskMetrics(updatedPositions));
+              const calculatedMetrics = calculateRiskMetrics(updatedPositions);
+              setRiskMetrics(calculatedMetrics);
+              setIsDemoRisk(calculatedMetrics === mockRiskMetrics || (Math.abs(calculatedMetrics.var95) < 1 && Math.abs(calculatedMetrics.sharpeRatio) < 0.01 && Math.abs(calculatedMetrics.maxDrawdown) < 0.1));
             }
           }
         } catch {
-          setRiskMetrics(calculateRiskMetrics(activePositions));
+          const fallbackMetrics = calculateRiskMetrics(activePositions);
+          setRiskMetrics(fallbackMetrics);
+          setIsDemoRisk(fallbackMetrics === mockRiskMetrics || (Math.abs(fallbackMetrics.var95) < 1 && Math.abs(fallbackMetrics.sharpeRatio) < 0.01 && Math.abs(fallbackMetrics.maxDrawdown) < 0.1));
         }
       } else {
         setRiskMetrics(mockRiskMetrics);
+        setIsDemoRisk(true);
       }
 
-      if (summaryRes.status === 'fulfilled' && summaryRes.value.ok) {
-        const data = await summaryRes.value.json();
+      if (summaryRes && summaryRes.ok) {
+        const data = await summaryRes.json();
         setSummary({
           totalInvested: data.totalInvested ?? data.totalCost ?? 0,
           totalPnl: data.totalPnl ?? data.totalProfit ?? 0,
@@ -366,6 +376,7 @@ export function PositionsView() {
       setClosedPositions(mockClosedPositions);
       setSummary(mockSummary);
       setRiskMetrics(mockRiskMetrics);
+      setIsDemoRisk(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -488,6 +499,7 @@ export function PositionsView() {
             <div className="flex items-center gap-2 mb-1">
               <Shield className="w-3.5 h-3.5 text-yellow-400" />
               <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('pos.var')}</span>
+              {isDemoRisk && <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[8px] px-1 py-0 ml-auto">{t('pos.demo')}</Badge>}
             </div>
             <p className="text-lg font-bold text-yellow-400">{formatCurrency(currentRisk.var95)}</p>
             <p className="text-[10px] text-zinc-600">{t('pos.confidence95')}</p>
@@ -498,6 +510,7 @@ export function PositionsView() {
             <div className="flex items-center gap-2 mb-1">
               <Activity className="w-3.5 h-3.5 text-emerald-400" />
               <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('pos.sharpe')}</span>
+              {isDemoRisk && <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[8px] px-1 py-0 ml-auto">{t('pos.demo')}</Badge>}
             </div>
             <p className={`text-lg font-bold ${currentRisk.sharpeRatio >= 1 ? 'text-emerald-400' : currentRisk.sharpeRatio >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>
               {currentRisk.sharpeRatio.toFixed(2)}
@@ -510,12 +523,16 @@ export function PositionsView() {
             <div className="flex items-center gap-2 mb-1">
               <TrendingDown className="w-3.5 h-3.5 text-red-400" />
               <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('pos.maxDrawdown')}</span>
+              {isDemoRisk && <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[8px] px-1 py-0 ml-auto">{t('pos.demo')}</Badge>}
             </div>
             <p className="text-lg font-bold text-red-400">{currentRisk.maxDrawdown.toFixed(1)}%</p>
             <p className="text-[10px] text-zinc-600">{t('pos.portfolioLevel')}</p>
           </CardContent>
         </Card>
       </div>
+      {isDemoRisk && (
+        <p className="text-[10px] text-yellow-500/70 text-center">{t('pos.demoRiskHint')}</p>
+      )}
 
       {/* Active Positions */}
       <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">

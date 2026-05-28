@@ -105,17 +105,17 @@ const defaultIndices: MarketIndex[] = [
 ];
 
 const defaultTrades: Trade[] = [
-  { id: '1', symbol: 'AAPL', name: 'Apple Inc.', side: 'BUY', price: 189.45, quantity: 50, total: 9472.50, timestamp: '2024-01-15T10:30:00Z' },
-  { id: '2', symbol: 'NVDA', name: 'NVIDIA Corp.', side: 'BUY', price: 615.20, quantity: 20, total: 12304.00, timestamp: '2024-01-15T09:45:00Z' },
-  { id: '3', symbol: 'TSLA', name: 'Tesla Inc.', side: 'SELL', price: 245.80, quantity: 30, total: 7374.00, timestamp: '2024-01-14T14:20:00Z' },
-  { id: '4', symbol: 'MSFT', name: 'Microsoft Corp.', side: 'BUY', price: 388.50, quantity: 25, total: 9712.50, timestamp: '2024-01-14T11:15:00Z' },
-  { id: '5', symbol: 'META', name: 'Meta Platforms', side: 'SELL', price: 374.20, quantity: 15, total: 5613.00, timestamp: '2024-01-13T15:45:00Z' },
+  { id: '1', symbol: 'AAPL', name: 'Apple Inc.', side: 'BUY', price: 189.45, quantity: 50, total: 9472.50, timestamp: new Date(Date.now() - 30 * 60000).toISOString() },
+  { id: '2', symbol: 'NVDA', name: 'NVIDIA Corp.', side: 'BUY', price: 615.20, quantity: 20, total: 12304.00, timestamp: new Date(Date.now() - 2 * 3600000).toISOString() },
+  { id: '3', symbol: 'TSLA', name: 'Tesla Inc.', side: 'SELL', price: 245.80, quantity: 30, total: 7374.00, timestamp: new Date(Date.now() - 6 * 3600000).toISOString() },
+  { id: '4', symbol: 'MSFT', name: 'Microsoft Corp.', side: 'BUY', price: 388.50, quantity: 25, total: 9712.50, timestamp: new Date(Date.now() - 1 * 86400000).toISOString() },
+  { id: '5', symbol: 'META', name: 'Meta Platforms', side: 'SELL', price: 374.20, quantity: 15, total: 5613.00, timestamp: new Date(Date.now() - 2 * 86400000).toISOString() },
 ];
 
 const defaultAlerts: AlertItem[] = [
-  { id: '1', symbol: 'NVDA', alertType: 'price_above', targetValue: 650, isActive: true, isTriggered: false, createdAt: '2024-01-15T10:00:00Z' },
-  { id: '2', symbol: 'AAPL', alertType: 'price_above', targetValue: 195, isActive: true, isTriggered: true, createdAt: '2024-01-14T09:00:00Z' },
-  { id: '3', symbol: 'TSLA', alertType: 'price_below', targetValue: 240, isActive: true, isTriggered: false, createdAt: '2024-01-13T15:00:00Z' },
+  { id: '1', symbol: 'NVDA', alertType: 'price_above', targetValue: 650, isActive: true, isTriggered: false, createdAt: new Date(Date.now() - 2 * 3600000).toISOString() },
+  { id: '2', symbol: 'AAPL', alertType: 'price_above', targetValue: 195, isActive: true, isTriggered: true, createdAt: new Date(Date.now() - 5 * 3600000).toISOString() },
+  { id: '3', symbol: 'TSLA', alertType: 'price_below', targetValue: 240, isActive: true, isTriggered: false, createdAt: new Date(Date.now() - 8 * 3600000).toISOString() },
 ];
 
 const miniSparklineData = [
@@ -177,17 +177,20 @@ export function DashboardView() {
       // US stocks as proxy for US market (free Finnhub doesn't have index quotes)
       const indexSymbols = 'SH000001,SZ399001,HSI,AAPL,GOOGL,MSFT';
 
-      const [summaryRes, indicesRes, alertsRes] = await Promise.allSettled([
-        fetch('/api/portfolio/summary'),
-        fetch(`/api/fusion/market/quote?symbols=${indexSymbols}`),
-        fetch('/api/alerts'),
-      ]);
+      // Sequential fetch to prevent server crashes in resource-constrained environments
+      let summaryRes: Response | null = null;
+      let indicesRes: Response | null = null;
+      let alertsRes: Response | null = null;
+
+      try { summaryRes = await fetch('/api/portfolio/summary'); } catch { /* ignore */ }
+      try { indicesRes = await fetch(`/api/fusion/market/quote?symbols=${indexSymbols}`); } catch { /* ignore */ }
+      try { alertsRes = await fetch('/api/alerts'); } catch { /* ignore */ }
 
       // Process portfolio summary
-      if (summaryRes.status === 'fulfilled' && summaryRes.value.ok) {
+      if (summaryRes && summaryRes.ok) {
         try {
-          const data = await summaryRes.value.json();
-          setSummary({
+          const data = await summaryRes.json();
+          const apiSummary: PortfolioSummary = {
             totalValue: data.totalValue ?? 0,
             todayPnl: data.todayPnl ?? 0,
             todayPnlPercent: data.todayPnlPercent ?? data.totalProfitPct ?? 0,
@@ -196,7 +199,13 @@ export function DashboardView() {
             activePositions: data.activePositions ?? 0,
             winRate: data.winRate ?? 0,
             totalInvested: data.totalInvested ?? data.totalCost ?? 0,
-          });
+          };
+          // If API returns empty/zero data, use demo fallback
+          if (apiSummary.totalValue <= 0 || (apiSummary.totalPnl === 0 && apiSummary.winRate === 0 && apiSummary.activePositions <= 1)) {
+            setSummary(defaultSummary);
+          } else {
+            setSummary(apiSummary);
+          }
         } catch {
           setSummary(defaultSummary);
         }
@@ -205,9 +214,9 @@ export function DashboardView() {
       }
 
       // Process indices from fusion batch quote
-      if (indicesRes.status === 'fulfilled' && indicesRes.value.ok) {
+      if (indicesRes && indicesRes.ok) {
         try {
-          const result = await indicesRes.value.json();
+          const result = await indicesRes.json();
           if (result.success && Array.isArray(result.data) && result.data.length > 0) {
             const indexResults: MarketIndex[] = result.data.map((q: { symbol: string; name: string; currentPrice: number; change: number; changePercent: number; market: string }) => ({
               symbol: q.symbol,
@@ -226,15 +235,15 @@ export function DashboardView() {
         }
       } else {
         setIndices(defaultIndices);
-        if (indicesRes.status === 'rejected') {
+        if (!indicesRes) {
           setError(t('dash.fetchError'));
         }
       }
 
       // Process alerts
-      if (alertsRes.status === 'fulfilled' && alertsRes.value.ok) {
+      if (alertsRes && alertsRes.ok) {
         try {
-          const data = await alertsRes.value.json();
+          const data = await alertsRes.json();
           if (Array.isArray(data) && data.length > 0) {
             const mappedAlerts: AlertItem[] = data.slice(0, 5).map((a: { id: string; symbol: string; alertType: string; targetValue: number; isActive: boolean; isTriggered: boolean; createdAt: string }) => ({
               id: a.id,
@@ -599,10 +608,11 @@ export function DashboardView() {
               const timeAgo = (() => {
                 const diff = Date.now() - new Date(alert.createdAt).getTime();
                 const mins = Math.floor(diff / 60000);
-                if (mins < 60) return `${mins}m ago`;
+                if (mins < 1) return t('common.justNow');
+                if (mins < 60) return `${mins}${t('common.minutesAgo')}`;
                 const hours = Math.floor(mins / 60);
-                if (hours < 24) return `${hours}h ago`;
-                return `${Math.floor(hours / 24)}d ago`;
+                if (hours < 24) return `${hours}${t('common.hoursAgo')}`;
+                return `${Math.floor(hours / 24)}${t('common.daysAgo')}`;
               })();
               return (
                 <div key={alert.id} className="flex items-start gap-3 p-2 bg-[#0a0a0f] rounded-lg border border-[#1e1e2e]">
