@@ -11,6 +11,7 @@ import {
   EyeOff,
   Save,
   ExternalLink,
+  Globe,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,8 +21,11 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { useLanguage } from '@/lib/i18n';
+import type { Language } from '@/lib/i18n';
 
 export function SettingsView() {
+  const { t, language, setLanguage } = useLanguage();
   const [showApiKey, setShowApiKey] = useState(false);
   const [saving, setSaving] = useState(false);
   
@@ -46,7 +50,7 @@ export function SettingsView() {
     // Simulate saving
     await new Promise((resolve) => setTimeout(resolve, 1000));
     setSaving(false);
-    toast.success('Settings saved successfully');
+    toast.success(language === 'zh' ? '设置已保存' : 'Settings saved successfully');
   };
 
   return (
@@ -56,12 +60,12 @@ export function SettingsView() {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Key className="w-5 h-5 text-emerald-400" />
-            <CardTitle className="text-base font-semibold text-white">API Configuration</CardTitle>
+            <CardTitle className="text-base font-semibold text-white">{t('settings.apiConfig')}</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-zinc-300 text-sm">Finnhub API Key</Label>
+            <Label className="text-zinc-300 text-sm">{t('settings.finnhubApiKey')}</Label>
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <Input
@@ -81,7 +85,7 @@ export function SettingsView() {
               </div>
             </div>
             <p className="text-[10px] text-zinc-500">
-              Your API key is used to fetch market data. Get a free key at{' '}
+              {t('settings.apiKeyHint')}{' '}
               <a
                 href="https://finnhub.io"
                 target="_blank"
@@ -96,7 +100,7 @@ export function SettingsView() {
           <div className="flex items-center gap-2 p-3 bg-emerald-600/5 border border-emerald-600/10 rounded-lg">
             <Shield className="w-4 h-4 text-emerald-400 flex-shrink-0" />
             <p className="text-xs text-zinc-400">
-              Your API key is stored securely and never shared. All requests are made server-side.
+              {t('settings.apiKeySecure')}
             </p>
           </div>
         </CardContent>
@@ -107,53 +111,53 @@ export function SettingsView() {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Settings className="w-5 h-5 text-emerald-400" />
-            <CardTitle className="text-base font-semibold text-white">Trading Parameters</CardTitle>
+            <CardTitle className="text-base font-semibold text-white">{t('settings.tradingParams')}</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-zinc-300 text-sm">Default Position Size (%)</Label>
+              <Label className="text-zinc-300 text-sm">{t('settings.defaultPositionSize')}</Label>
               <Input
                 type="number"
                 value={positionSize}
                 onChange={(e) => setPositionSize(e.target.value)}
                 className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
               />
-              <p className="text-[10px] text-zinc-500">Percentage of total capital per trade</p>
+              <p className="text-[10px] text-zinc-500">{t('settings.pctOfCapital')}</p>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-zinc-300 text-sm">Default Stop Loss (%)</Label>
+              <Label className="text-zinc-300 text-sm">{t('settings.defaultStopLoss')}</Label>
               <Input
                 type="number"
                 value={stopLoss}
                 onChange={(e) => setStopLoss(e.target.value)}
                 className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
               />
-              <p className="text-[10px] text-zinc-500">Maximum loss before auto-close</p>
+              <p className="text-[10px] text-zinc-500">{t('settings.maxLossAutoClose')}</p>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-zinc-300 text-sm">Default Take Profit (%)</Label>
+              <Label className="text-zinc-300 text-sm">{t('settings.defaultTakeProfit')}</Label>
               <Input
                 type="number"
                 value={takeProfit}
                 onChange={(e) => setTakeProfit(e.target.value)}
                 className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
               />
-              <p className="text-[10px] text-zinc-500">Target profit for auto-close</p>
+              <p className="text-[10px] text-zinc-500">{t('settings.targetProfitAutoClose')}</p>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-zinc-300 text-sm">Default Cycle Days</Label>
+              <Label className="text-zinc-300 text-sm">{t('settings.defaultCycleDays')}</Label>
               <Input
                 type="number"
                 value={cycleDays}
                 onChange={(e) => setCycleDays(e.target.value)}
                 className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
               />
-              <p className="text-[10px] text-zinc-500">Maximum holding period per position</p>
+              <p className="text-[10px] text-zinc-500">{t('settings.maxHoldingPeriod')}</p>
             </div>
           </div>
 
@@ -166,7 +170,7 @@ export function SettingsView() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
             >
               <Save className="w-4 h-4" />
-              {saving ? 'Saving...' : 'Save Parameters'}
+              {saving ? t('settings.saving') : t('settings.saveParams')}
             </Button>
             <Button
               variant="outline"
@@ -178,7 +182,7 @@ export function SettingsView() {
               }}
               className="border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-[#1a1a2e]"
             >
-              Reset Defaults
+              {t('settings.resetDefaults')}
             </Button>
           </div>
         </CardContent>
@@ -189,14 +193,14 @@ export function SettingsView() {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Bell className="w-5 h-5 text-emerald-400" />
-            <CardTitle className="text-base font-semibold text-white">Notification Preferences</CardTitle>
+            <CardTitle className="text-base font-semibold text-white">{t('settings.notifPrefs')}</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-1">
           <div className="flex items-center justify-between py-3">
             <div>
-              <p className="text-sm text-white">Signal Alerts</p>
-              <p className="text-xs text-zinc-500">Get notified when new trading signals are detected</p>
+              <p className="text-sm text-white">{t('settings.signalAlerts')}</p>
+              <p className="text-xs text-zinc-500">{t('settings.signalAlertsDesc')}</p>
             </div>
             <Switch
               checked={notifSignalAlerts}
@@ -208,8 +212,8 @@ export function SettingsView() {
 
           <div className="flex items-center justify-between py-3">
             <div>
-              <p className="text-sm text-white">Price Alerts</p>
-              <p className="text-xs text-zinc-500">Notifications when watchlist stocks hit target prices</p>
+              <p className="text-sm text-white">{t('settings.priceAlerts')}</p>
+              <p className="text-xs text-zinc-500">{t('settings.priceAlertsDesc')}</p>
             </div>
             <Switch
               checked={notifPriceAlerts}
@@ -221,8 +225,8 @@ export function SettingsView() {
 
           <div className="flex items-center justify-between py-3">
             <div>
-              <p className="text-sm text-white">Position Updates</p>
-              <p className="text-xs text-zinc-500">Updates on position open, close, and cycle expiration</p>
+              <p className="text-sm text-white">{t('settings.positionUpdates')}</p>
+              <p className="text-xs text-zinc-500">{t('settings.positionUpdatesDesc')}</p>
             </div>
             <Switch
               checked={notifPositionUpdates}
@@ -234,8 +238,8 @@ export function SettingsView() {
 
           <div className="flex items-center justify-between py-3">
             <div>
-              <p className="text-sm text-white">Daily Report</p>
-              <p className="text-xs text-zinc-500">End-of-day summary of portfolio performance</p>
+              <p className="text-sm text-white">{t('settings.dailyReport')}</p>
+              <p className="text-xs text-zinc-500">{t('settings.dailyReportDesc')}</p>
             </div>
             <Switch
               checked={notifDailyReport}
@@ -247,8 +251,8 @@ export function SettingsView() {
 
           <div className="flex items-center justify-between py-3">
             <div>
-              <p className="text-sm text-white">Market News</p>
-              <p className="text-xs text-zinc-500">Breaking market news and significant events</p>
+              <p className="text-sm text-white">{t('settings.marketNews')}</p>
+              <p className="text-xs text-zinc-500">{t('settings.marketNewsDesc')}</p>
             </div>
             <Switch
               checked={notifMarketNews}
@@ -259,38 +263,71 @@ export function SettingsView() {
         </CardContent>
       </Card>
 
+      {/* Language */}
+      <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Globe className="w-5 h-5 text-emerald-400" />
+            <CardTitle className="text-base font-semibold text-white">{t('settings.language')}</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-zinc-500">{t('settings.languageDesc')}</p>
+          <div className="flex items-center gap-3">
+            <Button
+              variant={language === 'en' ? 'default' : 'outline'}
+              onClick={() => setLanguage('en')}
+              className={language === 'en' 
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white gap-2' 
+                : 'border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-[#1a1a2e] gap-2'
+              }
+            >
+              🇺🇸 {t('settings.english')}
+            </Button>
+            <Button
+              variant={language === 'zh' ? 'default' : 'outline'}
+              onClick={() => setLanguage('zh' as Language)}
+              className={language === 'zh' 
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white gap-2' 
+                : 'border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-[#1a1a2e] gap-2'
+              }
+            >
+              🇨🇳 {t('settings.chinese')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* About */}
       <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Info className="w-5 h-5 text-emerald-400" />
-            <CardTitle className="text-base font-semibold text-white">About</CardTitle>
+            <CardTitle className="text-base font-semibold text-white">{t('settings.about')}</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between py-1">
-            <span className="text-sm text-zinc-400">Version</span>
+            <span className="text-sm text-zinc-400">{t('settings.version')}</span>
             <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[10px]">
               v1.0.0
             </Badge>
           </div>
           <div className="flex items-center justify-between py-1">
-            <span className="text-sm text-zinc-400">Framework</span>
+            <span className="text-sm text-zinc-400">{t('settings.framework')}</span>
             <span className="text-sm text-zinc-300">Next.js 16 + TypeScript</span>
           </div>
           <div className="flex items-center justify-between py-1">
-            <span className="text-sm text-zinc-400">Market Data</span>
+            <span className="text-sm text-zinc-400">{t('settings.marketData')}</span>
             <span className="text-sm text-zinc-300">Finnhub API</span>
           </div>
           <div className="flex items-center justify-between py-1">
-            <span className="text-sm text-zinc-400">Signal Engine</span>
+            <span className="text-sm text-zinc-400">{t('settings.signalEngine')}</span>
             <span className="text-sm text-zinc-300">RSI + MACD + Bollinger + KDJ</span>
           </div>
           <Separator className="bg-[#1e1e2e] my-2" />
           <p className="text-xs text-zinc-500 leading-relaxed">
-            QuantFlow is a quantitative trading dashboard designed for signal scanning, portfolio management, and market analysis. 
-            This tool is for informational purposes only and does not constitute financial advice. 
-            Always do your own research before making investment decisions.
+            {t('settings.aboutDesc')}
           </p>
         </CardContent>
       </Card>

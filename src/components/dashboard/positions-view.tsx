@@ -43,6 +43,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { useLanguage } from '@/lib/i18n';
 
 interface Position {
   id: string;
@@ -123,6 +124,7 @@ function formatCurrency(value: number | undefined | null): string {
 }
 
 export function PositionsView() {
+  const { t } = useLanguage();
   const [positions, setPositions] = useState<Position[] | null>(null);
   const [closedPositions, setClosedPositions] = useState<Position[] | null>(null);
   const [summary, setSummary] = useState<PositionSummary | null>(null);
@@ -224,7 +226,7 @@ export function PositionsView() {
         <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-zinc-400">Total Invested</span>
+              <span className="text-sm text-zinc-400">{t('pos.totalInvested')}</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-600/10 flex items-center justify-center">
                 <DollarSign className="w-4 h-4 text-emerald-400" />
               </div>
@@ -236,7 +238,7 @@ export function PositionsView() {
         <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-zinc-400">Total P&L</span>
+              <span className="text-sm text-zinc-400">{t('pos.totalPnl')}</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-600/10 flex items-center justify-center">
                 {totalPnl >= 0 ? (
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
@@ -254,12 +256,12 @@ export function PositionsView() {
         <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-zinc-400">Avg Holding Days</span>
+              <span className="text-sm text-zinc-400">{t('pos.avgHoldingDays')}</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-600/10 flex items-center justify-center">
                 <Clock className="w-4 h-4 text-emerald-400" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-white">{avgDays.toFixed(1)} days</p>
+            <p className="text-2xl font-bold text-white">{avgDays.toFixed(1)} {t('pos.days')}</p>
           </CardContent>
         </Card>
       </div>
@@ -269,7 +271,7 @@ export function PositionsView() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <CardTitle className="text-base font-semibold text-white">Active Positions</CardTitle>
+              <CardTitle className="text-base font-semibold text-white">{t('pos.activePositions')}</CardTitle>
               <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[10px]">
                 {positions?.length || 0}
               </Badge>
@@ -288,8 +290,8 @@ export function PositionsView() {
           {!positions || positions.length === 0 ? (
             <div className="text-center py-12">
               <Briefcase className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-              <p className="text-zinc-400 text-sm">No active positions</p>
-              <p className="text-zinc-500 text-xs mt-1">Open a position from the Signal Scanner</p>
+              <p className="text-zinc-400 text-sm">{t('pos.noActivePositions')}</p>
+              <p className="text-zinc-500 text-xs mt-1">{t('pos.openFromScanner')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -297,12 +299,12 @@ export function PositionsView() {
                 <TableHeader>
                   <TableRow className="border-[#1e1e2e] hover:bg-transparent">
                     <TableHead className="text-zinc-400 text-xs">Symbol</TableHead>
-                    <TableHead className="text-zinc-400 text-xs">Buy Price</TableHead>
-                    <TableHead className="text-zinc-400 text-xs">Current</TableHead>
-                    <TableHead className="text-zinc-400 text-xs">P&L%</TableHead>
-                    <TableHead className="text-zinc-400 text-xs">Days</TableHead>
-                    <TableHead className="text-zinc-400 text-xs">Remaining</TableHead>
-                    <TableHead className="text-zinc-400 text-xs text-right">Action</TableHead>
+                    <TableHead className="text-zinc-400 text-xs">{t('pos.buyPrice')}</TableHead>
+                    <TableHead className="text-zinc-400 text-xs">{t('pos.current')}</TableHead>
+                    <TableHead className="text-zinc-400 text-xs">{t('pos.pnlPercent')}</TableHead>
+                    <TableHead className="text-zinc-400 text-xs">{t('pos.days')}</TableHead>
+                    <TableHead className="text-zinc-400 text-xs">{t('pos.remaining')}</TableHead>
+                    <TableHead className="text-zinc-400 text-xs text-right">{t('pos.action')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -332,8 +334,8 @@ export function PositionsView() {
                       <TableCell>
                         <div className="space-y-1">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs text-zinc-400">{pos.remainingDays}d left</span>
-                            <span className="text-[10px] text-zinc-600">{pos.cycleDays}d cycle</span>
+                            <span className="text-xs text-zinc-400">{pos.remainingDays}d {t('pos.left')}</span>
+                            <span className="text-[10px] text-zinc-600">{pos.cycleDays}d {t('pos.cycle')}</span>
                           </div>
                           <Progress
                             value={((pos.cycleDays - pos.remainingDays) / pos.cycleDays) * 100}
@@ -359,20 +361,20 @@ export function PositionsView() {
                           </AlertDialogTrigger>
                           <AlertDialogContent className="bg-[#111118] border-[#1e1e2e]">
                             <AlertDialogHeader>
-                              <AlertDialogTitle className="text-white">Close Position</AlertDialogTitle>
+                              <AlertDialogTitle className="text-white">{t('pos.closePosition')}</AlertDialogTitle>
                               <AlertDialogDescription className="text-zinc-400">
-                                Are you sure you want to close your {pos.symbol} position? This will sell {pos.quantity} shares at the current market price of ${pos.currentPrice.toFixed(2)}.
+                                {t('pos.closePositionConfirm').replace('{symbol}', pos.symbol).replace('{quantity}', pos.quantity.toString()).replace('{price}', pos.currentPrice.toFixed(2))}
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel className="bg-[#1a1a2e] border-[#2e2e3e] text-zinc-300 hover:bg-[#2e2e3e]">
-                                Cancel
+                                {t('pos.cancel')}
                               </AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() => handleClosePosition(pos.id)}
                                 className="bg-red-600 hover:bg-red-700 text-white"
                               >
-                                Close Position
+                                {t('pos.closePosition')}
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
@@ -394,7 +396,7 @@ export function PositionsView() {
             <CardHeader className="pb-0 cursor-pointer hover:bg-[#1a1a2e]/30 transition-colors rounded-t-xl">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <CardTitle className="text-base font-semibold text-white">Closed Positions</CardTitle>
+                  <CardTitle className="text-base font-semibold text-white">{t('pos.closedPositions')}</CardTitle>
                   <Badge className="bg-zinc-600/15 text-zinc-400 border-zinc-600/20 text-[10px]">
                     {closedPositions?.length || 0}
                   </Badge>
@@ -415,11 +417,11 @@ export function PositionsView() {
                     <TableHeader>
                       <TableRow className="border-[#1e1e2e] hover:bg-transparent">
                         <TableHead className="text-zinc-400 text-xs">Symbol</TableHead>
-                        <TableHead className="text-zinc-400 text-xs">Buy Price</TableHead>
-                        <TableHead className="text-zinc-400 text-xs">Sell Price</TableHead>
-                        <TableHead className="text-zinc-400 text-xs">P&L</TableHead>
-                        <TableHead className="text-zinc-400 text-xs">Days Held</TableHead>
-                        <TableHead className="text-zinc-400 text-xs">Status</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">{t('pos.buyPrice')}</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">{t('pos.sellPrice')}</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">{t('pos.pnl')}</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">{t('pos.daysHeld')}</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">{t('pos.status')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -441,7 +443,7 @@ export function PositionsView() {
                           <TableCell className="text-sm text-zinc-400">{pos.holdingDays}d</TableCell>
                           <TableCell>
                             <Badge className="bg-zinc-600/15 text-zinc-400 border-zinc-600/20 text-[10px]">
-                              CLOSED
+                              {t('common.closed')}
                             </Badge>
                           </TableCell>
                         </TableRow>
@@ -451,7 +453,7 @@ export function PositionsView() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-zinc-500 text-sm">No closed positions yet</p>
+                  <p className="text-zinc-500 text-sm">{t('pos.noClosedPositions')}</p>
                 </div>
               )}
             </CardContent>

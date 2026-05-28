@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useLanguage } from '@/lib/i18n';
 
 interface NewsArticle {
   id: string;
@@ -115,14 +116,6 @@ const mockNews: NewsArticle[] = [
   },
 ];
 
-const categories = [
-  { value: 'all', label: 'All Categories' },
-  { value: 'general', label: 'General' },
-  { value: 'forex', label: 'Forex' },
-  { value: 'crypto', label: 'Crypto' },
-  { value: 'merger', label: 'M&A' },
-];
-
 function getCategoryColor(category: string): string {
   switch (category) {
     case 'crypto': return 'bg-purple-600/15 text-purple-400 border-purple-600/20';
@@ -155,9 +148,18 @@ function timeAgo(timestamp: string): string {
 }
 
 export function MarketNewsView() {
+  const { t } = useLanguage();
   const [news, setNews] = useState<NewsArticle[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('all');
+
+  const categories = [
+    { value: 'all', label: t('news.allCategories') },
+    { value: 'general', label: t('news.general') },
+    { value: 'forex', label: t('news.forex') },
+    { value: 'crypto', label: t('news.crypto') },
+    { value: 'merger', label: t('news.merger') },
+  ];
 
   const fetchNews = useCallback(async () => {
     setLoading(true);
@@ -211,7 +213,7 @@ export function MarketNewsView() {
         <div className="flex items-center gap-2">
           <Newspaper className="w-5 h-5 text-emerald-400" />
           <h3 className="text-sm font-medium text-zinc-400">
-            {filteredNews.length} articles
+            {filteredNews.length} {t('news.articles')}
           </h3>
         </div>
         <div className="flex items-center gap-2">
@@ -243,8 +245,8 @@ export function MarketNewsView() {
       {filteredNews.length === 0 ? (
         <div className="text-center py-16">
           <Newspaper className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-          <p className="text-zinc-400 text-sm">No news articles found</p>
-          <p className="text-zinc-500 text-xs mt-1">Try changing the category filter</p>
+          <p className="text-zinc-400 text-sm">{t('news.noNews')}</p>
+          <p className="text-zinc-500 text-xs mt-1">{t('news.tryChanging')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

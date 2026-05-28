@@ -42,6 +42,7 @@ import {
   Line,
   ResponsiveContainer,
 } from 'recharts';
+import { useLanguage } from '@/lib/i18n';
 
 interface WatchlistItem {
   id: string;
@@ -97,6 +98,7 @@ const mockAlerts: AlertItem[] = [
 
 
 export function WatchlistView() {
+  const { t, language } = useLanguage();
   const [watchlist, setWatchlist] = useState<WatchlistItem[] | null>(null);
   const [alerts, setAlerts] = useState<AlertItem[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -280,7 +282,7 @@ export function WatchlistView() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
           <Input
-            placeholder="Search to add stocks..."
+            placeholder={t('watch.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -314,7 +316,7 @@ export function WatchlistView() {
           )}
           {showSearch && searchQuery && filteredSearchResults.length === 0 && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-[#111118] border border-[#1e1e2e] rounded-lg shadow-xl z-50 p-4">
-              <p className="text-sm text-zinc-500 text-center">No stocks found</p>
+              <p className="text-sm text-zinc-500 text-center">{t('watch.noStocksFound')}</p>
             </div>
           )}
         </div>
@@ -323,19 +325,19 @@ export function WatchlistView() {
             <DialogTrigger asChild>
               <Button variant="outline" className="border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-[#1a1a2e] gap-2">
                 <Bell className="w-4 h-4" />
-                <span className="hidden sm:inline">Create Alert</span>
+                <span className="hidden sm:inline">{t('watch.createAlert')}</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="bg-[#111118] border-[#1e1e2e]">
               <DialogHeader>
-                <DialogTitle className="text-white">Create Price Alert</DialogTitle>
+                <DialogTitle className="text-white">{t('watch.createPriceAlert')}</DialogTitle>
                 <DialogDescription className="text-zinc-400">
-                  Get notified when a stock reaches your target price.
+                  {t('watch.alertDescription')}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label className="text-zinc-300 text-sm">Symbol</Label>
+                  <Label className="text-zinc-300 text-sm">{t('watch.symbol')}</Label>
                   <Input
                     placeholder="e.g., AAPL"
                     value={alertSymbol}
@@ -344,7 +346,7 @@ export function WatchlistView() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-zinc-300 text-sm">Target Price</Label>
+                  <Label className="text-zinc-300 text-sm">{t('watch.targetPrice')}</Label>
                   <Input
                     type="number"
                     placeholder="e.g., 195.00"
@@ -354,19 +356,19 @@ export function WatchlistView() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-zinc-300 text-sm">Direction</Label>
+                  <Label className="text-zinc-300 text-sm">{t('watch.direction')}</Label>
                   <Select value={alertDirection} onValueChange={(v) => setAlertDirection(v as 'above' | 'below')}>
                     <SelectTrigger className="bg-[#0a0a0f] border-[#1e1e2e] text-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-[#111118] border-[#1e1e2e]">
-                      <SelectItem value="above">Price goes above</SelectItem>
-                      <SelectItem value="below">Price goes below</SelectItem>
+                      <SelectItem value="above">{t('watch.priceGoesAbove')}</SelectItem>
+                      <SelectItem value="below">{t('watch.priceGoesBelow')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-zinc-300 text-sm">Expiry Date</Label>
+                  <Label className="text-zinc-300 text-sm">{t('watch.expiryDate')}</Label>
                   <Input
                     type="date"
                     value={alertExpiry}
@@ -381,14 +383,14 @@ export function WatchlistView() {
                   onClick={() => setAlertDialogOpen(false)}
                   className="border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300"
                 >
-                  Cancel
+                  {t('watch.cancel')}
                 </Button>
                 <Button
                   onClick={handleCreateAlert}
                   disabled={!alertSymbol || !alertTargetPrice}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
-                  Create Alert
+                  {t('watch.createAlertBtn')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -405,7 +407,7 @@ export function WatchlistView() {
       </div>
 
       {lastUpdated && (
-        <p className="text-[10px] text-zinc-600 -mt-4">Last updated: {lastUpdated.toLocaleTimeString()}</p>
+        <p className="text-[10px] text-zinc-600 -mt-4">{t('watch.lastUpdated')}: {lastUpdated.toLocaleTimeString()}</p>
       )}
 
       {/* Watchlist Grid */}
@@ -468,14 +470,14 @@ export function WatchlistView() {
           <CardContent
             className="p-4 flex flex-col items-center justify-center h-full min-h-[120px]"
             onClick={() => {
-              const input = document.querySelector('input[placeholder="Search to add stocks..."]') as HTMLInputElement;
+              const input = document.querySelector(`input[placeholder="${t('watch.searchPlaceholder')}"]`) as HTMLInputElement;
               input?.focus();
             }}
           >
             <div className="w-10 h-10 rounded-full bg-emerald-600/10 flex items-center justify-center mb-2 group-hover:bg-emerald-600/20 transition-colors">
               <Plus className="w-5 h-5 text-emerald-400" />
             </div>
-            <span className="text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors">Add Stock</span>
+            <span className="text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors">{t('watch.addStock')}</span>
           </CardContent>
         </Card>
       </div>
@@ -484,7 +486,7 @@ export function WatchlistView() {
       <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-base font-semibold text-white">Active Alerts</CardTitle>
+            <CardTitle className="text-base font-semibold text-white">{t('watch.activeAlerts')}</CardTitle>
             <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[10px]">
               {alerts?.length || 0}
             </Badge>
@@ -494,8 +496,8 @@ export function WatchlistView() {
           {!alerts || alerts.length === 0 ? (
             <div className="text-center py-8">
               <Bell className="w-10 h-10 text-zinc-600 mx-auto mb-2" />
-              <p className="text-zinc-400 text-sm">No active alerts</p>
-              <p className="text-zinc-500 text-xs mt-1">Create a price alert to get notified</p>
+              <p className="text-zinc-400 text-sm">{t('watch.noActiveAlerts')}</p>
+              <p className="text-zinc-500 text-xs mt-1">{t('watch.createAlertHint')}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -529,7 +531,7 @@ export function WatchlistView() {
                         </Badge>
                       </div>
                       <p className="text-[10px] text-zinc-500 mt-0.5">
-                        Expires: {alert.expiryDate}
+                        {t('watch.expires')}: {alert.expiryDate}
                       </p>
                     </div>
                   </div>

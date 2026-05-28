@@ -32,6 +32,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
+import { useLanguage } from '@/lib/i18n';
 
 interface StockQuote {
   currentPrice: number;
@@ -132,7 +133,17 @@ function getRecommendationIcon(rec: string) {
   }
 }
 
+function translateSignalType(signalType: string, t: (key: string) => string): string {
+  switch (signalType) {
+    case 'BUY': return t('common.buy');
+    case 'SELL': return t('common.sell');
+    case 'HOLD': return t('common.hold');
+    default: return signalType;
+  }
+}
+
 export function SignalScannerView() {
+  const { t, language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSymbol, setSelectedSymbol] = useState('AAPL');
   const [selectedName, setSelectedName] = useState('Apple Inc.');
@@ -167,8 +178,9 @@ export function SignalScannerView() {
       if (candleRes.status === 'fulfilled' && candleRes.value.ok) {
         const data = await candleRes.value.json();
         if (data.c && data.c.length > 0) {
+          const locale = language === 'zh' ? 'zh-CN' : 'en-US';
           const formatted: CandleData[] = data.c.map((c: number, i: number) => ({
-            time: new Date(data.t[i] * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            time: new Date(data.t[i] * 1000).toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
             open: data.o[i],
             high: data.h[i],
             low: data.l[i],
@@ -211,7 +223,7 @@ export function SignalScannerView() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     if (selectedSymbol) {
@@ -332,7 +344,7 @@ export function SignalScannerView() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
           <Input
-            placeholder="Search stocks by symbol or name..."
+            placeholder={t('scanner.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
             className="pl-9 bg-[#111118] border-[#1e1e2e] text-white placeholder:text-zinc-500 focus:border-emerald-600/50"
@@ -366,7 +378,7 @@ export function SignalScannerView() {
           className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
         >
           <Radar className="w-4 h-4" />
-          {scanning ? 'Scanning...' : 'Re-scan'}
+          {scanning ? t('scanner.scanning') : t('scanner.rescan')}
         </Button>
       </div>
 
@@ -399,7 +411,7 @@ export function SignalScannerView() {
                   <div className="flex items-center gap-2">
                     <Badge className={`${getRecommendationColor(signalResult.signalType)} border text-xs flex items-center gap-1`}>
                       {getRecommendationIcon(signalResult.signalType)}
-                      {signalResult.signalType}
+                      {translateSignalType(signalResult.signalType, t)}
                     </Badge>
                   </div>
                 )}
@@ -408,19 +420,19 @@ export function SignalScannerView() {
               {/* Price stats */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-[#1e1e2e]">
                 <div>
-                  <span className="text-xs text-zinc-500">Open</span>
+                  <span className="text-xs text-zinc-500">{t('scanner.open')}</span>
                   <p className="text-sm font-medium text-zinc-300">${(quote?.open || currentPrice).toFixed(2)}</p>
                 </div>
                 <div>
-                  <span className="text-xs text-zinc-500">High</span>
+                  <span className="text-xs text-zinc-500">{t('scanner.high')}</span>
                   <p className="text-sm font-medium text-zinc-300">${(quote?.high || currentPrice).toFixed(2)}</p>
                 </div>
                 <div>
-                  <span className="text-xs text-zinc-500">Low</span>
+                  <span className="text-xs text-zinc-500">{t('scanner.low')}</span>
                   <p className="text-sm font-medium text-zinc-300">${(quote?.low || currentPrice).toFixed(2)}</p>
                 </div>
                 <div>
-                  <span className="text-xs text-zinc-500">Prev Close</span>
+                  <span className="text-xs text-zinc-500">{t('scanner.prevClose')}</span>
                   <p className="text-sm font-medium text-zinc-300">${(quote?.prevClose || currentPrice).toFixed(2)}</p>
                 </div>
               </div>
@@ -431,7 +443,7 @@ export function SignalScannerView() {
           <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-semibold text-white">Price Chart (90 Days)</CardTitle>
+                <CardTitle className="text-base font-semibold text-white">{t('scanner.priceChart')}</CardTitle>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -531,7 +543,7 @@ export function SignalScannerView() {
                 </div>
               ) : (
                 <div className="h-64 flex items-center justify-center">
-                  <p className="text-zinc-500 text-sm">No chart data available</p>
+                  <p className="text-zinc-500 text-sm">{t('scanner.noChartData')}</p>
                 </div>
               )}
             </CardContent>
@@ -543,7 +555,7 @@ export function SignalScannerView() {
           {/* Signal Score */}
           <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-white">Signal Score</CardTitle>
+              <CardTitle className="text-base font-semibold text-white">{t('scanner.signalScore')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col items-center">
@@ -562,7 +574,7 @@ export function SignalScannerView() {
                     <span className="text-3xl font-bold" style={{ color: getSignalColor(signalResult?.score || 0) }}>
                       {signalResult?.score ?? '—'}
                     </span>
-                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Score</span>
+                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('scanner.score')}</span>
                   </div>
                 </div>
               </div>
@@ -577,7 +589,7 @@ export function SignalScannerView() {
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="text-zinc-500">≥50 BUY</span>
+                  <span className="text-zinc-500">{t('scanner.buySignal')}</span>
                 </div>
               </div>
             </CardContent>
@@ -586,7 +598,7 @@ export function SignalScannerView() {
           {/* Technical Indicators */}
           <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-white">Technical Indicators</CardTitle>
+              <CardTitle className="text-base font-semibold text-white">{t('scanner.techIndicators')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {loading ? (
@@ -600,7 +612,7 @@ export function SignalScannerView() {
                   {/* RSI */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-400">RSI (14)</span>
+                      <span className="text-xs text-zinc-400">{t('scanner.rsi14')}</span>
                       <span className={`text-xs font-medium ${
                         (indicators?.rsi || 50) > 70 ? 'text-red-400' : (indicators?.rsi || 50) < 30 ? 'text-emerald-400' : 'text-zinc-300'
                       }`}>
@@ -609,9 +621,9 @@ export function SignalScannerView() {
                     </div>
                     <Progress value={indicators?.rsi || 50} className="h-1.5 bg-[#1e1e2e]" />
                     <div className="flex justify-between text-[10px] text-zinc-600">
-                      <span>Oversold (&lt;30)</span>
-                      <span>Neutral</span>
-                      <span>Overbought (&gt;70)</span>
+                      <span>{t('scanner.oversold')}</span>
+                      <span>{t('scanner.neutral')}</span>
+                      <span>{t('scanner.overbought')}</span>
                     </div>
                   </div>
 
@@ -620,7 +632,7 @@ export function SignalScannerView() {
                   {/* MACD */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-400">MACD</span>
+                      <span className="text-xs text-zinc-400">{t('scanner.macd')}</span>
                       <span className={`text-xs font-medium ${
                         (indicators?.macdHist || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'
                       }`}>
@@ -629,11 +641,11 @@ export function SignalScannerView() {
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-[10px]">
                       <div>
-                        <span className="text-zinc-500">Signal: </span>
+                        <span className="text-zinc-500">{t('scanner.signal')}: </span>
                         <span className="text-zinc-300">{(indicators?.macdSignal || 0).toFixed(2)}</span>
                       </div>
                       <div>
-                        <span className="text-zinc-500">Hist: </span>
+                        <span className="text-zinc-500">{t('scanner.hist')}: </span>
                         <span className={(indicators?.macdHist || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}>
                           {(indicators?.macdHist || 0).toFixed(2)}
                         </span>
@@ -657,19 +669,19 @@ export function SignalScannerView() {
                   {/* Bollinger */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-400">Bollinger Bands</span>
+                      <span className="text-xs text-zinc-400">{t('scanner.bollingerBands')}</span>
                     </div>
                     <div className="space-y-1 text-[10px]">
                       <div className="flex justify-between">
-                        <span className="text-zinc-500">Upper</span>
+                        <span className="text-zinc-500">{t('scanner.upper')}</span>
                         <span className="text-red-400">${(indicators?.bollingerUpper || 0).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-zinc-500">Middle</span>
+                        <span className="text-zinc-500">{t('scanner.middle')}</span>
                         <span className="text-yellow-400">${(indicators?.bollingerMiddle || 0).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-zinc-500">Lower</span>
+                        <span className="text-zinc-500">{t('scanner.lower')}</span>
                         <span className="text-emerald-400">${(indicators?.bollingerLower || 0).toFixed(2)}</span>
                       </div>
                     </div>
@@ -713,7 +725,7 @@ export function SignalScannerView() {
                   {/* Volume */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-400">Volume Ratio</span>
+                      <span className="text-xs text-zinc-400">{t('scanner.volumeRatio')}</span>
                       <span className="text-xs font-medium text-zinc-300">
                         {(signalResult?.volumeRatio || 1).toFixed(2)}x
                       </span>
@@ -732,9 +744,9 @@ export function SignalScannerView() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Brain className="w-5 h-5 text-emerald-400" />
-              <CardTitle className="text-base font-semibold text-white">AI Sentiment Analysis</CardTitle>
+              <CardTitle className="text-base font-semibold text-white">{t('scanner.aiSentiment')}</CardTitle>
               <Badge className="bg-purple-600/15 text-purple-400 border-purple-600/20 text-[10px]">
-                <Sparkles className="w-3 h-3 mr-1" />AI Powered
+                <Sparkles className="w-3 h-3 mr-1" />{t('scanner.aiPowered')}
               </Badge>
             </div>
             <Button
@@ -744,7 +756,7 @@ export function SignalScannerView() {
               className="bg-purple-600 hover:bg-purple-700 text-white gap-1.5"
             >
               {analyzing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {analyzing ? 'Analyzing...' : 'Analyze'}
+              {analyzing ? t('scanner.analyzing') : t('scanner.analyze')}
             </Button>
           </div>
         </CardHeader>
@@ -752,8 +764,8 @@ export function SignalScannerView() {
           {analyzing && !sentiment ? (
             <div className="py-8 text-center">
               <div className="w-10 h-10 rounded-full border-2 border-purple-600 border-t-transparent animate-spin mx-auto mb-3" />
-              <p className="text-purple-400 text-sm font-medium">AI is analyzing {selectedSymbol}...</p>
-              <p className="text-zinc-500 text-xs mt-1">Fetching news and market data, then running sentiment analysis</p>
+              <p className="text-purple-400 text-sm font-medium">{t('scanner.aiAnalyzing')} {selectedSymbol}...</p>
+              <p className="text-zinc-500 text-xs mt-1">{t('scanner.fetchingNews')}</p>
             </div>
           ) : sentiment ? (
             <div className="space-y-4">
@@ -791,7 +803,7 @@ export function SignalScannerView() {
                 {/* Key Info */}
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-500">Risk Level</span>
+                    <span className="text-xs text-zinc-500">{t('scanner.riskLevel')}</span>
                     <Badge className={`text-[10px] px-1.5 py-0 ${
                       sentiment.riskLevel === 'LOW' ? 'bg-emerald-600/15 text-emerald-400' :
                       sentiment.riskLevel === 'HIGH' ? 'bg-red-600/15 text-red-400' :
@@ -801,12 +813,12 @@ export function SignalScannerView() {
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-500">Short-term Outlook</span>
+                    <span className="text-xs text-zinc-500">{t('scanner.shortTermOutlook')}</span>
                     <span className="text-xs text-zinc-300 font-medium">{sentiment.shortTermOutlook}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-500">News Analyzed</span>
-                    <span className="text-xs text-zinc-300 font-medium">{sentiment.newsCount} articles</span>
+                    <span className="text-xs text-zinc-500">{t('scanner.newsAnalyzed')}</span>
+                    <span className="text-xs text-zinc-300 font-medium">{sentiment.newsCount} {t('scanner.articles')}</span>
                   </div>
                 </div>
               </div>
@@ -814,7 +826,7 @@ export function SignalScannerView() {
               {/* Key Factors */}
               {sentiment.factors && sentiment.factors.length > 0 && (
                 <div>
-                  <p className="text-xs text-zinc-400 font-medium mb-2">Key Factors</p>
+                  <p className="text-xs text-zinc-400 font-medium mb-2">{t('scanner.keyFactors')}</p>
                   <div className="space-y-1">
                     {sentiment.factors.map((factor, i) => (
                       <div key={i} className="flex items-start gap-2">
@@ -834,14 +846,14 @@ export function SignalScannerView() {
               )}
 
               <p className="text-[10px] text-zinc-600 text-right">
-                Analyzed: {new Date(sentiment.analyzedAt).toLocaleString()}
+                {t('scanner.analyzed')}: {new Date(sentiment.analyzedAt).toLocaleString()}
               </p>
             </div>
           ) : (
             <div className="py-8 text-center">
               <Brain className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
-              <p className="text-zinc-400 text-sm">Click "Analyze" to run AI sentiment analysis</p>
-              <p className="text-zinc-500 text-xs mt-1">AI will analyze recent news and market data for {selectedSymbol}</p>
+              <p className="text-zinc-400 text-sm">{t('scanner.clickAnalyze')}</p>
+              <p className="text-zinc-500 text-xs mt-1">{t('scanner.aiWillAnalyze')} {selectedSymbol}</p>
             </div>
           )}
         </CardContent>
@@ -850,7 +862,7 @@ export function SignalScannerView() {
       {/* Popular Stocks Grid */}
       <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold text-white">Popular Stocks</CardTitle>
+          <CardTitle className="text-base font-semibold text-white">{t('scanner.popularStocks')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
@@ -895,7 +907,7 @@ export function SignalScannerView() {
                           ? 'bg-red-600/15 text-red-400'
                           : 'bg-yellow-600/15 text-yellow-400'
                       }`}>
-                        {scanData.signalType}
+                        {translateSignalType(scanData.signalType, t)}
                       </Badge>
                     </div>
                   )}

@@ -12,6 +12,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   TrendingUp,
+  Globe,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -21,23 +22,24 @@ import {
 } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { useLanguage, type Language } from '@/lib/i18n';
 
 export type NavItem = 'dashboard' | 'scanner' | 'positions' | 'watchlist' | 'news' | 'backtest' | 'settings';
 
 interface NavConfig {
   id: NavItem;
-  label: string;
+  labelKey: string;
   icon: React.ElementType;
 }
 
 const navItems: NavConfig[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'scanner', label: 'Signal Scanner', icon: Radar },
-  { id: 'positions', label: 'Positions', icon: Briefcase },
-  { id: 'watchlist', label: 'Watchlist', icon: Eye },
-  { id: 'news', label: 'Market News', icon: Newspaper },
-  { id: 'backtest', label: 'Backtest', icon: FlaskConical },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'dashboard', labelKey: 'sidebar.dashboard', icon: LayoutDashboard },
+  { id: 'scanner', labelKey: 'sidebar.scanner', icon: Radar },
+  { id: 'positions', labelKey: 'sidebar.positions', icon: Briefcase },
+  { id: 'watchlist', labelKey: 'sidebar.watchlist', icon: Eye },
+  { id: 'news', labelKey: 'sidebar.news', icon: Newspaper },
+  { id: 'backtest', labelKey: 'sidebar.backtest', icon: FlaskConical },
+  { id: 'settings', labelKey: 'sidebar.settings', icon: Settings },
 ];
 
 interface SidebarProps {
@@ -47,6 +49,7 @@ interface SidebarProps {
 
 export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const { language, setLanguage, t } = useLanguage();
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -76,6 +79,7 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeItem === item.id;
+            const label = t(item.labelKey);
 
             const button = (
               <button
@@ -99,7 +103,7 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
                     'text-sm font-medium whitespace-nowrap',
                     isActive ? 'text-emerald-400' : ''
                   )}>
-                    {item.label}
+                    {label}
                   </span>
                 )}
                 {isActive && !collapsed && (
@@ -115,7 +119,7 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
                     {button}
                   </TooltipTrigger>
                   <TooltipContent side="right" className="bg-[#1a1a2e] text-zinc-200 border-[#2e2e3e]">
-                    {item.label}
+                    {label}
                   </TooltipContent>
                 </Tooltip>
               );
@@ -131,6 +135,27 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
 
         <Separator className="bg-[#1e1e2e]" />
 
+        {/* Language Toggle */}
+        <div className={cn(
+          'py-2 px-2',
+          collapsed ? 'flex justify-center' : ''
+        )}>
+          <button
+            onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}
+            className={cn(
+              'flex items-center gap-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-[#1a1a2e] transition-colors',
+              collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2 w-full'
+            )}
+          >
+            <Globe className="w-4 h-4 flex-shrink-0" />
+            {!collapsed && (
+              <span className="text-xs font-medium">
+                {language === 'en' ? '中文' : 'English'}
+              </span>
+            )}
+          </button>
+        </div>
+
         {/* Collapse toggle */}
         <div className="p-2">
           <button
@@ -142,7 +167,7 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
             ) : (
               <>
                 <ChevronsLeft className="w-4 h-4" />
-                <span className="text-xs font-medium">Collapse</span>
+                <span className="text-xs font-medium">{t('sidebar.collapse')}</span>
               </>
             )}
           </button>

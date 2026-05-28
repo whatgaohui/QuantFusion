@@ -35,6 +35,7 @@ import {
   YAxis,
   CartesianGrid,
 } from 'recharts';
+import { useLanguage } from '@/lib/i18n';
 
 interface PortfolioSummary {
   totalValue: number;
@@ -64,14 +65,6 @@ interface Trade {
   total: number;
   timestamp: string;
 }
-
-const allocationData = [
-  { name: 'Technology', value: 35, color: '#10b981' },
-  { name: 'Healthcare', value: 20, color: '#0FEDBE' },
-  { name: 'Finance', value: 18, color: '#22c55e' },
-  { name: 'Energy', value: 15, color: '#f59e0b' },
-  { name: 'Consumer', value: 12, color: '#8b5cf6' },
-];
 
 const defaultSummary: PortfolioSummary = {
   totalValue: 125750.50,
@@ -112,11 +105,20 @@ function formatPercent(value: number | undefined | null): string {
 }
 
 export function DashboardView() {
+  const { t } = useLanguage();
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [indices, setIndices] = useState<MarketIndex[] | null>(null);
   const [trades, setTrades] = useState<Trade[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const allocationData = [
+    { name: t('alloc.technology'), value: 35, color: '#10b981' },
+    { name: t('alloc.healthcare'), value: 20, color: '#0FEDBE' },
+    { name: t('alloc.finance'), value: 18, color: '#22c55e' },
+    { name: t('alloc.energy'), value: 15, color: '#f59e0b' },
+    { name: t('alloc.consumer'), value: 12, color: '#8b5cf6' },
+  ];
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -177,15 +179,15 @@ export function DashboardView() {
       if (tradesRes.status === 'fulfilled' && tradesRes.value.ok) {
         const data = await tradesRes.value.json();
         if (Array.isArray(data) && data.length > 0) {
-          setTrades(data.map((t: { symbol: string; name: string; action: string; price: number; quantity: number; profitPct?: number; reason?: string; createdAt: string }) => ({
-            id: t.symbol + t.createdAt,
-            symbol: t.symbol,
-            name: t.name || t.symbol,
-            side: (t.action || 'BUY') as 'BUY' | 'SELL',
-            price: t.price,
-            quantity: t.quantity,
-            total: t.price * t.quantity,
-            timestamp: t.createdAt,
+          setTrades(data.map((tradeItem: { symbol: string; name: string; action: string; price: number; quantity: number; profitPct?: number; reason?: string; createdAt: string }) => ({
+            id: tradeItem.symbol + tradeItem.createdAt,
+            symbol: tradeItem.symbol,
+            name: tradeItem.name || tradeItem.symbol,
+            side: (tradeItem.action || 'BUY') as 'BUY' | 'SELL',
+            price: tradeItem.price,
+            quantity: tradeItem.quantity,
+            total: tradeItem.price * tradeItem.quantity,
+            timestamp: tradeItem.createdAt,
           })));
         } else {
           setTrades(defaultTrades);
@@ -212,30 +214,30 @@ export function DashboardView() {
 
   const metricCards = summary ? [
     {
-      title: 'Portfolio Value',
+      title: t('dash.portfolioValue'),
       value: formatCurrency(summary.totalValue),
       change: formatPercent(summary.todayPnlPercent),
       positive: summary.todayPnl >= 0,
       icon: DollarSign,
     },
     {
-      title: "Today's P&L",
+      title: t('dash.todayPnl'),
       value: formatCurrency(summary.todayPnl),
       change: formatPercent(summary.todayPnlPercent),
       positive: summary.todayPnl >= 0,
       icon: summary.todayPnl >= 0 ? TrendingUp : TrendingDown,
     },
     {
-      title: 'Active Positions',
+      title: t('dash.activePositions'),
       value: summary.activePositions.toString(),
-      change: 'Open trades',
+      change: t('dash.openTrades'),
       positive: true,
       icon: Briefcase,
     },
     {
-      title: 'Win Rate',
+      title: t('dash.winRate'),
       value: `${summary.winRate}%`,
-      change: summary.winRate >= 60 ? 'Above target' : 'Below target',
+      change: summary.winRate >= 60 ? t('dash.aboveTarget') : t('dash.belowTarget'),
       positive: summary.winRate >= 60,
       icon: Target,
     },
@@ -301,7 +303,7 @@ export function DashboardView() {
         <Card className="lg:col-span-2 bg-[#111118] border-[#1e1e2e] rounded-xl">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold text-white">Market Indices</CardTitle>
+              <CardTitle className="text-base font-semibold text-white">{t('dash.marketIndices')}</CardTitle>
               <Button
                 variant="ghost"
                 size="sm"
@@ -362,7 +364,7 @@ export function DashboardView() {
             </div>
             {lastUpdated && (
               <p className="text-[10px] text-zinc-600 mt-3 text-right">
-                Last updated: {lastUpdated.toLocaleTimeString()}
+                {t('dash.lastUpdated')}: {lastUpdated.toLocaleTimeString()}
               </p>
             )}
           </CardContent>
@@ -371,7 +373,7 @@ export function DashboardView() {
         {/* Portfolio Allocation */}
         <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-white">Allocation</CardTitle>
+            <CardTitle className="text-base font-semibold text-white">{t('dash.allocation')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-40">
@@ -423,18 +425,18 @@ export function DashboardView() {
         {/* Recent Trades */}
         <Card className="lg:col-span-2 bg-[#111118] border-[#1e1e2e] rounded-xl">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-white">Recent Trades</CardTitle>
+            <CardTitle className="text-base font-semibold text-white">{t('dash.recentTrades')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-[#1e1e2e] hover:bg-transparent">
-                    <TableHead className="text-zinc-400 text-xs">Symbol</TableHead>
-                    <TableHead className="text-zinc-400 text-xs">Side</TableHead>
-                    <TableHead className="text-zinc-400 text-xs">Price</TableHead>
-                    <TableHead className="text-zinc-400 text-xs">Qty</TableHead>
-                    <TableHead className="text-zinc-400 text-xs text-right">Total</TableHead>
+                    <TableHead className="text-zinc-400 text-xs">{t('dash.symbol')}</TableHead>
+                    <TableHead className="text-zinc-400 text-xs">{t('dash.side')}</TableHead>
+                    <TableHead className="text-zinc-400 text-xs">{t('dash.price')}</TableHead>
+                    <TableHead className="text-zinc-400 text-xs">{t('dash.qty')}</TableHead>
+                    <TableHead className="text-zinc-400 text-xs text-right">{t('dash.total')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -455,7 +457,7 @@ export function DashboardView() {
                               : 'bg-red-600/15 text-red-400 border-red-600/20'
                           }`}
                         >
-                          {trade.side}
+                          {trade.side === 'BUY' ? t('common.buy') : t('common.sell')}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-zinc-300">${trade.price.toFixed(2)}</TableCell>
@@ -474,34 +476,34 @@ export function DashboardView() {
         {/* Quick Actions */}
         <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-white">Quick Actions</CardTitle>
+            <CardTitle className="text-base font-semibold text-white">{t('dash.quickActions')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white justify-start gap-2">
               <Radar className="w-4 h-4" />
-              Scan Signals
+              {t('dash.scanSignals')}
             </Button>
             <Button
               variant="outline"
               className="w-full border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-[#1a1a2e] hover:text-white justify-start gap-2"
             >
               <Plus className="w-4 h-4" />
-              Add Position
+              {t('dash.addPosition')}
             </Button>
             <div className="pt-4 border-t border-[#1e1e2e] space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-500">Market Status</span>
+                <span className="text-xs text-zinc-500">{t('dash.marketStatus')}</span>
                 <div className="flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-glow" />
-                  <span className="text-xs text-emerald-400 font-medium">Open</span>
+                  <span className="text-xs text-emerald-400 font-medium">{t('dash.open')}</span>
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-500">Next Close</span>
+                <span className="text-xs text-zinc-500">{t('dash.nextClose')}</span>
                 <span className="text-xs text-zinc-300 font-medium">4:00 PM ET</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-500">Active Alerts</span>
+                <span className="text-xs text-zinc-500">{t('dash.activeAlerts')}</span>
                 <span className="text-xs text-emerald-400 font-medium">3</span>
               </div>
             </div>
