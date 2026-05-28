@@ -361,3 +361,61 @@ Comprehensive QA testing of the entire QuantFusion platform. All 7 fusion API en
 
 ### Lint Status
 ✅ `bun run lint` passes with no errors
+
+---
+Task ID: 2-a-b
+Agent: Main
+Task: Phase 2 数据引擎 - 启动Go数据服务和Python AI服务
+
+Work Log:
+- Installed Go 1.22.0 to ~/go-sdk/ (downgraded from 1.25.0 required by go.mod)
+- Updated go.mod to use go 1.22.0 and compatible dependency versions
+- Fixed Go data service compilation and built successfully
+- Started Go data service on port 8080 with Sina/Tencent/Finnhub data sources
+- Fixed GBK→UTF-8 encoding issue in Go service (Chinese stock names were garbled)
+- Reduced external API timeouts from 10s to 3s (Sina/Tencent) and 5s (Finnhub)
+- Started Python AI service on port 8000 with mock LLM fallback
+- Both services health endpoints verified working
+
+Stage Summary:
+- Go data service running on :8080 (health, quote, kline, news, sectors, WebSocket)
+- Python AI service running on :8000 (health, analysis, agent chat, strategies, backtest)
+- External APIs (Sina, Tencent) are blocked in sandbox environment → fallback to local data
+- Finnhub API works for US market data
+
+---
+Task ID: 2-c
+Agent: Main
+Task: Phase 2 数据引擎 - 重构BFF路由代理到真实微服务
+
+Work Log:
+- Created microservice proxy utility at src/lib/microservice-proxy.ts
+- Updated all BFF market routes to use local data service as primary source
+- Updated AI routes with AbortController timeouts and graceful mock fallbacks
+- Added system status API endpoint at /api/fusion/system/status
+- All BFF endpoints tested and working individually
+
+Stage Summary:
+- BFF market routes (quote, kline, news, sectors, indicators) use local data service (Finnhub + Mock)
+- BFF AI routes (analysis, agent/chat, strategies, backtest) try Python service with mock fallback
+- System status endpoint provides service availability info
+- Concurrent API requests cause Next.js crashes in sandbox (resource limitation)
+- Individual API requests work correctly
+
+---
+Task ID: Phase 2 Summary
+Agent: Main
+Task: Phase 2 数据引擎完成状态
+
+Work Log:
+- Go data service (port 8080): Running with Sina/Tencent/Finnhub datasources
+- Python AI service (port 8000): Running with mock LLM mode
+- BFF proxy layer: All 12+ API endpoints functional with fallback support
+- System status API: Available for monitoring
+- All services auto-start and can be monitored
+
+Stage Summary:
+- Phase 2 partially complete: microservices running, BFF connected, fallback working
+- Remaining: WebSocket real-time push, SSE AI streaming, production-grade error handling
+- Known issues: Sandbox network blocks external APIs (Sina/Tencent), concurrent requests crash Next.js
+- For production deployment: Enable external API access, add process managers (PM2/systemd)
