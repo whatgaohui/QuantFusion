@@ -452,7 +452,7 @@ export function AIAnalysisView() {
 
     // Poll for results
     let pollCount = 0;
-    const maxPolls = 60; // 60 * 2s = 2 min max
+    const maxPolls = 120; // 120 * 2s = 4 min max (debate mode can take a while)
     const pollInterval = 2000;
 
     while (pollCount < maxPolls) {
@@ -470,14 +470,43 @@ export function AIAnalysisView() {
         // Update agent progress based on task status
         if (taskStatus === 'processing' || taskStatus === 'running') {
           const progress = pollData?.data?.progress || pollData?.progress || 0;
+          const currentAgent = pollData?.data?.current_agent || pollData?.data?.current_step || '';
+          
+          // Find which agent matches the current step
           const runningAgentIdx = Math.min(
             Math.floor((progress / 100) * modeAgents.length),
             modeAgents.length - 1
           );
+          
+          // Also try to match by agent name
+          let matchedIdx = -1;
+          if (currentAgent) {
+            const agentNameMap: Record<string, string> = {
+              '技术分析师': 'technical',
+              '基本面分析师': 'fundamental',
+              '情绪分析师': 'sentiment',
+              '多头研究员': 'bullbear',
+              '空头研究员': 'bullbear',
+              '研究经理': 'decision',
+              '激进风险分析师': 'risk',
+              '保守风险分析师': 'risk',
+              '中性风险分析师': 'risk',
+              '风险管理经理': 'decision',
+              '决策引擎': 'decision',
+            };
+            const matchedId = agentNameMap[currentAgent];
+            if (matchedId) {
+              matchedIdx = modeAgents.indexOf(matchedId);
+              if (matchedIdx === -1) matchedIdx = modeAgents.findIndex(id => id === matchedId);
+            }
+          }
+          
+          const activeIdx = matchedIdx >= 0 ? matchedIdx : runningAgentIdx;
+          
           setAgents((prev) =>
             prev.map((a, idx) => ({
               ...a,
-              status: idx < runningAgentIdx ? 'done' : idx === runningAgentIdx ? 'running' : 'pending',
+              status: idx < activeIdx ? 'done' : idx === activeIdx ? 'running' : 'pending',
             }) as AgentState)
           );
         }
@@ -486,26 +515,27 @@ export function AIAnalysisView() {
           // All agents done
           setAgents((prev) => prev.map((a) => ({ ...a, status: 'done' as AgentStatus })));
 
-          const analysisResult = pollData?.data?.result || pollData?.result;
-          if (analysisResult) {
-            // Map the real API result to our AnalysisResult interface
+          const d = pollData?.data;
+          if (d) {
+            // Map the multi-agent analysis result to our AnalysisResult interface
             const mapped: AnalysisResult = {
               symbol: sym,
-              recommendation: analysisResult.recommendation || analysisResult.recommend || 'HOLD',
-              score: analysisResult.score || 50,
-              technicalSummary: analysisResult.technical_summary || analysisResult.technicalSummary || '',
-              fundamentalSummary: analysisResult.fundamental_summary || analysisResult.fundamentalSummary || '',
-              sentimentSummary: analysisResult.sentiment_summary || analysisResult.sentimentSummary || '',
-              riskLevel: analysisResult.risk_level || analysisResult.riskLevel || 'MEDIUM',
-              riskScore: analysisResult.risk_score || analysisResult.riskScore || 50,
-              bullCase: analysisResult.bull_case || analysisResult.bullCase,
-              bearCase: analysisResult.bear_case || analysisResult.bearCase,
-              report: analysisResult.report || analysisResult.full_report || '',
-              provider: analysisResult.provider || 'deepseek',
-              tokens: analysisResult.tokens || 0,
-              cost: analysisResult.cost || 0,
+              recommendation: d.recommendation || 'HOLD',
+              score: d.score || 50,
+              technicalSummary: d.technical_summary || '',
+              fundamentalSummary: d.fundamental_summary || '',
+              sentimentSummary: d.sentiment_summary || '',
+              riskLevel: d.risk_level || 'MEDIUM',
+              riskScore: d.risk_score || 50,
+              bullCase: d.bull_thesis || '',
+              bearCase: d.bear_thesis || '',
+              report: d.final_decision || d.investment_plan || d.risk_assessment || '',
+              provider: d.source === 'ai-multi-agent' ? 'z-ai-multi-agent' : d.source === 'ai-partial' ? 'z-ai-partial' : 'mock',
+              tokens: d.llm_calls ? d.llm_calls * 800 : 0, // Rough estimate
+              cost: d.llm_calls ? +(d.llm_calls * 800 * 0.000008).toFixed(3) : 0,
             };
             setResult(mapped);
+            setIsOffline(d.source === 'mock');
 
             const historyItem: HistoryItem = {
               id: Date.now().toString(),

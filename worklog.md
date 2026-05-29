@@ -826,3 +826,218 @@ Translated ALL English error messages and AI prompts in API routes to Chinese, a
 
 ## Lint Status
 ✅ `bun run lint` passes with no errors
+
+---
+
+**Task ID**: 3
+**Agent**: Settings LLM Redesign
+**Date**: 2025-05-29
+**Status**: ✅ Complete
+
+## Summary
+
+Redesigned the "大模型" (LLM) tab in the settings page from a basic dropdown + single config form to a tab-per-provider design with per-provider configuration cards, connection testing, and database persistence via SystemConfig.
+
+## Files Created
+
+1. **`src/app/api/settings/llm/route.ts`** — LLM config CRUD API
+   - `GET` — Returns all LLM provider configs from SystemConfig table, with defaults pre-filled for each provider
+   - `POST` — Saves a provider config using `upsert` on SystemConfig key-value store
+   - Key format: `llm_{provider}_{field}` (e.g., `llm_deepseek_apiKey`)
+   - Category: `llm`
+   - 7 providers with defaults: ZAI, DeepSeek, OpenAI, Anthropic, Qwen, GLM, Custom
+
+2. **`src/app/api/settings/llm/test/route.ts`** — LLM connection test API
+   - `POST` — Tests LLM connection for a given provider
+   - For ZAI: uses z-ai-web-dev-sdk to make a minimal chat completion
+   - For other providers: constructs OpenAI-compatible chat completion request
+   - For Anthropic: uses Anthropic Messages API format
+   - Returns `{ success, message, latencyMs? }`
+   - 15s timeout on all connection tests
+
+## Files Modified
+
+3. **`src/components/dashboard/settings-view.tsx`** — Complete LLM tab redesign
+   - Replaced dropdown provider selector with horizontal scrollable tab bar
+   - 7 provider tabs: ZAI (内置免费), DeepSeek, OpenAI, Anthropic, Qwen (通义千问), GLM (智谱AI), 自定义
+   - ZAI tab: prominently displays "✅ 内置免费大模型" badge, "无需API Key，开箱即用" message, model info, test connection
+   - Other provider tabs: API Key (password with show/hide toggle), Base URL (pre-filled), Model Name (pre-filled), Temperature slider, Max Tokens, Connection Status with test button, Save Config button
+   - Custom tab: all fields empty for manual configuration
+   - Connection status displayed with badges (Connected/Disconnected) and error messages
+   - Loads settings from API on page mount
+   - Saves settings via API per-provider
+   - All other tabs (数据/交易/提醒/系统) preserved exactly as before
+
+4. **`src/lib/i18n.ts`** — Added 29 new i18n keys (en + zh) for LLM settings
+
+## Test Results
+
+- ✅ `GET /api/settings/llm` → Returns all 7 provider configs with defaults
+- ✅ `POST /api/settings/llm` with DeepSeek config → Saved successfully, persists on reload
+- ✅ `POST /api/settings/llm/test` with provider=zai → Connected (299ms latency)
+- ✅ `bun run lint` passes with no errors
+
+**Task ID**: 5
+**Agent**: Main
+**Date**: 2025-05-29
+**Status**: ✅ Complete
+
+## Summary
+
+Implemented a Multi-Agent Debate Analysis System for the QuantFusion platform, inspired by TradingAgents-CN. The system replaces the previous single-LLM-call analysis with a proper multi-agent pipeline where different AI agents play specific roles (analysts, researchers, risk managers) and engage in structured debates before reaching a final investment decision.
+
+## Files Created
+
+1. **`src/lib/multi-agent-analysis.ts`** — Core multi-agent analysis engine (728 lines):
+   - 10 agent roles with detailed Chinese system prompts:
+     - **Market Analyst** (技术分析专家): Analyzes price trends, MA/MACD/RSI/KDJ/Bollinger indicators
+     - **Fundamental Analyst** (基本面分析专家): Evaluates valuation, growth, financial health
+     - **Sentiment Analyst** (情绪分析专家): Analyzes fund flows, market sentiment, institutional behavior
+     - **Bull Researcher** (看涨研究员): Argues for buying from technical/fundamental/sentiment perspectives
+     - **Bear Researcher** (看跌研究员): Argues for selling/risk avoidance
+     - **Research Manager** (研究经理): Evaluates bull-bear debate, makes investment recommendation
+     - **Aggressive Analyst** (激进风险分析师): Advocates high-risk/high-return strategy
+     - **Conservative Analyst** (保守风险分析师): Advocates safe/steady strategy
+     - **Neutral Analyst** (中性风险分析师): Advocates balanced risk-reward strategy
+     - **Risk Manager** (风险管理经理): Evaluates risk debate, makes final decision
+   - 4 analysis modes with different pipeline depths:
+     - `quick`: Market Analyst → Research Manager (2 LLM calls)
+     - `standard`: Market → Sentiment → Research Manager (3 LLM calls)
+     - `full`: Market → Fundamental → Sentiment → Bull↔Bear (1 round) → Research Manager (6 LLM calls)
+     - `debate`: Full pipeline with 2-round investment debate + 2-round risk debate (11 LLM calls)
+   - Debate logic: Bull/Bear alternate for N rounds, each rebutting the other's thesis
+   - Risk debate: Aggressive/Conservative/Neutral analysts alternate, respond to each other's arguments
+   - Progress reporting via callback: `(step, progress, agentName) => void`
+   - In-memory task store using `globalThis` for cross-route persistence in Next.js
+   - `parseAnalysisResult()` extracts recommendation/score/risk from free-text LLM output using regex
+
+## Files Modified
+
+2. **`src/lib/ai-service.ts`** — Exported `getZAI()` function (was private):
+   - Changed `async function getZAI()` → `export async function getZAI()`
+   - Allows `multi-agent-analysis.ts` to import and use the ZAI singleton
+
+3. **`src/app/api/fusion/analysis/start/route.ts`** — Replaced mock with real multi-agent analysis:
+   - Gathers market data (quote, indicators, kline) from mock data service
+   - Creates task in global in-memory store
+   - Starts analysis in background (non-blocking async)
+   - Returns `{ task_id, status: 'running', mode, symbol, stockName }` immediately
+
+4. **`src/app/api/fusion/analysis/[taskId]/route.ts`** — Replaced Python proxy with real task polling:
+   - Looks up task from global in-memory store
+   - Returns progress updates during analysis: `{ status: 'running', progress, current_step, current_agent }`
+   - Returns full parsed result on completion
+   - Returns 404 for unknown task IDs
+
+5. **`src/app/api/fusion/agent/chat/route.ts`** — Replaced mock with real AI chat:
+   - Calls `chatWithAssistant()` from `ai-service.ts`
+   - Falls back to Chinese mock response generator when AI is offline
+   - Returns `{ response, session_id, source, is_offline }`
+
+6. **`src/app/api/fusion/ai/brief/route.ts`** — Replaced mock with real AI brief:
+   - Gathers market index data from mock quote service
+   - Gathers news from mock news service
+   - Calls `generateMarketBrief()` from `ai-service.ts`
+   - Falls back to structured Chinese market brief when AI is offline
+
+7. **`src/components/dashboard/ai-analysis-view.tsx`** — Enhanced polling for multi-agent results:
+   - Increased max polls from 60 to 120 (4 min timeout for debate mode)
+   - Added agent name matching from `current_agent` field to update correct agent status indicator
+   - Maps new multi-agent response format: `bull_thesis`/`bear_thesis` → bullCase/bearCase, `final_decision` → report
+   - Sets provider to `z-ai-multi-agent` or `z-ai-partial` based on source
+   - Estimates token usage from `llm_calls` count
+   - Sets `isOffline` based on `source === 'mock'`
+
+## Design Decisions
+
+- Used `globalThis.__analysisTaskStore` to persist task store across Next.js route handler instances (module-level Maps get re-instantiated in dev mode)
+- All agent system prompts are in Chinese for consistent Chinese-language output
+- Sequential LLM calls (not parallel) to avoid memory exhaustion in sandbox
+- Each agent function has try-catch with graceful degradation — partial results are still useful
+- Regex-based extraction of recommendation/score from free-text LLM output (handles formats like "**HOLD**", "评分：65分", etc.)
+- Background analysis via fire-and-forget async pattern in the start route
+- Progress callback updates the task store in real-time during analysis
+
+## API Testing Results
+
+- ✅ `POST /api/fusion/analysis/start {symbol:"AAPL",mode:"quick"}` → Returns task_id, analysis runs in background
+- ✅ `GET /api/fusion/analysis/[taskId]` → Returns running progress with current_agent
+- ✅ `GET /api/fusion/analysis/[taskId]` (after completion) → Returns full analysis with technical_summary, recommendation, score, source
+- ✅ `POST /api/fusion/agent/chat {message:"分析一下苹果股票"}` → Real AI response with source:"ai"
+- ✅ `GET /api/fusion/ai/brief` → Real AI-generated market brief in Chinese
+
+## Lint Status
+✅ `bun run lint` passes with no errors
+
+---
+Task ID: 8
+Agent: Main
+Date: 2025-05-29
+Status: ✅ Complete
+
+## Summary
+
+Analyzed TradingAgents-CN project from GitHub, implemented multi-agent debate analysis system, and redesigned LLM settings page with professional provider configuration.
+
+## Part 1: TradingAgents-CN Analysis
+
+Downloaded and analyzed https://github.com/hsliuping/TradingAgents-CN project. Key findings:
+
+**Multi-Agent Debate Architecture:**
+1. **Analyst Phase**: Market/Fundamentals/News/Social analysts generate reports using tools
+2. **Investment Debate Phase**: Bull ↔ Bear researchers alternate N rounds with rebuttals, Research Manager adjudicates
+3. **Trader Phase**: Makes trading decision based on research manager's investment plan
+4. **Risk Debate Phase**: Aggressive ↔ Conservative ↔ Neutral analysts debate N rounds, Risk Manager makes final decision
+
+**Key Design Patterns:**
+- LangGraph StateGraph for workflow orchestration
+- Each agent receives full context (all reports + debate history)
+- Bull/Bear debate: each side can see and rebut the other's previous argument
+- Risk debate: three-way with mutual rebuttals
+- Memory system (FinancialSituationMemory) for past experience recall
+- Configurable debate rounds (max_debate_rounds, max_risk_discuss_rounds)
+
+## Part 2: Multi-Agent Debate Analysis Implementation
+
+### Files Created
+1. **`src/lib/multi-agent-analysis.ts`** (728 lines) — Core multi-agent debate engine:
+   - 10 agent roles with detailed Chinese system prompts
+   - 4 analysis modes: quick(2 LLM calls), standard(3), full(7), debate(11+)
+   - Debate logic: Bull↔Bear alternate with rebuttals, Risk analysts 3-way debate
+   - In-memory task store using globalThis for cross-route persistence
+   - parseAnalysisResult() extracts structured data from LLM free-text output
+
+### Files Modified
+2. **`src/lib/ai-service.ts`** — Exported getZAI() for use by multi-agent module
+3. **`src/app/api/fusion/analysis/start/route.ts`** — Real multi-agent analysis with background execution
+4. **`src/app/api/fusion/analysis/[taskId]/route.ts`** — Real task polling with progress updates
+5. **`src/app/api/fusion/agent/chat/route.ts`** — Real AI chat with mock fallback
+6. **`src/app/api/fusion/ai/brief/route.ts`** — Real AI brief with mock fallback
+
+## Part 3: Settings Page LLM Configuration Redesign
+
+### Files Created
+1. **`src/app/api/settings/llm/route.ts`** — LLM config CRUD API (GET/POST) using SystemConfig Prisma model
+2. **`src/app/api/settings/llm/test/route.ts`** — Connection test API (ZAI via SDK, others via OpenAI-compatible fetch)
+
+### Files Modified
+3. **`src/components/dashboard/settings-view.tsx`** — Complete LLM tab redesign:
+   - 7 provider tabs: ZAI (内置免费), DeepSeek, OpenAI, Anthropic, 通义千问, 智谱AI, 自定义
+   - ZAI tab: prominent free model badge, no API key needed, model info display
+   - Other tabs: API Key (show/hide), Base URL (pre-filled), Model Name (pre-filled), Temperature slider, Max Tokens, Connection Status with test button
+   - Custom tab: all empty fields for manual configuration
+   - Settings persistence via API → SystemConfig Prisma table
+4. **`src/lib/i18n.ts`** — Added 29 new i18n keys for LLM settings
+
+### Default Provider URLs
+- DeepSeek: https://api.deepseek.com / deepseek-chat
+- OpenAI: https://api.openai.com/v1 / gpt-4o-mini
+- Anthropic: https://api.anthropic.com / claude-3.5-sonnet
+- Qwen: https://dashscope.aliyuncs.com/compatible-mode/v1 / qwen-plus
+- GLM: https://open.bigmodel.cn/api/paas/v4 / glm-4-flash
+
+## Lint Status
+✅ `bun run lint` passes with no errors
+
+## Dev Server
+✅ Running on port 3000

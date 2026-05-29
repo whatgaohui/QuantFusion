@@ -15,7 +15,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 let zaiInstance: ZAI | null = null;
 let zaiInitPromise: Promise<ZAI> | null = null;
 
-async function getZAI(): Promise<ZAI> {
+export async function getZAI(): Promise<ZAI> {
   if (zaiInstance) return zaiInstance;
   if (zaiInitPromise) return zaiInitPromise;
   
