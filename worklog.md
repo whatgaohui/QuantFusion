@@ -1041,3 +1041,37 @@ Downloaded and analyzed https://github.com/hsliuping/TradingAgents-CN project. K
 
 ## Dev Server
 ✅ Running on port 3000
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix AI analysis showing mock/demo data instead of real AI results
+
+Work Log:
+- Diagnosed the issue: AI analysis backend (z-ai-web-dev-sdk) works correctly, but frontend was falling back to mock data too easily
+- Found root causes:
+  1. Previous analysis tasks got stuck in "running" status (no global timeout)
+  2. Frontend fell back to mock data silently on any failure
+  3. Mock data looked identical to real data - user couldn't tell the difference
+  4. No error feedback when AI failed
+- Backend fixes (analysis/start/route.ts):
+  - Added global timeout per mode (quick:60s, standard:120s, full:180s, debate:300s)
+  - Added console logging for analysis start/complete/fail
+  - Background analysis now properly races against timeout
+- Frontend fixes (ai-analysis-view.tsx):
+  - Added `isMock` and `errorMessage` fields to AnalysisResult interface
+  - Mock analysis now clearly tagged with `isMock: true`
+  - Added prominent yellow warning banner when showing mock data
+  - Added green success banner when showing real AI results
+  - Added `errorMessage` state to display why AI failed
+  - Adjusted polling timeouts per mode (quick:30, standard:60, full:90, debate:150 polls)
+  - Error messages explain the failure and suggest alternatives
+- Chat API (agent/chat/route.ts):
+  - Added console logging for chat responses
+- Verified: Both quick and standard modes return real AI results successfully
+- Lint passes clean
+
+Stage Summary:
+- AI analysis now uses real z-ai-web-dev-sdk results by default
+- When AI fails, users see a clear warning banner indicating mock data
+- Backend has proper timeout handling to prevent stuck tasks
+- All analysis modes tested and working: quick (2 LLM calls), standard (3 LLM calls)

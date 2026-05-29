@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
       chatMode
     );
 
+    console.log(`[Chat] ${chatMode} mode, offline: ${isOffline}, response length: ${response?.length || 0}`);
+
     if (isOffline || !response) {
       // AI is offline, return mock response
       const mockResponse = generateMockChatResponse(message);

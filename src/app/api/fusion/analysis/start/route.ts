@@ -7,6 +7,14 @@ import {
   type AnalysisMode,
 } from '@/lib/multi-agent-analysis';
 
+// Global timeout for the entire analysis pipeline (ms)
+const ANALYSIS_GLOBAL_TIMEOUT: Record<AnalysisMode, number> = {
+  quick: 60000,      // 1 min
+  standard: 120000,   // 2 min
+  full: 180000,       // 3 min
+  debate: 300000,     // 5 min
+};
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -56,13 +64,20 @@ export async function POST(request: NextRequest) {
       // Kline fetch failed, continue without
     }
 
+    console.log(`[Analysis] Starting ${analysisMode} analysis for ${symbol} (${resolvedName}), task: ${taskId}`);
+
     // Create task in store
     createTask(taskId);
 
+    // Global timeout for the entire analysis
+    const globalTimeout = ANALYSIS_GLOBAL_TIMEOUT[analysisMode];
+
     // Start analysis in background (don't await)
     (async () => {
+      let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
       try {
-        const result = await runMultiAgentAnalysis(
+        // Race between analysis and global timeout
+        const analysisPromise = runMultiAgentAnalysis(
           symbol,
           resolvedName,
           marketData,
@@ -76,6 +91,18 @@ export async function POST(request: NextRequest) {
           }
         );
 
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutHandle = setTimeout(() => {
+            reject(new Error(`分析超时（${globalTimeout / 1000}秒），请尝试快速分析模式`));
+          }, globalTimeout);
+        });
+
+        const result = await Promise.race([analysisPromise, timeoutPromise]);
+
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+
+        console.log(`[Analysis] Completed ${analysisMode} analysis for ${symbol}, task: ${taskId}, LLM calls: ${result.llmCalls}`);
+
         updateTask(taskId, {
           status: 'completed',
           progress: 100,
@@ -84,7 +111,9 @@ export async function POST(request: NextRequest) {
           result,
         });
       } catch (err) {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
         const errMsg = err instanceof Error ? err.message : '分析过程发生未知错误';
+        console.error(`[Analysis] Failed ${analysisMode} analysis for ${symbol}, task: ${taskId}:`, errMsg);
         updateTask(taskId, {
           status: 'failed',
           currentStep: '分析失败',

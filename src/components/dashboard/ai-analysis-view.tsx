@@ -68,6 +68,8 @@ interface AnalysisResult {
   provider: string;
   tokens: number;
   cost: number;
+  isMock?: boolean;
+  errorMessage?: string;
 }
 
 interface HistoryItem {
@@ -306,6 +308,7 @@ export function AIAnalysisView() {
   const [searchResults, setSearchResults] = useState<{ symbol: string; description: string }[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
   const abortRef = useRef<boolean>(false);
 
@@ -333,7 +336,7 @@ export function AIAnalysisView() {
     }, 300);
   };
 
-  const runMockAnalysis = useCallback(async (sym: string, analysisMode: AnalysisMode) => {
+  const runMockAnalysis = useCallback(async (sym: string, analysisMode: AnalysisMode, reason?: string) => {
     const modeAgents = modeConfig[analysisMode].agents;
     const initialAgents: AgentState[] = modeAgents.map((id) => ({
       id,
@@ -343,6 +346,7 @@ export function AIAnalysisView() {
     }));
     setAgents(initialAgents);
     setIsOfflineMode(true);
+    if (reason) setErrorMessage(reason);
 
     // Simulate agent progression
     for (let i = 0; i < modeAgents.length; i++) {
@@ -357,7 +361,7 @@ export function AIAnalysisView() {
       );
     }
 
-    const mockResult = generateMockAnalysis(sym, analysisMode, language);
+    const mockResult = { ...generateMockAnalysis(sym, analysisMode, language), isMock: true, errorMessage: reason };
     setResult(mockResult);
 
     // Add to history
@@ -382,6 +386,7 @@ export function AIAnalysisView() {
     }));
     setAgents(initialAgents);
     setIsOfflineMode(false);
+    setErrorMessage(null);
 
     // Start by calling the API
     let taskId: string | null = null;
@@ -393,8 +398,8 @@ export function AIAnalysisView() {
       });
 
       if (!res.ok) {
-        // API returned error, fall back to mock
-        await runMockAnalysis(sym, analysisMode);
+        // API returned error - show error, allow mock as fallback
+        await runMockAnalysis(sym, analysisMode, 'AI服务暂时不可用，显示模拟分析结果');
         return;
       }
 
@@ -424,6 +429,7 @@ export function AIAnalysisView() {
           provider: source === 'ai' ? 'z-ai' : 'mock',
           tokens: 0,
           cost: 0,
+          isMock: source === 'mock',
         };
         setResult(mapped);
         setIsOffline(source === 'mock');
@@ -440,20 +446,21 @@ export function AIAnalysisView() {
         return;
       }
     } catch {
-      // API unreachable, fall back to mock
-      await runMockAnalysis(sym, analysisMode);
+      // API unreachable - show error, allow mock as fallback
+      await runMockAnalysis(sym, analysisMode, 'AI服务连接失败，显示模拟分析结果');
       return;
     }
 
     if (!taskId) {
-      await runMockAnalysis(sym, analysisMode);
+      await runMockAnalysis(sym, analysisMode, '分析任务创建失败，显示模拟分析结果');
       return;
     }
 
-    // Poll for results
-    let pollCount = 0;
-    const maxPolls = 120; // 120 * 2s = 4 min max (debate mode can take a while)
+    // Poll for results - adjust max polls based on mode
+    const modeTimeouts: Record<AnalysisMode, number> = { quick: 30, standard: 60, full: 90, debate: 150 };
+    const maxPolls = modeTimeouts[analysisMode]; // Each poll = 2s
     const pollInterval = 2000;
+    let pollCount = 0;
 
     while (pollCount < maxPolls) {
       if (abortRef.current) return;
@@ -533,9 +540,10 @@ export function AIAnalysisView() {
               provider: d.source === 'ai-multi-agent' ? 'z-ai-multi-agent' : d.source === 'ai-partial' ? 'z-ai-partial' : 'mock',
               tokens: d.llm_calls ? d.llm_calls * 800 : 0, // Rough estimate
               cost: d.llm_calls ? +(d.llm_calls * 800 * 0.000008).toFixed(3) : 0,
+              isMock: false,
             };
             setResult(mapped);
-            setIsOffline(d.source === 'mock');
+            setIsOffline(false);
 
             const historyItem: HistoryItem = {
               id: Date.now().toString(),
@@ -551,8 +559,9 @@ export function AIAnalysisView() {
         }
 
         if (taskStatus === 'failed' || taskStatus === 'error') {
-          // Task failed, fall back to mock
-          await runMockAnalysis(sym, analysisMode);
+          // Task failed - show error info with mock data
+          const failReason = pollData?.data?.error || 'AI分析失败';
+          await runMockAnalysis(sym, analysisMode, failReason);
           return;
         }
       } catch {
@@ -560,8 +569,8 @@ export function AIAnalysisView() {
       }
     }
 
-    // Timeout - fall back to mock
-    await runMockAnalysis(sym, analysisMode);
+    // Timeout - show error
+    await runMockAnalysis(sym, analysisMode, 'AI分析超时，请尝试快速分析模式');
   }, [runMockAnalysis]);
 
   const handleStartAnalysis = useCallback(async () => {
@@ -570,8 +579,9 @@ export function AIAnalysisView() {
     setAnalyzing(true);
     setResult(null);
     setShowReport(false);
+    setErrorMessage(null);
 
-    // Try real API first, fallback to mock
+    // Always try real API first
     await runRealAnalysis(symbol.toUpperCase(), mode);
 
     setAnalyzing(false);
@@ -671,6 +681,45 @@ export function AIAnalysisView() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Mock Data Warning Banner */}
+      {(result?.isMock || errorMessage) && (
+        <Card className="bg-yellow-600/5 border-yellow-600/20 rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <WifiOff className="w-4 h-4 text-yellow-500 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm text-yellow-400 font-medium">
+                  {result?.isMock ? '当前显示模拟分析数据' : 'AI分析异常'}
+                </p>
+                {errorMessage && (
+                  <p className="text-xs text-yellow-500/80 mt-0.5">{errorMessage}</p>
+                )}
+              </div>
+              <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[10px]">
+                演示数据
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* AI Success Banner */}
+      {result && !result.isMock && (
+        <Card className="bg-emerald-600/5 border-emerald-600/20 rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <Wifi className="w-4 h-4 text-emerald-500 shrink-0" />
+              <p className="text-sm text-emerald-400 font-medium">
+                AI多智能体分析完成 — 真实分析结果
+              </p>
+              <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[10px]">
+                {result.provider === 'z-ai-multi-agent' ? `${modeConfig[mode].agents.length}智能体协作` : 'AI分析'}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Analysis Results Area */}
       {(analyzing || result) && (
