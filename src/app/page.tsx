@@ -116,7 +116,7 @@ export default function HomePage() {
         </header>
 
         {/* View Content */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6">
+        <div className={`flex-1 min-h-0 ${activeView === 'agentChat' ? 'overflow-hidden p-2 md:p-3' : 'overflow-y-auto custom-scrollbar p-4 md:p-6'}`}>
           {renderView()}
         </div>
 

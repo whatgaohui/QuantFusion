@@ -20,7 +20,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -379,6 +378,8 @@ export function AgentChatView() {
   const [showHistory, setShowHistory] = useState(false);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
 
@@ -386,8 +387,11 @@ export function AgentChatView() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
+  // Only auto-scroll if user is near the bottom
   useEffect(() => {
-    scrollToBottom();
+    if (isNearBottomRef.current) {
+      scrollToBottom();
+    }
   }, [activeSession?.messages, scrollToBottom]);
 
   const handleSend = useCallback(async (message?: string) => {
@@ -396,6 +400,7 @@ export function AgentChatView() {
 
     setInputValue('');
     setSending(true);
+    isNearBottomRef.current = true; // User sent a message, auto-scroll to bottom
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -490,7 +495,7 @@ export function AgentChatView() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-10rem)]">
+    <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -573,8 +578,17 @@ export function AgentChatView() {
       )}
 
       {/* Chat Messages */}
-      <Card className="flex-1 bg-[#111118] border-[#1e1e2e] rounded-xl flex flex-col overflow-hidden">
-        <ScrollArea className="flex-1 p-4">
+      <Card className="flex-1 min-h-0 bg-[#111118] border-[#1e1e2e] rounded-xl flex flex-col overflow-hidden">
+        <div
+          ref={scrollAreaRef}
+          className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            // Consider "near bottom" if within 100px of the bottom
+            const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+            isNearBottomRef.current = distanceFromBottom < 100;
+          }}
+        >
           {activeSession && activeSession.messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[300px] px-4">
               {/* Welcome Panel */}
@@ -668,7 +682,7 @@ export function AgentChatView() {
               <div ref={messagesEndRef} />
             </div>
           )}
-        </ScrollArea>
+        </div>
 
         {/* Suggested Prompts (when chat has messages) */}
         {activeSession && activeSession.messages.length > 0 && !sending && (

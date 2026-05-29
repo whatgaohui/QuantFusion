@@ -1075,3 +1075,30 @@ Stage Summary:
 - When AI fails, users see a clear warning banner indicating mock data
 - Backend has proper timeout handling to prevent stuck tasks
 - All analysis modes tested and working: quick (2 LLM calls), standard (3 LLM calls)
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix chat page unable to scroll up
+
+Work Log:
+- Diagnosed root cause: double scroll container conflict
+  - page.tsx content area had `overflow-y-auto` on the outer div
+  - agent-chat-view.tsx used Radix ScrollArea inside the chat Card
+  - Both were competing for scroll events, preventing upward scrolling
+- Also identified: `h-[calc(100vh-10rem)]` was hardcoded and didn't match actual available space
+- Also identified: auto-scroll on every message change prevented users from scrolling up to read history
+
+Fixes applied:
+1. page.tsx: Content wrapper now conditionally uses `overflow-hidden` (with less padding) for agentChat view, letting the chat component manage its own scrolling
+2. agent-chat-view.tsx: Replaced `h-[calc(100vh-10rem)]` with `h-full` to properly fill parent
+3. agent-chat-view.tsx: Added `min-h-0` to Card and scroll container for proper flex sizing
+4. agent-chat-view.tsx: Replaced Radix ScrollArea with native `div` with `overflow-y-auto custom-scrollbar` — native scroll events are more reliable
+5. agent-chat-view.tsx: Added scroll position tracking via `onScroll` handler and `isNearBottomRef`
+6. agent-chat-view.tsx: Auto-scroll now only triggers when user is near bottom (within 100px)
+7. agent-chat-view.tsx: When user sends a message, force `isNearBottomRef = true` to auto-scroll to response
+
+Stage Summary:
+- Chat scrolling now works properly: users can scroll up to read history
+- Auto-scroll to bottom only when appropriate (user near bottom or just sent a message)
+- No more double-scroll-container conflict
+- Lint passes clean
