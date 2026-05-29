@@ -137,9 +137,9 @@ const aShareStocks: Record<string, string> = {
 };
 
 const usStocks: Record<string, string> = {
-  'AAPL': 'Apple Inc.', 'NVDA': 'NVIDIA Corp.', 'TSLA': 'Tesla Inc.',
-  'MSFT': 'Microsoft Corp.', 'GOOGL': 'Alphabet Inc.', 'AMZN': 'Amazon.com Inc.',
-  'META': 'Meta Platforms', 'JPM': 'JPMorgan Chase', 'V': 'Visa Inc.',
+  'AAPL': '苹果', 'NVDA': '英伟达', 'TSLA': '特斯拉',
+  'MSFT': '微软', 'GOOGL': '谷歌', 'AMZN': '亚马逊',
+  'META': 'Meta', 'JPM': '摩根大通', 'V': 'Visa',
 };
 
 const hkStocks: Record<string, string> = {
@@ -230,51 +230,51 @@ ${recommendation === 'BUY' ? '综合技术面、基本面及情绪面分析，�
     };
   }
 
-  // English mock
-  const technicalSummary = `${stockName}(${symbol}) is trading above its 5-day moving average, indicating short-term bullish momentum. RSI(14) at ${rsi} suggests room for further upside. MACD histogram expanding, confirming bullish momentum. Key support at $${supportLevel}, resistance at $${resistLevel}. Volume is moderately increasing with healthy price-volume confirmation.`;
+  // 中文 mock（英文回退也使用中文）
+  const technicalSummary = `${stockName}(${symbol})当前运行于5日均线上方，短期趋势偏强。RSI(14)为${rsi}，处于中性偏多区域。MACD红柱持续放大，DIF线在DEA线上方，确认多头动能。5日均线 ¥${ma5} 构成短线支撑，下方关键支撑 ¥${supportLevel}，上方阻力 ¥${resistLevel}。成交量温和放大，量价配合良好。`;
 
   const peRatio = (15 + Math.random() * 30).toFixed(1);
   const revenueGrowth = (5 + Math.random() * 20).toFixed(1);
-  const fundamentalSummary = `${stockName} reported revenue growth of ${revenueGrowth}% YoY with stable profit margins. P/E ratio of ${peRatio}x is ${parseFloat(peRatio) > 25 ? 'above' : 'in line with'} sector average. ${isAShare ? 'Operating cash flow remains robust with stable dividend yield, offering defensive value.' : 'Core business competitiveness remains strong with expanding market share.'}`;
+  const fundamentalSummary = `${stockName}最新财报显示营收同比增长${revenueGrowth}%，利润端表现稳健。市盈率${peRatio}倍，处于行业${parseFloat(peRatio) > 25 ? '偏高' : '合理'}水平。${isAShare ? '经营性现金流充裕，分红率稳定，具备防御价值。' : '核心业务竞争力突出，市场份额持续提升。'}毛利率保持稳定，费用管控良好。`;
 
   const analystBuyPct = Math.floor(55 + Math.random() * 30);
-  const sentimentSummary = `Overall market sentiment is positive. ${analystBuyPct}% of analyst ratings are Buy/Outperform. Recent news coverage has a positive bias. ${isAShare ? 'Policy signals remain supportive with continued northbound capital inflows.' : 'Industry outlook is improving with optimistic earnings expectations.'} Social media sentiment trending from neutral to positive.`;
+  const sentimentSummary = `市场情绪整体偏正面。${analystBuyPct}%的分析师给出买入/增持评级。近期新闻覆盖以正面为主，${isAShare ? '政策面持续释放利好信号，北向资金净流入趋势延续。' : '行业景气度回升，市场对盈利前景持乐观预期。'}社交媒体讨论热度上升，散户情绪指标从中性转向积极。`;
 
   const bullCase = recommendation === 'BUY'
-    ? `Core business growth remains strong with favorable industry dynamics. Valuation is reasonable with upside potential. ${isAShare ? 'Policy catalysts and improving liquidity conditions could drive valuation re-rating.' : 'Technical breakout confirms trend with momentum indicators supporting continuation.'}`
-    : `Current valuation is at historical lows with adequate margin of safety. Potential upside if macro conditions improve. Consider accumulating on catalyst-driven opportunities.`;
+    ? `核心业务增长强劲，行业景气周期延续。估值相对合理，存在上行空间。${isAShare ? '政策催化叠加资金面改善，有望迎来估值修复行情。' : '技术面多头排列，动能指标确认趋势。'}中长线配置价值突出。`
+    : `当前估值处于历史低位区间，安全边际较高。若宏观环境改善，存在估值修复空间。建议关注催化剂出现后的布局机会。`;
 
   const bearCase = recommendation === 'SELL'
-    ? `${isAShare ? 'Increasing regulatory uncertainty and' : 'Intensifying competition causing'} downward earnings revision. Technical breakdown with significant selling pressure. Recommend caution until risk is adequately priced in.`
-    : `Macro headwinds could impact performance. ${isAShare ? 'Geopolitical factors' : 'Interest rate environment'} adding uncertainty. Monitor key support levels for signs of further deterioration.`;
+    ? `${isAShare ? '行业监管不确定性增加，' : '竞争加剧导致市场份额承压，'}盈利增长预期下调。技术面破位下行，短期卖压明显。建议暂时规避，等待风险释放。`
+    : `宏观经济下行风险可能拖累业绩，${isAShare ? '地缘政治因素' : '利率环境变化'}带来不确定性。短期波动加剧，需关注关键支撑位得失。`;
 
-  const report = `# ${stockName}(${symbol}) Comprehensive Analysis Report
+  const report = `# ${stockName}(${symbol}) 综合分析报告
 
-## Executive Summary
-${stockName}(${symbol}) presents a **${recommendation}** recommendation with a composite score of ${score}/100. ${recommendation === 'BUY' ? 'Multiple dimensions align bullishly, offering compelling risk/reward for medium-term allocation.' : recommendation === 'SELL' ? 'Risk/reward profile is unfavorable; caution is advised.' : 'Bull and bear factors are balanced; hold and monitor is recommended.'}
+## 执行摘要
+${stockName}(${symbol}) 综合评分 **${score}/100**，投资建议为 **${recommendation === 'BUY' ? '买入' : recommendation === 'SELL' ? '卖出' : '持有'}**。${recommendation === 'BUY' ? '多个维度共振偏多，中长期配置价值突出。' : recommendation === 'SELL' ? '风险收益比不佳，建议谨慎应对。' : '多空因素交织，建议观望为主。'}
 
-## Technical Analysis
-- **Trend**: ${score >= 60 ? 'Short-term uptrend with bullish moving average alignment' : 'Indeterminate trend, ranging market'}
-- **Momentum**: RSI(14) = ${rsi}, ${parseFloat(rsi) > 65 ? 'approaching overbought territory' : 'neutral-bullish zone'}
-- **MACD**: ${parseFloat(rsi) > 55 ? 'Histogram expanding, bullish momentum increasing' : 'Histogram contracting, bearish momentum fading'}
-- **Key Levels**: Support $${supportLevel} / Resistance $${resistLevel}
+## 技术分析
+- **趋势判断**: ${score >= 60 ? '短期趋势向上，均线多头排列' : '趋势不明朗，震荡格局'}
+- **动量指标**: RSI(14) = ${rsi}，${parseFloat(rsi) > 65 ? '接近超买区域' : '中性偏多区域'}
+- **MACD**: ${parseFloat(rsi) > 55 ? '红柱扩大，多头动能增强' : '绿柱收敛，空头动能减弱'}
+- **关键位**: 支撑 ¥${supportLevel} / 阻力 ¥${resistLevel}
 
-## Fundamental Analysis
-- **Revenue Growth**: ${revenueGrowth}% YoY
-- **Valuation**: PE ${peRatio}x
-- **Earnings Quality**: ${parseFloat(peRatio) < 25 ? 'Excellent earnings quality' : 'Monitor earnings sustainability'}
+## 基本面分析
+- **营收增速**: ${revenueGrowth}% YoY
+- **估值水平**: PE ${peRatio}x
+- **盈利质量**: ${parseFloat(peRatio) < 25 ? '盈利质量优秀' : '需关注盈利持续性'}
 
-## Sentiment Analysis
-- **Analyst Consensus**: ${analystBuyPct}% Buy ratings
-- **News Sentiment**: Positive bias
-- **Fund Flows**: ${isAShare ? 'Northbound capital' : 'Institutional funds'} ${Math.random() > 0.4 ? 'net inflow' : 'net outflow'}
+## 情绪分析
+- **分析师共识**: ${analystBuyPct}% 买入评级
+- **新闻情绪**: 偏正面
+- **资金流向**: ${isAShare ? '北向资金' : '主力资金'}${Math.random() > 0.4 ? '净流入' : '净流出'}
 
-## Risk Assessment
-- **Risk Level**: ${riskLevel} (score: ${riskScore}/100)
-- **Key Risks**: ${isAShare ? 'Policy changes, industry competition, macro conditions' : 'Market volatility, industry cycles, competitive landscape'}
+## 风险评估
+- **风险等级**: ${riskLevel === 'LOW' ? '低' : riskLevel === 'HIGH' ? '高' : '中'} (评分: ${riskScore}/100)
+- **主要风险**: ${isAShare ? '政策变动、行业竞争、宏观经济' : '市场波动、行业周期、竞争格局'}
 
-## Conclusion
-${recommendation === 'BUY' ? 'Technical, fundamental, and sentiment analysis converge favorably. Current risk/reward is attractive for position building on pullbacks.' : recommendation === 'SELL' ? 'Multiple bearish signals suggest reducing exposure and waiting for better entry opportunities.' : 'Bull and bear factors are relatively balanced. Hold and monitor for directional breakout from key levels.'}`;
+## 总结
+${recommendation === 'BUY' ? '综合技术面、基本面及情绪面分析，当前具备较好的风险收益比，建议逢低布局。' : recommendation === 'SELL' ? '多个信号偏空，建议减仓或规避，等待更好的入场时机。' : '多空因素相对均衡，建议持有观望，关注关键位突破方向。'}`;
 
   return {
     symbol,
@@ -621,7 +621,7 @@ export function AIAnalysisView() {
           {/* Mode Description + Offline Indicator */}
           <div className="flex items-center justify-between mt-2">
             <p className="text-xs text-zinc-500">
-              {t(modeConfig[mode].descKey)} — {modeConfig[mode].agents.length} agents
+              {t(modeConfig[mode].descKey)} — {modeConfig[mode].agents.length} 个智能体
             </p>
             {result && (
               <div className="flex items-center gap-1.5">

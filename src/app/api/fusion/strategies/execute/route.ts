@@ -11,6 +11,6 @@ export async function POST(request: NextRequest) {
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch {
-    return NextResponse.json({ error: 'Failed to execute strategy' }, { status: 502 });
+    return NextResponse.json({ error: '执行策略失败' }, { status: 502 });
   }
 }

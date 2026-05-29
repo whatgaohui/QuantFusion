@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     if (!symbol) {
       return NextResponse.json(
-        { error: 'Symbol parameter is required' },
+        { error: '股票代码参数不能为空' },
         { status: 400 }
       );
     }
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     if (!FINNHUB_API_KEY) {
       return NextResponse.json(
-        { error: 'Finnhub API key not configured' },
+        { error: 'Finnhub API密钥未配置' },
         { status: 500 }
       );
     }
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: `Finnhub API error: ${response.status}` },
+        { error: `Finnhub API错误: ${response.status}` },
         { status: response.status }
       );
     }
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     // Finnhub returns { c: current, d: change, dp: changePercent, h: high, l: low, o: open, pc: prevClose, t: timestamp }
     if (!data || (data.c === 0 && data.h === 0 && data.l === 0)) {
       return NextResponse.json(
-        { error: 'No quote data found for symbol' },
+        { error: '未找到行情数据' },
         { status: 404 }
       );
     }
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Quote API error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch stock quote' },
+      { error: '获取股票行情失败' },
       { status: 500 }
     );
   }

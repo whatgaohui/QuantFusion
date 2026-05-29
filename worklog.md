@@ -717,3 +717,112 @@ Stage Summary:
 - ✅ Server stability maintained with timeouts and sequential processing
 - Known: Brief endpoint uses static market data to avoid memory pressure
 - All lint checks pass
+
+---
+
+**Task ID**: 2-c (i18n fix)
+**Agent**: Main
+**Date**: 2025-05-28
+**Status**: ✅ Complete
+
+## Summary
+
+Fixed all remaining English content in the Signal Scanner, Agent Chat, and AI Analysis views to use Chinese text, as this is a Chinese quantitative trading app.
+
+## Files Modified
+
+### 1. `src/components/dashboard/signal-scanner-view.tsx`
+- US stock names in `MARKET_STOCKS` → Chinese: Apple Inc.→苹果, NVIDIA Corp.→英伟达, Tesla Inc.→特斯拉, Microsoft Corp.→微软, Amazon.com→亚马逊, Meta Platforms→Meta, Alphabet Inc.→谷歌, AMD Inc.→AMD, JPMorgan Chase→摩根大通, Visa Inc.→Visa
+- US stock names in `generateDemoSignals()` demo data → same Chinese mapping
+- Sector names in demo data: Semiconductors→半导体, Technology→科技, Automotive→汽车, Social Media→社交媒体, Banking→银行
+- Badge text: `Live` → `实时`
+
+### 2. `src/components/dashboard/agent-chat-view.tsx`
+- US stock names in `usNames` mapping → Chinese (same mapping as above)
+- Capability tags: `📊 Stock Analysis` → `📊 股票分析`, `📈 Market Trends` → `📈 市场趋势`, `🎯 Trading Insights` → `🎯 交易洞察`, `💡 Strategy Advice` → `💡 策略建议`
+- Label: `Suggestions` → `建议`
+- Default session title: `New Analysis Session` → `新建分析会话`
+- English mock responses replaced with Chinese text for all 4 generators:
+  - `generateStockResponse()` lang='en' fallback → Chinese
+  - `generateMarketResponse()` lang='en' fallback → Chinese
+  - `generateStrategyResponse()` lang='en' fallback → Chinese
+  - `generateDefaultResponse()` lang='en' fallback → Chinese
+
+### 3. `src/components/dashboard/ai-analysis-view.tsx`
+- US stock names in `usStocks` mapping → Chinese (same mapping as above)
+- English mock analysis text (`generateMockAnalysis` lang='en' fallback) → Chinese (identical to zh block)
+- Mode description suffix: `{count} agents` → `{count} 个智能体`
+
+## Lint Status
+✅ `bun run lint` passes with no errors
+
+---
+
+**Task ID**: 2-f
+**Agent**: Main
+**Date**: 2025-05-28
+**Status**: ✅ Complete
+
+## Summary
+
+Translated ALL English error messages and AI prompts in API routes to Chinese, as this is a Chinese quantitative trading app. User-facing error messages in 27 API route files were converted from English to Chinese. AI prompts in `ai/sentiment/route.ts` were also translated to Chinese.
+
+## Files Modified (27 files)
+
+### Fusion API Routes (12 files)
+1. `src/app/api/fusion/agent/chat/route.ts` — `'Message is required'` → `'消息不能为空'`, `'Failed to process chat message'` → `'处理聊天消息失败'`
+2. `src/app/api/fusion/analysis/start/route.ts` — `'Symbol is required'` → `'股票代码不能为空'`, `'Failed to start analysis'` → `'启动分析失败'`
+3. `src/app/api/fusion/backtest/run/route.ts` — `'Failed to run backtest'` → `'运行回测失败'`
+4. `src/app/api/fusion/market/quote/route.ts` — `'No valid symbols provided'` → `'未提供有效的股票代码'`, `'Symbol parameter is required'` → `'股票代码参数不能为空'`, `'Failed to fetch quote data'` → `'获取行情数据失败'`
+5. `src/app/api/fusion/market/kline/route.ts` — `'Symbol parameter is required'` → `'股票代码参数不能为空'`, `'Failed to fetch kline data'` → `'获取K线数据失败'`
+6. `src/app/api/fusion/market/news/route.ts` — `'Failed to fetch news data'` → `'获取新闻数据失败'`
+7. `src/app/api/fusion/market/sectors/route.ts` — `'Failed to fetch sectors data'` → `'获取板块数据失败'`
+8. `src/app/api/fusion/market/indicators/route.ts` — `'Symbol parameter is required'` → `'股票代码参数不能为空'`, `'Failed to fetch indicators data'` → `'获取指标数据失败'`
+9. `src/app/api/fusion/strategies/route.ts` — `'Failed to fetch strategies'` → `'获取策略失败'`
+10. `src/app/api/fusion/strategies/execute/route.ts` — `'Failed to execute strategy'` → `'执行策略失败'`
+11. `src/app/api/fusion/notifications/send/route.ts` — `'Failed to send notification'` → `'发送通知失败'`
+12. `src/app/api/fusion/ai/brief/route.ts` — `'Failed to generate brief'` → `'生成摘要失败'`
+
+### Signal Scanner (1 file)
+13. `src/app/api/signals/scan/route.ts` — 5 error messages translated
+
+### Alerts (1 file)
+14. `src/app/api/alerts/route.ts` — 10 error messages translated (GET/POST/PATCH/DELETE)
+
+### Portfolio (3 files)
+15. `src/app/api/portfolio/positions/route.ts` — 8 error messages translated
+16. `src/app/api/portfolio/summary/route.ts` — `'Failed to get portfolio summary'` → `'获取投资组合摘要失败'`
+17. `src/app/api/portfolio/check/route.ts` — 4 error/reason messages translated
+
+### Watchlist (1 file)
+18. `src/app/api/watchlist/route.ts` — 9 error messages translated
+
+### Market Routes (6 files)
+19. `src/app/api/market/news/route.ts` — 3 messages translated
+20. `src/app/api/market/search/route.ts` — 4 messages translated
+21. `src/app/api/market/profile/route.ts` — 5 messages translated
+22. `src/app/api/market/candle/route.ts` — 3 messages translated
+23. `src/app/api/market/quote/route.ts` — 5 messages translated
+24. `src/app/api/market/symbols/route.ts` — 3 messages translated
+
+### Trades (1 file)
+25. `src/app/api/trades/route.ts` — `'Failed to fetch trade logs'` → `'获取交易记录失败'`
+
+### AI Route (1 file — error messages + AI prompts)
+26. `src/app/api/ai/sentiment/route.ts`:
+   - Error messages: `'Symbol is required'` → `'股票代码不能为空'`, `'Failed to analyze sentiment'` → `'情绪分析失败'`
+   - AI system prompt translated: English financial analyst prompt → Chinese
+   - AI user prompt translated: "Analyze market sentiment for..." → "请分析...的市场情绪"
+   - Context data labels: `'Current Price:'` → `'当前价格:'`, `'Change:'` → `'涨跌:'`, `'High:'` → `'最高:'`, `'Low:'` → `'最低:'`
+   - News summary fallbacks: `'No summary'` → `'无摘要'`, `'No recent news available...'` → `'该股票暂无近期新闻。'`
+   - Fallback result: `'Unable to parse AI analysis'` → `'无法解析AI分析结果'`, `'Uncertain'` → `'不确定'`
+
+## Design Decisions
+- Only translated user-facing error messages and AI prompts — did NOT change console.error messages, code comments, variable names, or technical identifiers
+- Field names in AI JSON output (score, label, factors, riskLevel, shortTermOutlook, summary) kept in English as they are technical identifiers consumed by the frontend
+- Parameter names in validation errors (symbol, alertType, targetValue, avgCost, quantity, id, closePrice) kept as-is since they are technical identifiers
+- Finnhub API error prefix standardized to `'Finnhub API错误: {status}'`
+- Finnhub API key error standardized to `'Finnhub API密钥未配置'`
+
+## Lint Status
+✅ `bun run lint` passes with no errors

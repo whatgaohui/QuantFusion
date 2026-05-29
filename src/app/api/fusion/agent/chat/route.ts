@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
-        { success: false, data: null, error: 'Message is required' },
+        { success: false, data: null, error: '消息不能为空' },
         { status: 400 }
       );
     }
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Agent chat API error:', error);
     return NextResponse.json(
-      { success: false, data: null, error: 'Failed to process chat message' },
+      { success: false, data: null, error: '处理聊天消息失败' },
       { status: 500 }
     );
   }

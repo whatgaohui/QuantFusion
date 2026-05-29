@@ -11,6 +11,6 @@ export async function POST(request: NextRequest) {
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch {
-    return NextResponse.json({ error: 'Failed to send notification' }, { status: 502 });
+    return NextResponse.json({ error: '发送通知失败' }, { status: 502 });
   }
 }

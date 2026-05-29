@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Fusion sectors API error:', error);
     return NextResponse.json(
-      { success: false, data: null, error: 'Failed to fetch sectors data' },
+      { success: false, data: null, error: '获取板块数据失败' },
       { status: 500 }
     );
   }

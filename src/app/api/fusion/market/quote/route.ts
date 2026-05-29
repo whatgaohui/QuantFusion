@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       const symbolList = symbols.split(',').map(s => s.trim()).filter(Boolean);
       if (symbolList.length === 0) {
         return NextResponse.json(
-          { success: false, data: null, error: 'No valid symbols provided' },
+          { success: false, data: null, error: '未提供有效的股票代码' },
           { status: 400 }
         );
       }
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     // Single quote request
     if (!symbol) {
       return NextResponse.json(
-        { success: false, data: null, error: 'Symbol parameter is required' },
+        { success: false, data: null, error: '股票代码参数不能为空' },
         { status: 400 }
       );
     }
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Fusion quote API error:', error);
     return NextResponse.json(
-      { success: false, data: null, error: 'Failed to fetch quote data' },
+      { success: false, data: null, error: '获取行情数据失败' },
       { status: 500 }
     );
   }

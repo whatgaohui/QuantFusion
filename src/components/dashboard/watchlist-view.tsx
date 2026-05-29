@@ -96,12 +96,12 @@ function generateSparkline(): { v: number }[] {
 }
 
 const mockWatchlist: WatchlistItem[] = [
-  { id: '1', symbol: 'AAPL', name: 'Apple Inc.', price: 189.45, change: 2.34, changePercent: 1.25, sparkline: generateSparkline() },
-  { id: '2', symbol: 'NVDA', name: 'NVIDIA Corp.', price: 615.20, change: 8.45, changePercent: 1.39, sparkline: generateSparkline() },
-  { id: '3', symbol: 'TSLA', name: 'Tesla Inc.', price: 245.80, change: -3.67, changePercent: -1.47, sparkline: generateSparkline() },
-  { id: '4', symbol: 'MSFT', name: 'Microsoft Corp.', price: 388.50, change: 1.89, changePercent: 0.49, sparkline: generateSparkline() },
-  { id: '5', symbol: 'AMZN', name: 'Amazon.com', price: 178.25, change: -0.45, changePercent: -0.25, sparkline: generateSparkline() },
-  { id: '6', symbol: 'META', name: 'Meta Platforms', price: 374.20, change: 5.67, changePercent: 1.54, sparkline: generateSparkline() },
+  { id: '1', symbol: 'AAPL', name: '苹果', price: 189.45, change: 2.34, changePercent: 1.25, sparkline: generateSparkline() },
+  { id: '2', symbol: 'NVDA', name: '英伟达', price: 615.20, change: 8.45, changePercent: 1.39, sparkline: generateSparkline() },
+  { id: '3', symbol: 'TSLA', name: '特斯拉', price: 245.80, change: -3.67, changePercent: -1.47, sparkline: generateSparkline() },
+  { id: '4', symbol: 'MSFT', name: '微软', price: 388.50, change: 1.89, changePercent: 0.49, sparkline: generateSparkline() },
+  { id: '5', symbol: 'AMZN', name: '亚马逊', price: 178.25, change: -0.45, changePercent: -0.25, sparkline: generateSparkline() },
+  { id: '6', symbol: 'META', name: 'Meta', price: 374.20, change: 5.67, changePercent: 1.54, sparkline: generateSparkline() },
 ];
 
 const mockAlerts: AlertItem[] = [
@@ -478,7 +478,7 @@ export function WatchlistView() {
                 <div className="space-y-2">
                   <Label className="text-zinc-300 text-sm">{t('watch.symbol')}</Label>
                   <Input
-                    placeholder="e.g., AAPL"
+                    placeholder="例如 AAPL"
                     value={alertSymbol}
                     onChange={(e) => setAlertSymbol(e.target.value.toUpperCase())}
                     className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
@@ -488,7 +488,7 @@ export function WatchlistView() {
                   <Label className="text-zinc-300 text-sm">{t('watch.targetPrice')}</Label>
                   <Input
                     type="number"
-                    placeholder="e.g., 195.00"
+                    placeholder="例如 195.00"
                     value={alertTargetPrice}
                     onChange={(e) => setAlertTargetPrice(e.target.value)}
                     className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
@@ -710,7 +710,7 @@ export function WatchlistView() {
                               : 'bg-red-600/15 text-red-400 border-red-600/20'
                           }`}
                         >
-                          {alert.direction === 'above' ? '↑ Above' : '↓ Below'} ${alert.targetPrice.toFixed(2)}
+                          {alert.direction === 'above' ? '↑ 高于' : '↓ 低于'} ${alert.targetPrice.toFixed(2)}
                         </Badge>
                       </div>
                       <p className="text-[10px] text-zinc-500 mt-0.5">

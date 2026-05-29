@@ -9,14 +9,14 @@ export async function GET(request: NextRequest) {
 
     if (!q) {
       return NextResponse.json(
-        { error: 'Search query parameter "q" is required' },
+        { error: '搜索查询参数"q"为必填项' },
         { status: 400 }
       );
     }
 
     if (!FINNHUB_API_KEY) {
       return NextResponse.json(
-        { error: 'Finnhub API key not configured' },
+        { error: 'Finnhub API密钥未配置' },
         { status: 500 }
       );
     }
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: `Finnhub API error: ${response.status}` },
+        { error: `Finnhub API错误: ${response.status}` },
         { status: response.status }
       );
     }
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Search API error:', error);
     return NextResponse.json(
-      { error: 'Failed to search stocks' },
+      { error: '搜索股票失败' },
       { status: 500 }
     );
   }

@@ -43,7 +43,7 @@ async function analyzeSentiment(symbol: string, name?: string) {
       if (quoteRes.ok) {
         const quote = await quoteRes.json();
         if (quote.c) {
-          quoteInfo = `Current Price: $${quote.c}, Change: ${quote.d >= 0 ? '+' : ''}${quote.d} (${quote.dp >= 0 ? '+' : ''}${quote.dp}%), High: $${quote.h}, Low: $${quote.l}`;
+          quoteInfo = `当前价格: $${quote.c}, 涨跌: ${quote.d >= 0 ? '+' : ''}${quote.d} (${quote.dp >= 0 ? '+' : ''}${quote.dp}%), 最高: $${quote.h}, 最低: $${quote.l}`;
         }
       }
     } catch {
@@ -53,8 +53,8 @@ async function analyzeSentiment(symbol: string, name?: string) {
 
   // Prepare news summary
   const newsSummary = newsItems.length > 0
-    ? newsItems.map((n, i) => `${i + 1}. "${n.headline}" - ${n.summary || 'No summary'} (${n.source})`).join('\n')
-    : 'No recent news available for this symbol.';
+    ? newsItems.map((n, i) => `${i + 1}. "${n.headline}" - ${n.summary || '无摘要'} (${n.source})`).join('\n')
+    : '该股票暂无近期新闻。';
 
   // Use LLM for sentiment analysis
   const zai = await ZAI.create();
@@ -62,24 +62,24 @@ async function analyzeSentiment(symbol: string, name?: string) {
     messages: [
       {
         role: 'assistant',
-        content: `You are an expert financial analyst specializing in stock market sentiment analysis. Analyze the given stock data and provide:
-1. Overall sentiment score from -100 (extremely bearish) to +100 (extremely bullish)
-2. Sentiment label: STRONG_BUY, BUY, NEUTRAL, SELL, or STRONG_SELL
-3. Key factors influencing the sentiment (as an array of strings)
-4. Risk level: LOW, MEDIUM, HIGH
-5. Short-term outlook (1-7 days)
-6. A brief analysis summary
+        content: `你是一位专业的金融分析师，擅长股票市场情绪分析。分析给定的股票数据并提供：
+1. 整体情绪评分，范围从 -100（极度看空）到 +100（极度看多）
+2. 情绪标签：STRONG_BUY、BUY、NEUTRAL、SELL 或 STRONG_SELL
+3. 影响情绪的关键因素（字符串数组）
+4. 风险等级：LOW、MEDIUM、HIGH
+5. 短期展望（1-7天）
+6. 简要分析摘要
 
-Always respond in valid JSON format with these fields: score, label, factors, riskLevel, shortTermOutlook, summary`
+请始终以有效的JSON格式回复，包含以下字段：score、label、factors、riskLevel、shortTermOutlook、summary`
       },
       {
         role: 'user',
-        content: `Analyze market sentiment for ${name || symbol} (${symbol}).
+        content: `请分析 ${name || symbol}（${symbol}）的市场情绪。
 
-${quoteInfo ? `Market Data: ${quoteInfo}\n` : ''}Recent News:
+${quoteInfo ? `市场数据：${quoteInfo}\n` : ''}近期新闻：
 ${newsSummary}
 
-Provide your sentiment analysis in JSON format.`
+请以JSON格式提供你的情绪分析。`
       }
     ],
     thinking: { type: 'disabled' }
@@ -97,9 +97,9 @@ Provide your sentiment analysis in JSON format.`
       sentimentResult = {
         score: 0,
         label: 'NEUTRAL',
-        factors: ['Unable to parse AI analysis'],
+        factors: ['无法解析AI分析结果'],
         riskLevel: 'MEDIUM',
-        shortTermOutlook: 'Uncertain',
+        shortTermOutlook: '不确定',
         summary: aiResponse,
       };
     }
@@ -107,9 +107,9 @@ Provide your sentiment analysis in JSON format.`
     sentimentResult = {
       score: 0,
       label: 'NEUTRAL',
-      factors: ['Unable to parse AI analysis'],
+      factors: ['无法解析AI分析结果'],
       riskLevel: 'MEDIUM',
-      shortTermOutlook: 'Uncertain',
+      shortTermOutlook: '不确定',
       summary: aiResponse,
     };
   }
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     const { symbol, name } = body as { symbol: string; name?: string };
 
     if (!symbol) {
-      return NextResponse.json({ error: 'Symbol is required' }, { status: 400 });
+      return NextResponse.json({ error: '股票代码不能为空' }, { status: 400 });
     }
 
     const result = await analyzeSentiment(symbol, name);
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('AI sentiment analysis error:', error);
     return NextResponse.json(
-      { error: 'Failed to analyze sentiment' },
+      { error: '情绪分析失败' },
       { status: 500 }
     );
   }
@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
     const name = searchParams.get('name') || undefined;
 
     if (!symbol) {
-      return NextResponse.json({ error: 'Symbol is required' }, { status: 400 });
+      return NextResponse.json({ error: '股票代码不能为空' }, { status: 400 });
     }
 
     const result = await analyzeSentiment(symbol, name);
@@ -158,7 +158,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('AI sentiment GET error:', error);
     return NextResponse.json(
-      { error: 'Failed to analyze sentiment' },
+      { error: '情绪分析失败' },
       { status: 500 }
     );
   }

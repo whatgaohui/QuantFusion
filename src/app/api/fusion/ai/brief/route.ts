@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('AI brief API error:', error);
     return NextResponse.json(
-      { success: false, data: null, error: 'Failed to generate brief' },
+      { success: false, data: null, error: '生成摘要失败' },
       { status: 500 }
     );
   }

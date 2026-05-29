@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Fusion strategies API error:', error);
     return NextResponse.json(
-      { success: false, data: null, error: 'Failed to fetch strategies' },
+      { success: false, data: null, error: '获取策略失败' },
       { status: 500 }
     );
   }

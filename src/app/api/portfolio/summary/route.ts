@@ -133,7 +133,7 @@ export async function GET() {
   } catch (error) {
     console.error('Portfolio summary error:', error);
     return NextResponse.json(
-      { error: 'Failed to get portfolio summary' },
+      { error: '获取投资组合摘要失败' },
       { status: 500 }
     );
   }

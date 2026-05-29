@@ -25,16 +25,16 @@ const HK_SHARE: Record<string, {name:string;price:number}> = {
 };
 
 const US_NAMES: Record<string,string> = {
-  'AAPL':'Apple Inc.','GOOGL':'Alphabet Inc.','MSFT':'Microsoft Corp.',
-  'AMZN':'Amazon.com','NVDA':'NVIDIA Corp.','META':'Meta Platforms',
-  'TSLA':'Tesla Inc.','JPM':'JPMorgan Chase','AMD':'AMD','NFLX':'Netflix',
-  'V':'Visa Inc.','JNJ':'Johnson & Johnson','WMT':'Walmart Inc.',
-  'INTC':'Intel Corp.','CSCO':'Cisco Systems','PFE':'Pfizer Inc.',
-  'BA':'Boeing Co.','GS':'Goldman Sachs','PYPL':'PayPal Holdings',
-  'DIS':'Walt Disney Co.','BRK.B':'Berkshire Hathaway','MA':'Mastercard Inc.',
-  'HD':'Home Depot Inc.','UNH':'UnitedHealth Group','PG':'Procter & Gamble',
-  'CRM':'Salesforce Inc.','ORCL':'Oracle Corp.','QCOM':'Qualcomm Inc.',
-  'COST':'Costco Wholesale','ADBE':'Adobe Inc.',
+  'AAPL':'苹果','GOOGL':'谷歌','MSFT':'微软',
+  'AMZN':'亚马逊','NVDA':'英伟达','META':'Meta',
+  'TSLA':'特斯拉','JPM':'摩根大通','AMD':'AMD','NFLX':'奈飞',
+  'V':'Visa','JNJ':'强生','WMT':'沃尔玛',
+  'INTC':'英特尔','CSCO':'思科','PFE':'辉瑞',
+  'BA':'波音','GS':'高盛','PYPL':'PayPal',
+  'DIS':'迪士尼','BRK.B':'伯克希尔','MA':'万事达',
+  'HD':'家得宝','UNH':'联合健康','PG':'宝洁',
+  'CRM':'赛富时','ORCL':'甲骨文','QCOM':'高通',
+  'COST':'好市多','ADBE':'Adobe',
 };
 
 const US_INDICES: Record<string, {name:string;price:number}> = {
@@ -126,9 +126,9 @@ export function getMockNews(market: string, count = 10) {
     { h: '港府推出消费券计划', s: '刺激本地消费市场', src: '香港经济日报', sent: 'neutral' },
   ];
   const newsUS = [
-    { h: 'Fed signals potential rate cuts', s: 'Inflation data softens', src: 'Reuters', sent: 'bullish' },
-    { h: 'NVIDIA hits new all-time high', s: 'Data center revenue surges', src: 'Bloomberg', sent: 'bullish' },
-    { h: 'Tech earnings beat expectations', s: 'Q4 results strong', src: 'CNBC', sent: 'bullish' },
+    { h: '美联储暗示降息', s: '通胀数据降温', src: '路透社', sent: 'bullish' },
+    { h: '英伟达股价再创新高', s: '数据中心收入激增', src: '彭博社', sent: 'bullish' },
+    { h: '科技股财报超预期', s: '四季度业绩强劲', src: 'CNBC', sent: 'bullish' },
   ];
   const src = market === 'HK' ? newsHK : market === 'US' ? newsUS : newsA;
   const items = src.slice(0, Math.min(count, 5)).map((t, i) => ({
@@ -141,7 +141,7 @@ export function getMockNews(market: string, count = 10) {
 export function getMockSectors(market: string) {
   const names = market === 'A' ? ['白酒','新能源','银行','医药','证券','保险','电子','矿业','家电','电力','农业','旅游']
     : market === 'HK' ? ['互联网','银行','保险','科技','电商','汽车']
-    : ['Technology','Healthcare','Finance','Consumer','Energy','Industrials'];
+    : ['科技','医疗','金融','消费','能源','工业'];
   const sectors = names.map(n => ({
     name: n, changePercent: +((Math.random()-0.48)*6).toFixed(2),
     volume: Math.floor(5e7+Math.random()*1e8), topStocks: [],

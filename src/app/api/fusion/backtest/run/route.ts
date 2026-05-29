@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Fusion backtest API error:', error);
     return NextResponse.json(
-      { success: false, data: null, error: 'Failed to run backtest' },
+      { success: false, data: null, error: '运行回测失败' },
       { status: 500 }
     );
   }

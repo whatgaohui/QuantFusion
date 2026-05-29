@@ -96,20 +96,20 @@ const defaultSummary: PortfolioSummary = {
 };
 
 const defaultIndices: MarketIndex[] = [
-  { symbol: 'SH000001', name: 'SSE Composite', price: 3156.28, change: 12.45, changePercent: 0.40, market: 'A' },
-  { symbol: 'SZ399001', name: 'SZSE Component', price: 10245.67, change: 53.21, changePercent: 0.52, market: 'A' },
-  { symbol: 'HSI', name: 'Hang Seng', price: 18942.35, change: 154.32, changePercent: 0.82, market: 'HK' },
-  { symbol: 'AAPL', name: 'Apple Inc.', price: 189.45, change: 1.23, changePercent: 0.65, market: 'US' },
-  { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 142.65, change: 0.89, changePercent: 0.63, market: 'US' },
-  { symbol: 'MSFT', name: 'Microsoft Corp.', price: 388.50, change: 2.15, changePercent: 0.56, market: 'US' },
+  { symbol: 'SH000001', name: '上证指数', price: 3156.28, change: 12.45, changePercent: 0.40, market: 'A' },
+  { symbol: 'SZ399001', name: '深证成指', price: 10245.67, change: 53.21, changePercent: 0.52, market: 'A' },
+  { symbol: 'HSI', name: '恒生指数', price: 18942.35, change: 154.32, changePercent: 0.82, market: 'HK' },
+  { symbol: 'AAPL', name: '苹果', price: 189.45, change: 1.23, changePercent: 0.65, market: 'US' },
+  { symbol: 'GOOGL', name: '谷歌', price: 142.65, change: 0.89, changePercent: 0.63, market: 'US' },
+  { symbol: 'MSFT', name: '微软', price: 388.50, change: 2.15, changePercent: 0.56, market: 'US' },
 ];
 
 const defaultTrades: Trade[] = [
-  { id: '1', symbol: 'AAPL', name: 'Apple Inc.', side: 'BUY', price: 189.45, quantity: 50, total: 9472.50, timestamp: new Date(Date.now() - 30 * 60000).toISOString() },
-  { id: '2', symbol: 'NVDA', name: 'NVIDIA Corp.', side: 'BUY', price: 615.20, quantity: 20, total: 12304.00, timestamp: new Date(Date.now() - 2 * 3600000).toISOString() },
-  { id: '3', symbol: 'TSLA', name: 'Tesla Inc.', side: 'SELL', price: 245.80, quantity: 30, total: 7374.00, timestamp: new Date(Date.now() - 6 * 3600000).toISOString() },
-  { id: '4', symbol: 'MSFT', name: 'Microsoft Corp.', side: 'BUY', price: 388.50, quantity: 25, total: 9712.50, timestamp: new Date(Date.now() - 1 * 86400000).toISOString() },
-  { id: '5', symbol: 'META', name: 'Meta Platforms', side: 'SELL', price: 374.20, quantity: 15, total: 5613.00, timestamp: new Date(Date.now() - 2 * 86400000).toISOString() },
+  { id: '1', symbol: 'AAPL', name: '苹果', side: 'BUY', price: 189.45, quantity: 50, total: 9472.50, timestamp: new Date(Date.now() - 30 * 60000).toISOString() },
+  { id: '2', symbol: 'NVDA', name: '英伟达', side: 'BUY', price: 615.20, quantity: 20, total: 12304.00, timestamp: new Date(Date.now() - 2 * 3600000).toISOString() },
+  { id: '3', symbol: 'TSLA', name: '特斯拉', side: 'SELL', price: 245.80, quantity: 30, total: 7374.00, timestamp: new Date(Date.now() - 6 * 3600000).toISOString() },
+  { id: '4', symbol: 'MSFT', name: '微软', side: 'BUY', price: 388.50, quantity: 25, total: 9712.50, timestamp: new Date(Date.now() - 1 * 86400000).toISOString() },
+  { id: '5', symbol: 'META', name: 'Meta', side: 'SELL', price: 374.20, quantity: 15, total: 5613.00, timestamp: new Date(Date.now() - 2 * 86400000).toISOString() },
 ];
 
 const defaultAlerts: AlertItem[] = [
@@ -123,8 +123,8 @@ const miniSparklineData = [
 ];
 
 function formatCurrency(value: number | undefined | null): string {
-  if (value == null || isNaN(value)) return '$0.00';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+  if (value == null || isNaN(value)) return '¥0.00';
+  return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(value);
 }
 
 function formatPercent(value: number | undefined | null): string {
@@ -134,12 +134,12 @@ function formatPercent(value: number | undefined | null): string {
 
 function getAlertTypeLabel(alertType: string): string {
   switch (alertType) {
-    case 'price_above': return 'price';
-    case 'price_below': return 'price';
-    case 'volume': return 'signal';
-    case 'rsi': return 'signal';
-    case 'macd': return 'signal';
-    default: return 'signal';
+    case 'price_above': return '价格';
+    case 'price_below': return '价格';
+    case 'volume': return '信号';
+    case 'rsi': return '信号';
+    case 'macd': return '信号';
+    default: return '信号';
   }
 }
 
@@ -641,7 +641,7 @@ export function DashboardView() {
                     <p className="text-[10px] text-zinc-600">{timeAgo}</p>
                   </div>
                   {alert.isTriggered && (
-                    <Badge className="bg-emerald-600/15 text-emerald-400 text-[8px] px-1 py-0">Triggered</Badge>
+                    <Badge className="bg-emerald-600/15 text-emerald-400 text-[8px] px-1 py-0">已触发</Badge>
                   )}
                 </div>
               );

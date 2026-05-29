@@ -49,21 +49,21 @@ import { useLanguage } from '@/lib/i18n';
 // ==================== Strategy list (matches StrategyCenterView) ====================
 
 const STRATEGY_LIST = [
-  { value: 'ma-golden-cross', label: 'MA Golden Cross' },
-  { value: 'rsi-divergence', label: 'RSI Divergence' },
-  { value: 'macd-momentum', label: 'MACD Momentum' },
-  { value: 'bollinger-breakout', label: 'Bollinger Breakout' },
-  { value: 'kdj-golden-cross', label: 'KDJ Golden Cross' },
-  { value: 'volume-breakout', label: 'Volume Breakout' },
-  { value: 'low-volume-pullback', label: 'Low Volume Pullback' },
-  { value: 'three-white-soldiers', label: 'Three White Soldiers' },
-  { value: 'ma-death-cross', label: 'MA Death Cross Short' },
-  { value: 'double-bottom', label: 'Double Bottom' },
-  { value: 'atr-volatility', label: 'ATR Volatility Squeeze' },
-  { value: 'rsi-overbought-oversold', label: 'RSI Mean Reversion' },
-  { value: 'macd-divergence', label: 'MACD Divergence' },
-  { value: 'volume-profile', label: 'Volume Profile Support' },
-  { value: 'channel-breakout', label: 'Channel Breakout' },
+  { value: 'ma-golden-cross', label: '均线金叉' },
+  { value: 'rsi-divergence', label: 'RSI背离' },
+  { value: 'macd-momentum', label: 'MACD动量' },
+  { value: 'bollinger-breakout', label: '布林带突破' },
+  { value: 'kdj-golden-cross', label: 'KDJ金叉' },
+  { value: 'volume-breakout', label: '放量突破' },
+  { value: 'low-volume-pullback', label: '缩量回踩' },
+  { value: 'three-white-soldiers', label: '三白兵' },
+  { value: 'ma-death-cross', label: '均线死叉做空' },
+  { value: 'double-bottom', label: '双底形态' },
+  { value: 'atr-volatility', label: 'ATR波动率收缩' },
+  { value: 'rsi-overbought-oversold', label: 'RSI均值回归' },
+  { value: 'macd-divergence', label: 'MACD背离' },
+  { value: 'volume-profile', label: '成交量分布支撑' },
+  { value: 'channel-breakout', label: '通道突破' },
 ];
 
 // ==================== Types ====================
@@ -348,7 +348,7 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
             <div className="space-y-2">
               <Label className="text-zinc-300 text-sm">{t('back.symbol')}</Label>
               <Input
-                placeholder="e.g., AAPL"
+                placeholder="例如 AAPL"
                 value={config.symbol}
                 onChange={(e) => setConfig({ ...config, symbol: e.target.value.toUpperCase() })}
                 className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
@@ -570,7 +570,7 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
                     <RechartsTooltip
                       contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #2e2e3e', borderRadius: '8px', fontSize: '12px' }}
                       itemStyle={{ color: '#10b981' }}
-                      formatter={(value: number) => [`$${value.toLocaleString()}`, 'Equity']}
+                      formatter={(value: number) => [`¥${value.toLocaleString()}`, '权益']}
                     />
                     <Area type="monotone" dataKey="equity" stroke="#10b981" strokeWidth={2} fill="url(#equityGradient)" />
                   </AreaChart>
@@ -591,7 +591,7 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
                     <TableHeader>
                       <TableRow className="border-[#1e1e2e] hover:bg-transparent">
                         <TableHead className="text-zinc-400 text-xs">{t('back.symbol')}</TableHead>
-                        <TableHead className="text-zinc-400 text-xs">Side</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">方向</TableHead>
                         <TableHead className="text-zinc-400 text-xs">{t('back.entryDate')}</TableHead>
                         <TableHead className="text-zinc-400 text-xs">{t('back.exitDate')}</TableHead>
                         <TableHead className="text-zinc-400 text-xs">{t('back.entryPrice')}</TableHead>
@@ -606,7 +606,7 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
                           <TableCell className="text-sm font-medium text-white">{trade.symbol}</TableCell>
                           <TableCell>
                             <Badge className={`text-[10px] px-1.5 py-0 ${trade.side === 'BUY' ? 'bg-emerald-600/15 text-emerald-400' : 'bg-red-600/15 text-red-400'}`}>
-                              {trade.side}
+                              {trade.side === 'BUY' ? '买入' : '卖出'}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-xs text-zinc-300">{trade.entryDate}</TableCell>

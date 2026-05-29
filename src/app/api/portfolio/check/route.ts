@@ -55,7 +55,7 @@ export async function GET() {
             profitPct: 0,
             holdingDays: 0,
             status: 'OK',
-            reason: 'Failed to fetch price',
+            reason: '获取价格失败',
           });
           continue;
         }
@@ -71,7 +71,7 @@ export async function GET() {
             profitPct: 0,
             holdingDays: 0,
             status: 'OK',
-            reason: 'No price data available',
+            reason: '无可用价格数据',
           });
           continue;
         }
@@ -152,7 +152,7 @@ export async function GET() {
           profitPct: 0,
           holdingDays: 0,
           status: 'OK',
-          reason: 'Error checking position',
+          reason: '检查持仓出错',
         });
       }
     }
@@ -161,7 +161,7 @@ export async function GET() {
   } catch (error) {
     console.error('Portfolio check error:', error);
     return NextResponse.json(
-      { error: 'Failed to check positions' },
+      { error: '检查持仓失败' },
       { status: 500 }
     );
   }

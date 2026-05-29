@@ -128,16 +128,16 @@ const MARKET_STOCKS: Record<string, { symbol: string; name: string }[]> = {
     { symbol: 'HK02015', name: '理想汽车' },
   ],
   US: [
-    { symbol: 'AAPL', name: 'Apple Inc.' },
-    { symbol: 'NVDA', name: 'NVIDIA Corp.' },
-    { symbol: 'TSLA', name: 'Tesla Inc.' },
-    { symbol: 'MSFT', name: 'Microsoft Corp.' },
-    { symbol: 'AMZN', name: 'Amazon.com' },
-    { symbol: 'META', name: 'Meta Platforms' },
-    { symbol: 'GOOGL', name: 'Alphabet Inc.' },
-    { symbol: 'AMD', name: 'AMD Inc.' },
-    { symbol: 'JPM', name: 'JPMorgan Chase' },
-    { symbol: 'V', name: 'Visa Inc.' },
+    { symbol: 'AAPL', name: '苹果' },
+    { symbol: 'NVDA', name: '英伟达' },
+    { symbol: 'TSLA', name: '特斯拉' },
+    { symbol: 'MSFT', name: '微软' },
+    { symbol: 'AMZN', name: '亚马逊' },
+    { symbol: 'META', name: 'Meta' },
+    { symbol: 'GOOGL', name: '谷歌' },
+    { symbol: 'AMD', name: 'AMD' },
+    { symbol: 'JPM', name: '摩根大通' },
+    { symbol: 'V', name: 'Visa' },
   ],
 };
 
@@ -342,14 +342,14 @@ function generateDemoSignals(market: 'A' | 'HK' | 'US'): ScanSignal[] {
       { symbol: 'HK09618', name: '京东集团', market: 'HK', signalType: 'BUY', strength: 'medium', score: 65, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'golden' }, price: 108.20, changePercent: 1.78, sector: '电商' },
     ],
     US: [
-      { symbol: 'NVDA', name: 'NVIDIA Corp.', market: 'US', signalType: 'BUY', strength: 'strong', score: 90, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 875.30, changePercent: 3.45, sector: 'Semiconductors' },
-      { symbol: 'AAPL', name: 'Apple Inc.', market: 'US', signalType: 'BUY', strength: 'medium', score: 68, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 182.50, changePercent: 1.12, sector: 'Technology' },
-      { symbol: 'TSLA', name: 'Tesla Inc.', market: 'US', signalType: 'SELL', strength: 'strong', score: 22, indicators: { maCross: 'death', rsiSignal: 'overbought', macdCross: 'death', bollingerBreak: 'upper', kdjCross: 'death' }, price: 178.25, changePercent: -4.32, sector: 'Automotive' },
-      { symbol: 'MSFT', name: 'Microsoft Corp.', market: 'US', signalType: 'HOLD', strength: 'weak', score: 52, indicators: { maCross: 'none', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 415.80, changePercent: 0.45, sector: 'Technology' },
-      { symbol: 'META', name: 'Meta Platforms', market: 'US', signalType: 'BUY', strength: 'strong', score: 80, indicators: { maCross: 'golden', rsiSignal: 'oversold', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 485.60, changePercent: 2.88, sector: 'Social Media' },
-      { symbol: 'AMD', name: 'AMD Inc.', market: 'US', signalType: 'SELL', strength: 'medium', score: 32, indicators: { maCross: 'death', rsiSignal: 'overbought', macdCross: 'death', bollingerBreak: 'none', kdjCross: 'death' }, price: 162.40, changePercent: -2.65, sector: 'Semiconductors' },
-      { symbol: 'GOOGL', name: 'Alphabet Inc.', market: 'US', signalType: 'BUY', strength: 'medium', score: 70, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'golden' }, price: 155.20, changePercent: 1.55, sector: 'Technology' },
-      { symbol: 'JPM', name: 'JPMorgan Chase', market: 'US', signalType: 'BUY', strength: 'weak', score: 58, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'none', bollingerBreak: 'none', kdjCross: 'none' }, price: 198.75, changePercent: 0.68, sector: 'Banking' },
+      { symbol: 'NVDA', name: '英伟达', market: 'US', signalType: 'BUY', strength: 'strong', score: 90, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 875.30, changePercent: 3.45, sector: '半导体' },
+      { symbol: 'AAPL', name: '苹果', market: 'US', signalType: 'BUY', strength: 'medium', score: 68, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 182.50, changePercent: 1.12, sector: '科技' },
+      { symbol: 'TSLA', name: '特斯拉', market: 'US', signalType: 'SELL', strength: 'strong', score: 22, indicators: { maCross: 'death', rsiSignal: 'overbought', macdCross: 'death', bollingerBreak: 'upper', kdjCross: 'death' }, price: 178.25, changePercent: -4.32, sector: '汽车' },
+      { symbol: 'MSFT', name: '微软', market: 'US', signalType: 'HOLD', strength: 'weak', score: 52, indicators: { maCross: 'none', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 415.80, changePercent: 0.45, sector: '科技' },
+      { symbol: 'META', name: 'Meta', market: 'US', signalType: 'BUY', strength: 'strong', score: 80, indicators: { maCross: 'golden', rsiSignal: 'oversold', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 485.60, changePercent: 2.88, sector: '社交媒体' },
+      { symbol: 'AMD', name: 'AMD', market: 'US', signalType: 'SELL', strength: 'medium', score: 32, indicators: { maCross: 'death', rsiSignal: 'overbought', macdCross: 'death', bollingerBreak: 'none', kdjCross: 'death' }, price: 162.40, changePercent: -2.65, sector: '半导体' },
+      { symbol: 'GOOGL', name: '谷歌', market: 'US', signalType: 'BUY', strength: 'medium', score: 70, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'golden' }, price: 155.20, changePercent: 1.55, sector: '科技' },
+      { symbol: 'JPM', name: '摩根大通', market: 'US', signalType: 'BUY', strength: 'weak', score: 58, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'none', bollingerBreak: 'none', kdjCross: 'none' }, price: 198.75, changePercent: 0.68, sector: '银行' },
     ],
   };
 
@@ -706,7 +706,7 @@ export function SignalScannerView() {
               ) : (
                 <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[10px]">
                   <Wifi className="w-3 h-3 mr-1" />
-                  Live
+                  实时
                 </Badge>
               )}
             </div>

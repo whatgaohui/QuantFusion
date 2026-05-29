@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
 
     if (!symbol || typeof symbol !== 'string') {
       return NextResponse.json(
-        { success: false, data: null, error: 'Symbol is required' },
+        { success: false, data: null, error: '股票代码不能为空' },
         { status: 400 }
       );
     }
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Analysis start API error:', error);
     return NextResponse.json(
-      { success: false, data: null, error: 'Failed to start analysis' },
+      { success: false, data: null, error: '启动分析失败' },
       { status: 500 }
     );
   }

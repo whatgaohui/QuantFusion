@@ -19,7 +19,7 @@ export async function GET() {
   } catch (error) {
     console.error('Get alerts error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch alerts' },
+      { error: '获取提醒失败' },
       { status: 500 }
     );
   }
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     if (!symbol || alertType === undefined || targetValue === undefined) {
       return NextResponse.json(
-        { error: 'symbol, alertType, and targetValue are required' },
+        { error: 'symbol、alertType和targetValue为必填项' },
         { status: 400 }
       );
     }
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     const validAlertTypes = ['price_above', 'price_below', 'volume', 'rsi', 'macd', 'custom'];
     if (!validAlertTypes.includes(alertType)) {
       return NextResponse.json(
-        { error: `alertType must be one of: ${validAlertTypes.join(', ')}` },
+        { error: `alertType必须是以下之一: ${validAlertTypes.join(', ')}` },
         { status: 400 }
       );
     }
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Create alert error:', error);
     return NextResponse.json(
-      { error: 'Failed to create alert' },
+      { error: '创建提醒失败' },
       { status: 500 }
     );
   }
@@ -86,7 +86,7 @@ export async function PATCH(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json(
-        { error: 'id is required' },
+        { error: 'id为必填项' },
         { status: 400 }
       );
     }
@@ -95,7 +95,7 @@ export async function PATCH(request: NextRequest) {
 
     if (!existing) {
       return NextResponse.json(
-        { error: 'Alert not found' },
+        { error: '未找到该提醒' },
         { status: 404 }
       );
     }
@@ -117,7 +117,7 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     console.error('Update alert error:', error);
     return NextResponse.json(
-      { error: 'Failed to update alert' },
+      { error: '更新提醒失败' },
       { status: 500 }
     );
   }
@@ -135,7 +135,7 @@ export async function DELETE(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json(
-        { error: 'id is required' },
+        { error: 'id为必填项' },
         { status: 400 }
       );
     }
@@ -144,18 +144,18 @@ export async function DELETE(request: NextRequest) {
 
     if (!existing) {
       return NextResponse.json(
-        { error: 'Alert not found' },
+        { error: '未找到该提醒' },
         { status: 404 }
       );
     }
 
     await db.alert.delete({ where: { id } });
 
-    return NextResponse.json({ message: 'Alert deleted', id });
+    return NextResponse.json({ message: '提醒已删除', id });
   } catch (error) {
     console.error('Delete alert error:', error);
     return NextResponse.json(
-      { error: 'Failed to delete alert' },
+      { error: '删除提醒失败' },
       { status: 500 }
     );
   }

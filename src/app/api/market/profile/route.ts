@@ -9,14 +9,14 @@ export async function GET(request: NextRequest) {
 
     if (!symbol) {
       return NextResponse.json(
-        { error: 'Symbol parameter is required' },
+        { error: '股票代码参数不能为空' },
         { status: 400 }
       );
     }
 
     if (!FINNHUB_API_KEY) {
       return NextResponse.json(
-        { error: 'Finnhub API key not configured' },
+        { error: 'Finnhub API密钥未配置' },
         { status: 500 }
       );
     }
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: `Finnhub API error: ${response.status}` },
+        { error: `Finnhub API错误: ${response.status}` },
         { status: response.status }
       );
     }
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     if (!data || !data.name) {
       return NextResponse.json(
-        { error: 'No profile data found for symbol' },
+        { error: '未找到该股票的公司资料' },
         { status: 404 }
       );
     }
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Profile API error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch company profile' },
+      { error: '获取公司资料失败' },
       { status: 500 }
     );
   }

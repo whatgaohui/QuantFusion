@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
 
     if (!symbol) {
       return NextResponse.json(
-        { error: 'Symbol query parameter is required' },
+        { error: '股票代码查询参数不能为空' },
         { status: 400 }
       );
     }
@@ -184,7 +184,7 @@ export async function GET(request: NextRequest) {
     const candleData = await fetchCandleData(symbol);
     if (!candleData || candleData.c.length < 30) {
       return NextResponse.json(
-        { error: 'Not enough data to scan this symbol' },
+        { error: '该股票数据不足以进行扫描' },
         { status: 400 }
       );
     }
@@ -194,7 +194,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Signal scan error:', error);
     return NextResponse.json(
-      { error: 'Failed to run signal scan' },
+      { error: '运行信号扫描失败' },
       { status: 500 }
     );
   }
@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
     };
 
     if (!symbol) {
-      return NextResponse.json({ error: 'Symbol is required' }, { status: 400 });
+      return NextResponse.json({ error: '股票代码不能为空' }, { status: 400 });
     }
 
     if (candleData && candleData.c && candleData.c.length >= 30) {
@@ -224,13 +224,13 @@ export async function POST(request: NextRequest) {
     // No candle data provided, auto-fetch
     const data = await fetchCandleData(symbol);
     if (!data || data.c.length < 30) {
-      return NextResponse.json({ error: 'Not enough data' }, { status: 400 });
+      return NextResponse.json({ error: '数据不足' }, { status: 400 });
     }
 
     const result = analyzeSignals(data, symbol);
     return NextResponse.json(result);
   } catch (error) {
     console.error('Signal scan error:', error);
-    return NextResponse.json({ error: 'Failed to run signal scan' }, { status: 500 });
+    return NextResponse.json({ error: '运行信号扫描失败' }, { status: 500 });
   }
 }

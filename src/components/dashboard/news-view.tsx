@@ -43,11 +43,11 @@ interface NewsArticle {
 const mockNews: NewsArticle[] = [
   {
     id: '1',
-    headline: 'S&P 500 Hits New All-Time High as Tech Sector Leads Rally',
-    source: 'Reuters',
+    headline: '标普500再创新高，科技板块领涨',
+    source: '路透社',
     url: '#',
     image: '',
-    summary: 'The benchmark index climbed to a record close as strong earnings from major technology companies boosted investor sentiment across the board.',
+    summary: '受主要科技公司强劲财报提振，基准指数收盘创历史新高，市场情绪全面向好。',
     category: 'general',
     sentiment: 'bullish',
     relatedStocks: ['AAPL', 'NVDA', 'MSFT'],
@@ -55,11 +55,11 @@ const mockNews: NewsArticle[] = [
   },
   {
     id: '2',
-    headline: 'NVIDIA Surges on AI Chip Demand Forecast, Beats Quarterly Estimates',
-    source: 'Bloomberg',
+    headline: '英伟达AI芯片需求预测超预期，股价大涨',
+    source: '彭博社',
     url: '#',
     image: '',
-    summary: 'The chipmaker raised its revenue guidance for the current quarter, citing unprecedented demand for its AI training and inference processors.',
+    summary: '芯片制造商上调了当前季度收入指引，称其AI训练和推理处理器需求空前旺盛。',
     category: 'general',
     sentiment: 'bullish',
     relatedStocks: ['NVDA', 'AMD'],
@@ -67,11 +67,11 @@ const mockNews: NewsArticle[] = [
   },
   {
     id: '3',
-    headline: 'Federal Reserve Signals Potential Rate Cuts in Coming Months',
+    headline: '美联储暗示未来可能降息，市场反应积极',
     source: 'CNBC',
     url: '#',
     image: '',
-    summary: 'Fed officials indicated that inflation data has been moving in the right direction, opening the door for possible interest rate reductions.',
+    summary: '美联储官员表示通胀数据正朝正确方向发展，为可能的降息打开了大门。',
     category: 'general',
     sentiment: 'bullish',
     relatedStocks: [],
@@ -79,11 +79,11 @@ const mockNews: NewsArticle[] = [
   },
   {
     id: '4',
-    headline: 'Bitcoin ETFs See Record Inflows on First Day of Trading',
+    headline: '比特币ETF首日交易创纪录资金流入',
     source: 'CoinDesk',
     url: '#',
     image: '',
-    summary: 'Newly approved spot Bitcoin ETFs attracted over $4.6 billion in trading volume on their debut, marking the most successful ETF launch in history.',
+    summary: '新获批的现货比特币ETF首日交易量超过46亿美元，创历史上最成功的ETF发行纪录。',
     category: 'crypto',
     sentiment: 'bullish',
     relatedStocks: ['COIN'],
@@ -91,11 +91,11 @@ const mockNews: NewsArticle[] = [
   },
   {
     id: '5',
-    headline: 'Dollar Weakens Against Major Currencies After Fed Comments',
-    source: 'Financial Times',
+    headline: '美元兑主要货币走弱，人民币汇率走强',
+    source: '金融时报',
     url: '#',
     image: '',
-    summary: 'The greenback fell sharply against the euro and yen as traders priced in a higher probability of rate cuts in the first half of the year.',
+    summary: '美元兑欧元和日元大幅下跌，交易员提高了对上半年降息的预期概率。',
     category: 'forex',
     sentiment: 'neutral',
     relatedStocks: [],
@@ -103,11 +103,11 @@ const mockNews: NewsArticle[] = [
   },
   {
     id: '6',
-    headline: 'Pfizer Announces $43B Acquisition of Cancer Drug Maker Seagen',
-    source: 'WSJ',
+    headline: '辉瑞宣布430亿美元收购Seagen，医药板块异动',
+    source: '华尔街日报',
     url: '#',
     image: '',
-    summary: 'The pharmaceutical giant will acquire Seagen to bolster its oncology pipeline, in one of the largest healthcare deals in recent years.',
+    summary: '制药巨头将收购Seagen以加强其肿瘤药物管线，这是近年来最大的医疗健康交易之一。',
     category: 'merger',
     sentiment: 'neutral',
     relatedStocks: ['PFE', 'SGEN'],
@@ -128,8 +128,12 @@ function getCategoryColor(category: string): string {
 
 function getCategoryLabel(category: string): string {
   switch (category) {
-    case 'ashare': return 'A-SHARE';
-    case 'hk': return 'HK';
+    case 'ashare': return 'A股';
+    case 'hk': return '港股';
+    case 'general': return '综合';
+    case 'crypto': return '加密';
+    case 'forex': return '外汇';
+    case 'merger': return '并购';
     default: return category.toUpperCase();
   }
 }
@@ -146,14 +150,14 @@ function timeAgo(timestamp: string): string {
   const now = new Date();
   const then = new Date(timestamp);
   const diffMs = now.getTime() - then.getTime();
-  if (diffMs < 0) return 'just now';
+  if (diffMs < 0) return '刚刚';
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
 
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  return `${diffDays}d ago`;
+  if (diffMins < 60) return `${diffMins}分钟前`;
+  if (diffHours < 24) return `${diffHours}小时前`;
+  return `${diffDays}天前`;
 }
 
 export function MarketNewsView() {

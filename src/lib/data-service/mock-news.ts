@@ -89,24 +89,24 @@ export function generateHKNews(count: number): NewsItem[] {
 
 export function generateUSNews(count: number): NewsItem[] {
   const templates = [
-    { headline: 'Fed signals potential rate cuts as inflation shows signs of cooling', sentiment: 'bullish' },
-    { headline: 'Tech stocks rally on strong earnings, NASDAQ hits new high', sentiment: 'bullish' },
-    { headline: 'Apple announces new AI features across product lineup', sentiment: 'bullish' },
-    { headline: 'Microsoft cloud revenue surpasses expectations, Azure growth accelerates', sentiment: 'bullish' },
-    { headline: 'NVIDIA continues to dominate AI chip market, data center revenue surges', sentiment: 'bullish' },
-    { headline: 'S&P 500 notches weekly gain amid positive economic data', sentiment: 'bullish' },
-    { headline: 'Tesla deliveries exceed estimates, stock rises in premarket', sentiment: 'bullish' },
-    { headline: 'Amazon Web Services launches new AI-powered services', sentiment: 'bullish' },
-    { headline: 'Google DeepMind achieves breakthrough in protein structure prediction', sentiment: 'neutral' },
-    { headline: 'US job market remains resilient, unemployment rate holds steady', sentiment: 'neutral' },
-    { headline: 'Oil prices surge on OPEC+ production cut extension', sentiment: 'bearish' },
-    { headline: 'Bank of America upgrades semiconductor sector outlook', sentiment: 'bullish' },
-    { headline: 'Consumer confidence index rises to six-month high', sentiment: 'bullish' },
-    { headline: 'Dow Jones retreats from record high on profit-taking', sentiment: 'neutral' },
-    { headline: 'Meta Platforms invests heavily in metaverse infrastructure', sentiment: 'neutral' },
+    { headline: '美联储暗示降息，通胀数据显示降温迹象', sentiment: 'bullish' },
+    { headline: '科技股财报强劲，纳斯达克指数再创新高', sentiment: 'bullish' },
+    { headline: '苹果发布全线产品AI新功能', sentiment: 'bullish' },
+    { headline: '微软云收入超预期，Azure增长加速', sentiment: 'bullish' },
+    { headline: '英伟达继续主导AI芯片市场，数据中心收入激增', sentiment: 'bullish' },
+    { headline: '标普500周线上涨，经济数据向好', sentiment: 'bullish' },
+    { headline: '特斯拉交付量超预期，盘前股价上涨', sentiment: 'bullish' },
+    { headline: '亚马逊云服务推出全新AI服务', sentiment: 'bullish' },
+    { headline: '谷歌DeepMind蛋白质结构预测取得突破', sentiment: 'neutral' },
+    { headline: '美国就业市场保持韧性，失业率稳定', sentiment: 'neutral' },
+    { headline: 'OPEC+延长减产，油价飙升', sentiment: 'bearish' },
+    { headline: '美银上调半导体板块展望', sentiment: 'bullish' },
+    { headline: '消费者信心指数升至六个月高点', sentiment: 'bullish' },
+    { headline: '道指从历史高点回落，获利了结', sentiment: 'neutral' },
+    { headline: 'Meta加大元宇宙基础设施投资', sentiment: 'neutral' },
   ];
 
-  const sources = ['Reuters', 'Bloomberg', 'CNBC', 'Wall Street Journal', 'MarketWatch', 'Yahoo Finance', 'Barrons', 'Financial Times'];
+  const sources = ['路透社', '彭博社', 'CNBC', '华尔街日报', 'MarketWatch', '雅虎财经', '巴伦周刊', '金融时报'];
 
   return templates.slice(0, count).map((item, idx) => {
     const hoursAgo = Math.floor(Math.random() * 48);

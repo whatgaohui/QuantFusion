@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
 
     if (!symbol) {
       return NextResponse.json(
-        { success: false, data: null, error: 'Symbol parameter is required' },
+        { success: false, data: null, error: '股票代码参数不能为空' },
         { status: 400 }
       );
     }
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Fusion indicators API error:', error);
     return NextResponse.json(
-      { success: false, data: null, error: 'Failed to fetch indicators data' },
+      { success: false, data: null, error: '获取指标数据失败' },
       { status: 500 }
     );
   }

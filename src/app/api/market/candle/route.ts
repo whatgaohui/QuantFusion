@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     if (!symbol) {
       return NextResponse.json(
-        { error: 'Symbol parameter is required' },
+        { error: '股票代码参数不能为空' },
         { status: 400 }
       );
     }
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     const validResolutions = ['1', '5', '15', '30', '60', 'D', 'W', 'M'];
     if (!validResolutions.includes(resolution)) {
       return NextResponse.json(
-        { error: `Invalid resolution. Must be one of: ${validResolutions.join(', ')}` },
+        { error: `无效的时间周期。必须是以下之一: ${validResolutions.join(', ')}` },
         { status: 400 }
       );
     }
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Candle API error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch candle data' },
+      { error: '获取K线数据失败' },
       { status: 500 }
     );
   }

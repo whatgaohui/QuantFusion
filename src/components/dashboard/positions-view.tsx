@@ -94,31 +94,31 @@ interface RiskMetrics {
 
 const mockActivePositions: Position[] = [
   {
-    id: '1', symbol: 'AAPL', name: 'Apple Inc.', buyPrice: 182.50, currentPrice: 189.45,
+    id: '1', symbol: 'AAPL', name: '苹果', buyPrice: 182.50, currentPrice: 189.45,
     quantity: 50, buyDate: '2024-01-10', cycleDays: 7, pnl: 347.50, pnlPercent: 3.81,
     holdingDays: 4, remainingDays: 3, status: 'ACTIVE',
     lots: [{ id: 'l1', buyDate: '2024-01-10', qty: 30, price: 181.00, openDate: '2024-01-10', quantity: 30, costPrice: 181.00, realizedPnl: 0 }, { id: 'l2', buyDate: '2024-01-11', qty: 20, price: 184.75, openDate: '2024-01-11', quantity: 20, costPrice: 184.75, realizedPnl: 0 }],
   },
   {
-    id: '2', symbol: 'NVDA', name: 'NVIDIA Corp.', buyPrice: 598.30, currentPrice: 615.20,
+    id: '2', symbol: 'NVDA', name: '英伟达', buyPrice: 598.30, currentPrice: 615.20,
     quantity: 20, buyDate: '2024-01-12', cycleDays: 7, pnl: 338.00, pnlPercent: 2.82,
     holdingDays: 2, remainingDays: 5, status: 'ACTIVE',
     lots: [{ id: 'l3', buyDate: '2024-01-12', qty: 20, price: 598.30, openDate: '2024-01-12', quantity: 20, costPrice: 598.30, realizedPnl: 0 }],
   },
   {
-    id: '3', symbol: 'TSLA', name: 'Tesla Inc.', buyPrice: 252.10, currentPrice: 245.80,
+    id: '3', symbol: 'TSLA', name: '特斯拉', buyPrice: 252.10, currentPrice: 245.80,
     quantity: 30, buyDate: '2024-01-09', cycleDays: 7, pnl: -189.00, pnlPercent: -2.50,
     holdingDays: 5, remainingDays: 2, status: 'ACTIVE',
     lots: [{ id: 'l4', buyDate: '2024-01-09', qty: 30, price: 252.10, openDate: '2024-01-09', quantity: 30, costPrice: 252.10, realizedPnl: 0 }],
   },
   {
-    id: '4', symbol: 'MSFT', name: 'Microsoft Corp.', buyPrice: 380.20, currentPrice: 388.50,
+    id: '4', symbol: 'MSFT', name: '微软', buyPrice: 380.20, currentPrice: 388.50,
     quantity: 25, buyDate: '2024-01-13', cycleDays: 7, pnl: 207.50, pnlPercent: 2.18,
     holdingDays: 1, remainingDays: 6, status: 'ACTIVE',
     lots: [{ id: 'l5', buyDate: '2024-01-13', qty: 25, price: 380.20, openDate: '2024-01-13', quantity: 25, costPrice: 380.20, realizedPnl: 0 }],
   },
   {
-    id: '5', symbol: 'AMZN', name: 'Amazon.com', buyPrice: 175.80, currentPrice: 178.25,
+    id: '5', symbol: 'AMZN', name: '亚马逊', buyPrice: 175.80, currentPrice: 178.25,
     quantity: 40, buyDate: '2024-01-08', cycleDays: 7, pnl: 98.00, pnlPercent: 1.39,
     holdingDays: 6, remainingDays: 1, status: 'ACTIVE',
     lots: [{ id: 'l6', buyDate: '2024-01-08', qty: 40, price: 175.80, openDate: '2024-01-08', quantity: 40, costPrice: 175.80, realizedPnl: 0 }],
@@ -127,12 +127,12 @@ const mockActivePositions: Position[] = [
 
 const mockClosedPositions: Position[] = [
   {
-    id: '6', symbol: 'META', name: 'Meta Platforms', buyPrice: 360.50, currentPrice: 374.20,
+    id: '6', symbol: 'META', name: 'Meta', buyPrice: 360.50, currentPrice: 374.20,
     quantity: 15, buyDate: '2024-01-02', cycleDays: 7, pnl: 205.50, pnlPercent: 3.80,
     holdingDays: 7, remainingDays: 0, status: 'CLOSED',
   },
   {
-    id: '7', symbol: 'GOOGL', name: 'Alphabet Inc.', buyPrice: 145.20, currentPrice: 142.65,
+    id: '7', symbol: 'GOOGL', name: '谷歌', buyPrice: 145.20, currentPrice: 142.65,
     quantity: 35, buyDate: '2024-01-01', cycleDays: 7, pnl: -89.25, pnlPercent: -1.76,
     holdingDays: 7, remainingDays: 0, status: 'CLOSED',
   },
@@ -153,8 +153,8 @@ const mockRiskMetrics: RiskMetrics = {
 };
 
 function formatCurrency(value: number | undefined | null): string {
-  if (value == null || isNaN(value)) return '$0.00';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+  if (value == null || isNaN(value)) return '¥0.00';
+  return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(value);
 }
 
 function calculateRiskMetrics(positions: Position[]): RiskMetrics {
@@ -567,7 +567,7 @@ export function PositionsView() {
               <Table>
                 <TableHeader>
                   <TableRow className="border-[#1e1e2e] hover:bg-transparent">
-                    <TableHead className="text-zinc-400 text-xs">Symbol</TableHead>
+                    <TableHead className="text-zinc-400 text-xs">代码</TableHead>
                     <TableHead className="text-zinc-400 text-xs">{t('pos.buyPrice')}</TableHead>
                     <TableHead className="text-zinc-400 text-xs">{t('pos.current')}</TableHead>
                     <TableHead className="text-zinc-400 text-xs">{t('pos.pnlPercent')}</TableHead>
@@ -607,7 +607,7 @@ export function PositionsView() {
                               {pos.lots.map((lot, idx) => (
                                 <div key={lot.id || idx} className="flex items-center gap-3 text-[10px] text-zinc-400">
                                   <span>{lot.openDate ? new Date(lot.openDate).toLocaleDateString() : lot.buyDate}</span>
-                                  <span>{lot.quantity || (lot as { qty?: number }).qty} shares</span>
+                                  <span>{lot.quantity || (lot as { qty?: number }).qty} 股</span>
                                   <span>@ ${(lot.costPrice || (lot as { price?: number }).price || 0).toFixed(2)}</span>
                                 </div>
                               ))}
@@ -717,7 +717,7 @@ export function PositionsView() {
                   <Table>
                     <TableHeader>
                       <TableRow className="border-[#1e1e2e] hover:bg-transparent">
-                        <TableHead className="text-zinc-400 text-xs">Symbol</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">代码</TableHead>
                         <TableHead className="text-zinc-400 text-xs">{t('pos.buyPrice')}</TableHead>
                         <TableHead className="text-zinc-400 text-xs">{t('pos.sellPrice')}</TableHead>
                         <TableHead className="text-zinc-400 text-xs">{t('pos.pnl')}</TableHead>

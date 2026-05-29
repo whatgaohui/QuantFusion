@@ -88,9 +88,9 @@ function generateStockResponse(sym: string, lang: 'en' | 'zh'): string {
     '300750': '宁德时代', '600036': '招商银行',
   };
   const usNames: Record<string, string> = {
-    'AAPL': 'Apple Inc.', 'NVDA': 'NVIDIA Corp.', 'TSLA': 'Tesla Inc.',
-    'MSFT': 'Microsoft Corp.', 'GOOGL': 'Alphabet Inc.', 'AMZN': 'Amazon.com Inc.',
-    'META': 'Meta Platforms',
+    'AAPL': '苹果', 'NVDA': '英伟达', 'TSLA': '特斯拉',
+    'MSFT': '微软', 'GOOGL': '谷歌', 'AMZN': '亚马逊',
+    'META': 'Meta',
   };
   const hkNames: Record<string, string> = {
     '00700': '腾讯控股', '09988': '阿里巴巴', '03690': '美团', '01810': '小米集团',
@@ -128,26 +128,26 @@ ${parseFloat(change) >= 0 ? '短期趋势偏多，建议关注上方阻力位突
 *💡 需要更详细的分析吗？可以切换到"深度"模式获取完整的多智能体分析报告。*`;
   }
 
-  return `## ${name}(${sym}) Analysis Report
+  return `## ${name}(${sym}) 分析报告
 
-**Current Price**: $${price} (${changeSign}${change}%)
+**当前价格**: $${price} (${changeSign}${change}%)
 
-### Technical Indicators
-- **RSI(14)**: ${rsi}, ${parseFloat(rsi) > 65 ? 'approaching overbought territory' : parseFloat(rsi) < 35 ? 'oversold zone' : 'neutral-bullish zone'}
-- **MACD**: ${parseFloat(change) >= 0 ? 'Histogram expanding, bullish momentum increasing' : 'Histogram contracting, bearish momentum fading'}
-- **Moving Averages**: ${parseFloat(change) >= 0 ? 'MA5 > MA10, short-term uptrend intact' : 'MA5 < MA10, short-term pressure'}
-- **Volume**: ${Math.random() > 0.5 ? 'Moderate increase with healthy price-volume confirmation' : 'Slight decrease, watch for follow-through'}
+### 技术指标
+- **RSI(14)**: ${rsi}，${parseFloat(rsi) > 65 ? '接近超买区域' : parseFloat(rsi) < 35 ? '超卖区域' : '中性偏多区域'}
+- **MACD**: ${parseFloat(change) >= 0 ? '红柱扩大，多头动能增强' : '绿柱收敛，空头动能减弱'}
+- **均线系统**: ${parseFloat(change) >= 0 ? 'MA5 > MA10，短期趋势向上' : 'MA5 < MA10，短期承压'}
+- **成交量**: ${Math.random() > 0.5 ? '温和放大，量价配合良好' : '略有萎缩，关注后续放量'}
 
-### Fundamentals
-- **P/E Ratio**: ${pe}x
-- **Market Position**: ${isAShare ? 'Leading A-share company with strong brand moat' : isHK ? 'HK tech leader with comprehensive ecosystem' : 'Industry benchmark with strong innovation drive'}
-- **Profitability**: Stable gross margin, ROE at industry-leading levels
+### 基本面
+- **市盈率**: ${pe}x
+- **行业地位**: ${isAShare ? 'A股龙头企业，品牌护城河深厚' : isHK ? '港股科技龙头，生态体系完善' : '行业标杆企业，创新驱动力强'}
+- **盈利能力**: 毛利率稳定，ROE处于行业前列
 
-### Recommendation
-${parseFloat(change) >= 0 ? 'Short-term trend is bullish. Watch for resistance breakout for potential position addition.' : 'Short-term correction pressure. Wait for stabilization signals; consider accumulating near support.'} Risk notice: Manage position sizing and set stop-loss levels.
+### 投资建议
+${parseFloat(change) >= 0 ? '短期趋势偏多，建议关注上方阻力位突破情况，若有效突破可适当加仓。' : '短期面临调整压力，建议观望等待企稳信号，可关注支撑位附近低吸机会。'}风险提示：注意控制仓位，设置止损。
 
 ---
-*💡 Want a deeper analysis? Switch to "Deep" mode for a full multi-agent analysis report.*`;
+*💡 需要更详细的分析吗？可以切换到"深度"模式获取完整的多智能体分析报告。*`;
 }
 
 function generateMarketResponse(lang: 'en' | 'zh'): string {
@@ -182,28 +182,28 @@ function generateMarketResponse(lang: 'en' | 'zh'): string {
 *💡 想了解某只股票的详细分析？直接输入股票代码即可！*`;
   }
 
-  return `## Market Trend Overview
+  return `## 大盘走势分析
 
-### A-Share Market
-- **Shanghai Composite**: ${shComp} (${(Math.random() * 2 - 0.5).toFixed(2)}%)
-- **Shenzhen Component**: ${szComp} (${(Math.random() * 2 - 0.5).toFixed(2)}%)
-- Overall market showing ${Math.random() > 0.5 ? 'upward momentum' : 'consolidation pattern'}
-- Volume ${Math.random() > 0.5 ? 'moderately increasing' : 'slightly declining'}, ${Math.random() > 0.5 ? 'with incremental capital entering' : 'indicative of range-bound trading'}
+### A股市场
+- **上证指数**: ${shComp} (${Math.random() > 0.5 ? '+' : ''}${(Math.random() * 2 - 0.5).toFixed(2)}%)
+- **深证成指**: ${szComp} (${Math.random() > 0.5 ? '+' : ''}${(Math.random() * 2 - 0.5).toFixed(2)}%)
+- 市场整体呈现震荡${Math.random() > 0.5 ? '上行' : '整理'}格局
+- 成交量${Math.random() > 0.5 ? '温和放大' : '略有萎缩'}，${Math.random() > 0.5 ? '增量资金入场' : '存量博弈特征明显'}
 
-### Hong Kong Market
-- **Hang Seng Index**: ${hsi} (${(Math.random() * 2 - 0.5).toFixed(2)}%)
-- ${Math.random() > 0.5 ? 'Tech stocks active, supported by positive external cues' : 'Financial sector under pressure, watch for policy developments'}
+### 港股市场
+- **恒生指数**: ${hsi} (${Math.random() > 0.5 ? '+' : ''}${(Math.random() * 2 - 0.5).toFixed(2)}%)
+- ${Math.random() > 0.5 ? '科技股表现活跃，受外围利好带动' : '金融板块承压，关注政策面变化'}
 
-### US Market
-- **S&P 500**: ${sp500} (${(Math.random() * 1.5 - 0.3).toFixed(2)}%)
-- **NASDAQ**: ${nasdaq} (${(Math.random() * 2 - 0.5).toFixed(2)}%)
-- ${Math.random() > 0.5 ? 'Tech sector leading gains, AI theme remains hot' : 'Market awaiting economic data guidance, volatility rising'}
+### 美股市场
+- **S&P 500**: ${sp500} (${Math.random() > 0.5 ? '+' : ''}${(Math.random() * 1.5 - 0.3).toFixed(2)}%)
+- **纳斯达克**: ${nasdaq} (${Math.random() > 0.5 ? '+' : ''}${(Math.random() * 2 - 0.5).toFixed(2)}%)
+- ${Math.random() > 0.5 ? '科技板块领涨，AI概念持续火热' : '市场等待经济数据指引，波动率有所上升'}
 
-### Outlook & Strategy
-Short-term market sentiment is ${Math.random() > 0.5 ? 'positive' : 'cautious'}. ${Math.random() > 0.5 ? 'Monitor upcoming economic data. Consider selective positioning in quality names on pullbacks.' : 'Maintain defensive positioning; consider value-oriented allocation in blue-chip stocks.'}
+### 展望与建议
+短期市场情绪${Math.random() > 0.5 ? '偏积极' : '谨慎'}，${Math.random() > 0.5 ? '关注周五非农数据。建议控制仓位，逢低布局优质标的。' : '建议保持防御性配置，关注低估值蓝筹的配置价值。'}
 
 ---
-*💡 Want detailed analysis on a specific stock? Just type the ticker symbol!*`;
+*💡 想了解某只股票的详细分析？直接输入股票代码即可！*`;
 }
 
 function generateStrategyResponse(lang: 'en' | 'zh'): string {
@@ -239,35 +239,35 @@ function generateStrategyResponse(lang: 'en' | 'zh'): string {
 *💡 对某个策略感兴趣？我可以进一步分析具体标的和入场时机。*`;
   }
 
-  return `## Investment Strategy Recommendations
+  return `## 投资策略推荐
 
-### 1. High Dividend Defensive Strategy
-- **Best for**: Range-bound markets, defensive positioning
-- **Core holdings**: JPMorgan (JPM), Visa (V), Procter & Gamble (PG)
-- **Expected return**: 4-5% dividend yield + capital appreciation
-- **Risk level**: Low
+### 1. 高股息防御策略
+- **适用场景**: 震荡市、防御性配置
+- **核心标的**: 工商银行(601398)、农业银行(601288)、中国神华(601088)
+- **预期收益**: 股息率5-6% + 资本增值
+- **风险等级**: 低
 
-### 2. Growth Momentum Strategy
-- **Best for**: Bull markets, clear uptrend
-- **Core holdings**: NVIDIA (NVDA), Apple (AAPL), Microsoft (MSFT)
-- **Expected return**: 15-25% annualized
-- **Risk level**: Medium-High
+### 2. 成长动量策略
+- **适用场景**: 上升行情、趋势明确
+- **核心标的**: 宁德时代(300750)、立讯精密(002475)
+- **预期收益**: 年化15-25%
+- **风险等级**: 中高
 
-### 3. Value Recovery Strategy
-- **Best for**: Market bottoms, policy catalysts
-- **Screening criteria**: PE < sector avg & PB < 1
-- **Focus sectors**: Banking, Real Estate, Infrastructure
-- **Risk level**: Medium
+### 3. 估值修复策略
+- **适用场景**: 市场底部、政策催化
+- **筛选条件**: PE < 行业均值 & PB < 1
+- **关注行业**: 银行、地产、基建
+- **风险等级**: 中
 
-### Allocation Recommendation
-| Strategy | Allocation | Holding Period |
-|----------|-----------|----------------|
-| High Dividend | 40% | 6-12 months |
-| Growth Momentum | 35% | 3-6 months |
-| Value Recovery | 25% | 3-9 months |
+### 配置建议
+| 策略 | 配置比例 | 持有周期 |
+|------|----------|----------|
+| 高股息 | 40% | 6-12月 |
+| 成长动量 | 35% | 3-6月 |
+| 估值修复 | 25% | 3-9月 |
 
 ---
-*💡 Interested in a specific strategy? I can analyze specific entry points and timing in detail.*`;
+*💡 对某个策略感兴趣？我可以进一步分析具体标的和入场时机。*`;
 }
 
 function generateDefaultResponse(msg: string, lang: 'en' | 'zh'): string {
@@ -294,26 +294,26 @@ function generateDefaultResponse(msg: string, lang: 'en' | 'zh'): string {
 - 咨询投资策略（如：推荐低估值股票）*`;
   }
 
-  return `## Analysis Result
+  return `## 分析结果
 
-Thank you for your question. Regarding "${msg.slice(0, 30)}", here is my analysis:
+感谢您的提问。关于"${msg.slice(0, 30)}"，以下是我的分析：
 
-### Key Takeaways
-- Current market conditions warrant a cautious approach; focus on fundamentally sound, reasonably valued names
-- Technical and capital flow signals should be assessed holistically; single indicators are insufficient for decision-making
-- Risk management is paramount — limit single position size to no more than 10% of total capital
+### 关键要点
+- 当前市场环境需要谨慎应对，建议关注基本面扎实、估值合理的标的
+- 技术面和资金面信号需要综合判断，单一指标不足以作为决策依据
+- 风险管理是投资的首要原则，建议严格控制单笔仓位不超过总资金的10%
 
-### Suggested Actions
-1. Define your investment objectives and risk tolerance
-2. Conduct thorough research and due diligence
-3. Scale into positions gradually with stop-loss levels
-4. Review regularly and adjust strategy as needed
+### 建议操作
+1. 明确投资目标和风险承受能力
+2. 做好充分的研究和尽职调查
+3. 分批建仓，设置止损位
+4. 定期复盘，及时调整策略
 
 ---
-*💡 You can:
-- Type a stock symbol for detailed analysis (e.g., AAPL, 600519)
-- Ask about market trends (e.g., How is the market trend?)
-- Inquire about strategies (e.g., Recommend undervalued stocks)*`;
+*💡 您可以：
+- 输入股票代码获取详细分析（如：AAPL、600519）
+- 询问市场趋势（如：大盘走势如何）
+- 咨询投资策略（如：推荐低估值股票）*`;
 }
 
 function generateMockResponse(msg: string, lang: 'en' | 'zh'): string {
@@ -367,7 +367,7 @@ export function AgentChatView() {
   const [sessions, setSessions] = useState<ChatSession[]>([
     {
       id: '1',
-      title: 'New Analysis Session',
+      title: '新建分析会话',
       messages: [],
       createdAt: new Date().toISOString(),
     },
@@ -590,7 +590,7 @@ export function AgentChatView() {
 
               {/* Capability Tags */}
               <div className="flex flex-wrap gap-2 justify-center mb-6 max-w-lg">
-                {['📊 Stock Analysis', '📈 Market Trends', '🎯 Trading Insights', '💡 Strategy Advice'].map((tag) => (
+                {['📊 股票分析', '📈 市场趋势', '🎯 交易洞察', '💡 策略建议'].map((tag) => (
                   <span key={tag} className="px-2.5 py-1 rounded-full bg-[#0a0a0f] border border-[#1e1e2e] text-[11px] text-zinc-400">
                     {tag}
                   </span>
@@ -675,7 +675,7 @@ export function AgentChatView() {
           <div className="px-4 pb-2">
             <div className="flex items-center gap-1.5 mb-2">
               <Lightbulb className="w-3 h-3 text-yellow-400" />
-              <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Suggestions</span>
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wider">建议</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {suggestedPrompts.map((prompt) => (

@@ -85,23 +85,23 @@ export function SettingsView() {
         <TabsList className="bg-[#111118] border border-[#1e1e2e]">
           <TabsTrigger value="llm" className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-400">
             <Cpu className="w-3.5 h-3.5 mr-1.5" />
-            LLM
+            大模型
           </TabsTrigger>
           <TabsTrigger value="data" className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-400">
             <Database className="w-3.5 h-3.5 mr-1.5" />
-            Data
+            数据
           </TabsTrigger>
           <TabsTrigger value="trading" className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-400">
             <Settings className="w-3.5 h-3.5 mr-1.5" />
-            Trading
+            交易
           </TabsTrigger>
           <TabsTrigger value="notifications" className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-400">
             <Bell className="w-3.5 h-3.5 mr-1.5" />
-            Alerts
+            提醒
           </TabsTrigger>
           <TabsTrigger value="system" className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-400">
             <Server className="w-3.5 h-3.5 mr-1.5" />
-            System
+            系统
           </TabsTrigger>
         </TabsList>
 
@@ -228,11 +228,11 @@ export function SettingsView() {
                     <span className="text-sm text-white font-medium">{t('settings.finnhub')}</span>
                     <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[9px]">US/HK</Badge>
                   </div>
-                  <p className="text-xs text-zinc-500 mb-2">Real-time quotes, news, financials</p>
+                  <p className="text-xs text-zinc-500 mb-2">实时行情、新闻、财报</p>
                   <div className="flex items-center gap-2 max-w-xs">
                     <Input
                       type="password"
-                      placeholder="API Token"
+                      placeholder="API 令牌"
                       value={finnhubToken}
                       onChange={(e) => setFinnhubToken(e.target.value)}
                       className="bg-[#0a0a0f] border-[#1e1e2e] text-white text-xs h-8"
@@ -250,7 +250,7 @@ export function SettingsView() {
                     <span className="text-sm text-white font-medium">{t('settings.cls')}</span>
                     <Badge className="bg-red-600/15 text-red-400 border-red-600/20 text-[9px]">A-Share</Badge>
                   </div>
-                  <p className="text-xs text-zinc-500">Chinese financial news and market data</p>
+                  <p className="text-xs text-zinc-500">中国财经新闻和市场数据</p>
                 </div>
                 <Switch checked={clsEnabled} onCheckedChange={setClsEnabled} className="data-[state=checked]:bg-emerald-600" />
               </div>
@@ -263,7 +263,7 @@ export function SettingsView() {
                     <span className="text-sm text-white font-medium">{t('settings.sina')}</span>
                     <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[9px]">A-Share</Badge>
                   </div>
-                  <p className="text-xs text-zinc-500">A-share real-time quotes and news</p>
+                  <p className="text-xs text-zinc-500">A股实时行情和新闻</p>
                 </div>
                 <Switch checked={sinaEnabled} onCheckedChange={setSinaEnabled} className="data-[state=checked]:bg-emerald-600" />
               </div>

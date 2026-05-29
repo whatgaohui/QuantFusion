@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     if (!FINNHUB_API_KEY) {
       return NextResponse.json(
-        { error: 'Finnhub API key not configured' },
+        { error: 'Finnhub API密钥未配置' },
         { status: 500 }
       );
     }
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: `Finnhub API error: ${response.status}` },
+        { error: `Finnhub API错误: ${response.status}` },
         { status: response.status }
       );
     }
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Symbols API error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch stock symbols' },
+      { error: '获取股票列表失败' },
       { status: 500 }
     );
   }
