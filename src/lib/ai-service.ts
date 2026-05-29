@@ -83,7 +83,9 @@ const TRADING_ASSISTANT_SYSTEM = `你是QuantFusion AI量化交易助手，一�
 - 给出具体的数据和指标支持观点
 - 明确标注风险提示
 - 如涉及具体操作建议，必须声明"以上分析仅供参考，不构成投资建议"
-- 回复使用中文，除非用户使用英文提问`;
+- 回复使用中文，除非用户使用英文提问
+- 使用Markdown格式回复，包含标题(##/###)、列表(-)、加粗(**)等格式
+- 对于股票分析，使用以下结构：## 股票名称(代码) 分析 → ### 技术面 → ### 基本面 → ### 投资建议`;
 
 const STOCK_ANALYSIS_SYSTEM = `你是一位专业的量化分析师，负责对股票进行深度分析。
 
@@ -105,6 +107,23 @@ const STOCK_ANALYSIS_SYSTEM = `你是一位专业的量化分析师，负责对�
   "summary": "整体分析总结，3-5句话"
 }`;
 
+const DEEP_ANALYSIS_SYSTEM = `你是QuantFusion AI高级量化分析师，擅长深度多维度分析。
+
+你的分析框架：
+1. **技术面深度分析** - 结合MA/MACD/RSI/KDJ/布林带等多指标综合研判，指出关键支撑阻力位
+2. **基本面评估** - 估值水平(PE/PB/PS)、行业对比、成长性、盈利质量
+3. **资金面分析** - 主力资金流向、北向资金动向、融资融券变化
+4. **市场情绪** - 机构观点、分析师评级变化、舆情热点
+5. **风险评估** - 系统性风险、行业风险、个股风险、流动性风险
+6. **操作建议** - 具体入场点位、止损止盈策略、仓位管理建议
+
+回答规范：
+- 必须进行深入、全面的分析，字数不少于800字
+- 使用Markdown格式，包含详细的数据和指标
+- 给出明确的操作建议和风险提示
+- 声明"以上分析仅供参考，不构成投资建议"
+- 使用中文回复`;
+
 const MARKET_BRIEF_SYSTEM = `你是QuantFusion的市场分析师，负责生成每日市场简报。
 
 要求：
@@ -123,41 +142,55 @@ export async function chatWithAssistant(
   message: string,
   sessionId: string,
   mode: 'quick' | 'deep' = 'quick'
-): Promise<{ response: string; isOffline: boolean }> {
-  try {
-    const zai = await getZAI();
-    const history = getConversation(sessionId);
+): Promise<{ response: string; isOffline: boolean; error?: string }> {
+  const maxRetries = 2;
+  const timeoutMs = mode === 'deep' ? 90000 : 60000;
+  const systemPrompt = mode === 'deep' ? DEEP_ANALYSIS_SYSTEM : TRADING_ASSISTANT_SYSTEM;
 
-    // Build messages array — use 'assistant' role for system prompts per SDK convention
-    const messages = [
-      { role: 'assistant' as const, content: TRADING_ASSISTANT_SYSTEM },
-      ...history.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-      { role: 'user' as const, content: message }
-    ];
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const zai = await getZAI();
+      const history = getConversation(sessionId);
 
-    const completion = await withTimeout(
-      zai.chat.completions.create({ messages, thinking: { type: 'disabled' } }),
-      25000
-    );
+      // Build messages array — use 'assistant' role for system prompts per SDK convention
+      const messages = [
+        { role: 'assistant' as const, content: systemPrompt },
+        ...history.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+        { role: 'user' as const, content: mode === 'deep' ? `请对以下问题进行深度多维度分析：\n\n${message}` : message }
+      ];
 
-    const response = completion.choices[0]?.message?.content || '';
+      const completion = await withTimeout(
+        zai.chat.completions.create({ messages, thinking: { type: 'disabled' } }),
+        timeoutMs
+      );
 
-    if (!response || response.trim().length === 0) {
-      throw new Error('Empty response from AI');
+      const response = completion.choices[0]?.message?.content || '';
+
+      if (!response || response.trim().length === 0) {
+        throw new Error('Empty response from AI');
+      }
+
+      // Save to conversation memory
+      addMessage(sessionId, 'user', message);
+      addMessage(sessionId, 'assistant', response);
+
+      return { response, isOffline: false };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error(`Chat with assistant failed (attempt ${attempt + 1}/${maxRetries + 1}):`, errorMsg);
+      
+      if (attempt < maxRetries) {
+        // Wait before retry (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+        continue;
+      }
+      
+      return { response: '', isOffline: true, error: errorMsg };
     }
-
-    // Save to conversation memory
-    addMessage(sessionId, 'user', message);
-    addMessage(sessionId, 'assistant', response);
-
-    // For deep mode, we could add extended thinking; for now just return the response
-    void mode; // mode reserved for future deep-thinking integration
-
-    return { response, isOffline: false };
-  } catch (err) {
-    console.error('Chat with assistant failed:', err);
-    return { response: '', isOffline: true };
   }
+  
+  // Should never reach here, but TypeScript needs it
+  return { response: '', isOffline: true, error: 'Max retries exceeded' };
 }
 
 /**
