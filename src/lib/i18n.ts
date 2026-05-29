@@ -137,6 +137,12 @@ const translations: Record<Language, Record<string, string>> = {
     'chat.deepThinking': 'Deep analysis in progress...',
     'chat.offlineMode': 'Offline — Demo Responses',
     'chat.realtimeMode': 'AI Connected',
+    'chat.aiUnavailable': 'AI Unavailable',
+    'chat.aiWaiting': 'Ready',
+    'chat.poweredByAI': 'Powered by Real AI Analysis',
+    'chat.realAIResponse': 'Real AI Response',
+    'chat.retry': 'Retry',
+    'chat.deepThinkingHint': 'Deep analysis may take 30-90 seconds...',
 
     // Signal Scanner View
     'scanner.searchPlaceholder': 'Search stocks by symbol or name...',
@@ -619,6 +625,12 @@ const translations: Record<Language, Record<string, string>> = {
     'chat.deepThinking': '深度分析中...',
     'chat.offlineMode': '离线 — 演示回复',
     'chat.realtimeMode': 'AI 已连接',
+    'chat.aiUnavailable': 'AI 不可用',
+    'chat.aiWaiting': '就绪',
+    'chat.poweredByAI': '由真实AI分析驱动',
+    'chat.realAIResponse': '真实AI回复',
+    'chat.retry': '重试',
+    'chat.deepThinkingHint': '深度分析可能需要30-90秒...',
 
     // Signal Scanner View
     'scanner.searchPlaceholder': '按代码或名称搜索股票...',
