@@ -6,8 +6,7 @@ import {
   calculateKDJ,
   calculateVolumeRatio,
 } from '@/lib/indicators';
-
-const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || '';
+import { finnhubFetch, FINNHUB_API_KEY } from '@/lib/data-service/config';
 
 interface CandleData {
   o: number[];
@@ -18,8 +17,56 @@ interface CandleData {
   t: number[];
 }
 
+interface StockInfo {
+  symbol: string;
+  name: string;
+  sector: string;
+}
+
+// Sector mapping for stocks
+const STOCK_SECTORS: Record<string, Record<string, { name: string; sector: string }>> = {
+  A: {
+    'SH600519': { name: '贵州茅台', sector: '白酒' },
+    'SH601318': { name: '中国平安', sector: '保险' },
+    'SH600036': { name: '招商银行', sector: '银行' },
+    'SZ000858': { name: '五粮液', sector: '白酒' },
+    'SH601398': { name: '工商银行', sector: '银行' },
+    'SZ300750': { name: '宁德时代', sector: '新能源' },
+    'SH600276': { name: '恒瑞医药', sector: '医药' },
+    'SH600030': { name: '中信证券', sector: '券商' },
+    'SZ000333': { name: '美的集团', sector: '家电' },
+    'SH600900': { name: '长江电力', sector: '电力' },
+    'SH601899': { name: '紫金矿业', sector: '有色金属' },
+    'SZ002475': { name: '立讯精密', sector: '电子' },
+  },
+  HK: {
+    'HK00700': { name: '腾讯控股', sector: '科技' },
+    'HK09988': { name: '阿里巴巴', sector: '电商' },
+    'HK03690': { name: '美团', sector: '本地生活' },
+    'HK00005': { name: '汇丰控股', sector: '银行' },
+    'HK00941': { name: '中国移动', sector: '通信' },
+    'HK01299': { name: '友邦保险', sector: '保险' },
+    'HK01810': { name: '小米集团', sector: '消费电子' },
+    'HK09618': { name: '京东集团', sector: '电商' },
+    'HK09888': { name: '百度集团', sector: '科技' },
+    'HK02015': { name: '理想汽车', sector: '汽车' },
+  },
+  US: {
+    'AAPL': { name: '苹果', sector: '科技' },
+    'NVDA': { name: '英伟达', sector: '半导体' },
+    'TSLA': { name: '特斯拉', sector: '汽车' },
+    'MSFT': { name: '微软', sector: '科技' },
+    'AMZN': { name: '亚马逊', sector: '电商' },
+    'META': { name: 'Meta', sector: '社交媒体' },
+    'GOOGL': { name: '谷歌', sector: '科技' },
+    'AMD': { name: 'AMD', sector: '半导体' },
+    'JPM': { name: '摩根大通', sector: '银行' },
+    'V': { name: 'Visa', sector: '金融' },
+  },
+};
+
 function generateMockCandleData(currentPrice: number, days: number = 90): CandleData {
-  const result: CandleData = { o: [], h: [], l: [], c: [], v: [], t: [], s: 'ok' } as CandleData & { s: string };
+  const result: CandleData = { o: [], h: [], l: [], c: [], v: [], t: [] };
   let price = currentPrice * (0.85 + Math.random() * 0.1);
   const now = Math.floor(Date.now() / 1000);
   const daySeconds = 86400;
@@ -47,127 +94,247 @@ function generateMockCandleData(currentPrice: number, days: number = 90): Candle
   return result;
 }
 
-async function fetchCandleData(symbol: string): Promise<CandleData | null> {
-  const to = Math.floor(Date.now() / 1000);
-  const from = to - 90 * 86400;
+// Convert A/HK stock symbol to Finnhub-compatible format
+function toFinnhubSymbol(symbol: string): string {
+  // A-shares: SH600519 → 600519.SS, SZ000858 → 000858.SZ
+  if (symbol.startsWith('SH')) return symbol.slice(2) + '.SS';
+  if (symbol.startsWith('SZ')) return symbol.slice(2) + '.SZ';
+  // HK stocks: HK00700 → 0700.HK
+  if (symbol.startsWith('HK')) return symbol.slice(2).replace(/^0*/, '') + '.HK';
+  // US stocks: already correct
+  return symbol;
+}
 
-  // Try Finnhub API
+async function fetchCandleData(symbol: string): Promise<{ candle: CandleData | null; usedRealData: boolean }> {
+  const finnhubSymbol = toFinnhubSymbol(symbol);
+
+  // Try Finnhub candle API first
   if (FINNHUB_API_KEY) {
-    try {
-      const response = await fetch(
-        `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(symbol)}&resolution=D&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        if (data.s === 'ok' && data.c && data.c.length >= 30) {
-          return { o: data.o, h: data.h, l: data.l, c: data.c, v: data.v, t: data.t };
-        }
-      }
-    } catch {
-      // Fall through to mock
+    const to = Math.floor(Date.now() / 1000);
+    const from = to - 120 * 86400; // 120 days to ensure 90 trading days
+
+    const data = await finnhubFetch<{ s: string; c: number[]; o: number[]; h: number[]; l: number[]; v: number[]; t: number[] }>(
+      'stock/candle',
+      { symbol: finnhubSymbol, resolution: 'D', from: String(from), to: String(to) }
+    );
+
+    if (data && data.s === 'ok' && data.c && data.c.length >= 30) {
+      return { candle: { o: data.o, h: data.h, l: data.l, c: data.c, v: data.v, t: data.t }, usedRealData: true };
     }
 
-    // Get current price for mock data
-    try {
-      const quoteRes = await fetch(
-        `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_API_KEY}`
-      );
-      if (quoteRes.ok) {
-        const quoteData = await quoteRes.json();
-        if (quoteData.c) {
-          return generateMockCandleData(quoteData.c, 90);
-        }
-      }
-    } catch {
-      // Use default
+    // Try getting current price from quote for better mock data
+    const quoteData = await finnhubFetch<{ c: number }>('quote', { symbol: finnhubSymbol });
+    if (quoteData && quoteData.c && quoteData.c > 0) {
+      return { candle: generateMockCandleData(quoteData.c, 90), usedRealData: false };
     }
   }
 
-  return generateMockCandleData(150, 90);
+  return { candle: generateMockCandleData(150, 90), usedRealData: false };
 }
 
-function analyzeSignals(candleData: CandleData, symbol: string) {
+async function fetchQuotePrice(symbol: string): Promise<number> {
+  const finnhubSymbol = toFinnhubSymbol(symbol);
+  const data = await finnhubFetch<{ c: number; dp: number }>('quote', { symbol: finnhubSymbol });
+  return data?.c || 0;
+}
+
+function analyzeSignals(candleData: CandleData, symbol: string, stockInfo: { name: string; sector: string }) {
   const closes = candleData.c;
   const highs = candleData.h;
   const lows = candleData.l;
   const volumes = candleData.v;
 
+  // Calculate all indicators from real candle data
+  const rsi = calculateRSI(closes, 14);
+  const macdResult = calculateMACD(closes);
+  const bbResult = calculateBollingerBands(closes);
+  const kdjResult = calculateKDJ(highs, lows, closes);
+  const volumeRatio = calculateVolumeRatio(volumes);
+
+  // Calculate MA
+  const ma5 = closes.length >= 5 ? closes.slice(-5).reduce((s, v) => s + v, 0) / 5 : 0;
+  const ma10 = closes.length >= 10 ? closes.slice(-10).reduce((s, v) => s + v, 0) / 10 : 0;
+  const ma20 = closes.length >= 20 ? closes.slice(-20).reduce((s, v) => s + v, 0) / 20 : 0;
+  const ma60 = closes.length >= 60 ? closes.slice(-60).reduce((s, v) => s + v, 0) / 60 : 0;
+
+  const currentPrice = closes[closes.length - 1];
+  const prevPrice = closes.length >= 2 ? closes[closes.length - 2] : currentPrice;
+  const changePercent = prevPrice > 0 ? ((currentPrice - prevPrice) / prevPrice) * 100 : 0;
+
+  // Signal scoring
   let score = 0;
+  let buyCount = 0;
+  let sellCount = 0;
+
+  // MA crossover
+  let maCross: 'golden' | 'death' | 'none' = 'none';
+  if (ma5 > 0 && ma20 > 0) {
+    if (ma5 > ma20) { maCross = 'golden'; buyCount++; score += 10; }
+    else { maCross = 'death'; sellCount++; score -= 10; }
+  }
 
   // RSI
-  const rsi = calculateRSI(closes, 14);
-  let rsiSignal = 'NEUTRAL';
-  if (rsi < 30) { score += 20; rsiSignal = 'OVERSOLD'; }
-  else if (rsi > 70) { score -= 20; rsiSignal = 'OVERBOUGHT'; }
-  else if (rsi < 40) { score += 5; rsiSignal = 'LEANING_OVERSOLD'; }
-  else if (rsi > 60) { score -= 5; rsiSignal = 'LEANING_OVERBOUGHT'; }
+  let rsiSignal: 'overbought' | 'oversold' | 'neutral' = 'neutral';
+  if (rsi > 70) { rsiSignal = 'overbought'; sellCount++; score -= 20; }
+  else if (rsi < 30) { rsiSignal = 'oversold'; buyCount++; score += 20; }
+  else if (rsi < 40) { buyCount++; score += 5; }
+  else if (rsi > 60) { sellCount++; score -= 5; }
 
   // MACD
-  const macdResult = calculateMACD(closes);
-  let macdSignalStr = 'NEUTRAL';
+  let macdCross: 'golden' | 'death' | 'none' = 'none';
   if (macdResult.prevMacd <= macdResult.prevSignal && macdResult.macd > macdResult.signal) {
-    score += 25; macdSignalStr = 'GOLDEN_CROSS';
+    macdCross = 'golden'; buyCount++; score += 25;
   } else if (macdResult.prevMacd >= macdResult.prevSignal && macdResult.macd < macdResult.signal) {
-    score -= 30; macdSignalStr = 'DEATH_CROSS';
-  } else if (macdResult.macd > macdResult.signal && macdResult.histogram > 0) {
-    score += 10; macdSignalStr = 'BULLISH';
-  } else if (macdResult.macd < macdResult.signal && macdResult.histogram < 0) {
-    score -= 10; macdSignalStr = 'BEARISH';
+    macdCross = 'death'; sellCount++; score -= 30;
+  } else if (macdResult.histogram > 0) {
+    buyCount++; score += 10;
+  } else if (macdResult.histogram < 0) {
+    sellCount++; score -= 10;
   }
 
   // Bollinger Bands
-  const bbResult = calculateBollingerBands(closes);
-  let bollingerSignal = 'NEUTRAL';
-  if (bbResult.pricePosition <= 0.2) { score += 15; bollingerSignal = 'NEAR_LOWER'; }
-  else if (bbResult.pricePosition >= 0.8) { score -= 15; bollingerSignal = 'NEAR_UPPER'; }
-  else if (bbResult.pricePosition < 0.4) { score += 5; bollingerSignal = 'LOWER_HALF'; }
-  else if (bbResult.pricePosition > 0.6) { score -= 5; bollingerSignal = 'UPPER_HALF'; }
+  let bollingerBreak: 'upper' | 'lower' | 'none' = 'none';
+  if (bbResult.upper > 0) {
+    if (currentPrice > bbResult.upper) { bollingerBreak = 'upper'; sellCount++; score -= 15; }
+    else if (currentPrice < bbResult.lower) { bollingerBreak = 'lower'; buyCount++; score += 15; }
+  }
 
   // KDJ
-  const kdjResult = calculateKDJ(highs, lows, closes);
-  let kdjSignal = 'NEUTRAL';
+  let kdjCross: 'golden' | 'death' | 'none' = 'none';
   if (kdjResult.prevK <= kdjResult.prevD && kdjResult.k > kdjResult.d) {
-    score += 15; kdjSignal = 'GOLDEN_CROSS';
+    kdjCross = 'golden'; buyCount++; score += 15;
   } else if (kdjResult.prevK >= kdjResult.prevD && kdjResult.k < kdjResult.d) {
-    score -= 15; kdjSignal = 'DEATH_CROSS';
+    kdjCross = 'death'; sellCount++; score -= 15;
   }
-  if (kdjResult.j < 0) { score += 10; kdjSignal = kdjSignal === 'NEUTRAL' ? 'J_OVERSOLD' : kdjSignal; }
-  else if (kdjResult.j > 100) { score -= 10; kdjSignal = kdjSignal === 'NEUTRAL' ? 'J_OVERBOUGHT' : kdjSignal; }
+  if (kdjResult.j < 0) { buyCount++; score += 10; }
+  else if (kdjResult.j > 100) { sellCount++; score -= 10; }
 
   // Volume
-  const volumeRatio = calculateVolumeRatio(volumes);
-  if (volumeRatio > 2.0) { score += 15; }
-  else if (volumeRatio > 1.5) { score += 5; }
-  else if (volumeRatio < 0.5) { score -= 5; }
+  if (volumeRatio > 2.0) score += 15;
+  else if (volumeRatio > 1.5) score += 5;
 
-  // Signal type
-  let signalType: 'BUY' | 'HOLD' | 'SELL';
-  if (score >= 50) signalType = 'BUY';
-  else if (score <= -40) signalType = 'SELL';
+  // Determine signal type
+  let signalType: 'BUY' | 'SELL' | 'HOLD';
+  if (score >= 30) signalType = 'BUY';
+  else if (score <= -30) signalType = 'SELL';
   else signalType = 'HOLD';
 
-  const currentPrice = closes[closes.length - 1];
+  // Normalize score to 0-100
+  const normalizedScore = Math.max(0, Math.min(100, 50 + score));
+
+  // Strength
+  let strength: 'strong' | 'medium' | 'weak';
+  const dominant = signalType === 'BUY' ? buyCount : signalType === 'SELL' ? sellCount : 0;
+  if (dominant >= 4) strength = 'strong';
+  else if (dominant >= 2) strength = 'medium';
+  else strength = 'weak';
 
   return {
-    symbol: symbol.toUpperCase(),
-    score,
+    symbol,
+    name: stockInfo.name,
+    sector: stockInfo.sector,
+    price: parseFloat(currentPrice.toFixed(2)),
+    changePercent: parseFloat(changePercent.toFixed(2)),
     signalType,
-    rsi: parseFloat(rsi.toFixed(2)),
-    macdSignal: macdSignalStr,
-    macd: macdResult,
-    bollingerSignal,
-    bollingerBands: bbResult,
-    kdjSignal,
-    kdj: kdjResult,
-    volumeRatio: parseFloat(volumeRatio.toFixed(2)),
-    price: currentPrice,
+    strength,
+    score: Math.round(normalizedScore),
+    indicators: {
+      maCross,
+      rsiSignal,
+      macdCross,
+      bollingerBreak,
+      kdjCross,
+    },
+    technicalDetails: {
+      rsi: parseFloat(rsi.toFixed(2)),
+      macd: macdResult,
+      bollinger: bbResult,
+      kdj: kdjResult,
+      ma: { ma5: parseFloat(ma5.toFixed(2)), ma10: parseFloat(ma10.toFixed(2)), ma20: parseFloat(ma20.toFixed(2)), ma60: parseFloat(ma60.toFixed(2)) },
+      volumeRatio: parseFloat(volumeRatio.toFixed(2)),
+    },
     scannedAt: new Date().toISOString(),
   };
 }
 
 /**
+ * POST /api/signals/scan
+ * Batch scan: accepts { market: 'US'|'HK'|'A', symbols?: string[] }
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { market = 'US', symbols: customSymbols } = body as {
+      market?: 'A' | 'HK' | 'US';
+      symbols?: string[];
+    };
+
+    const marketStocks = STOCK_SECTORS[market] || STOCK_SECTORS.US;
+    const symbols = customSymbols || Object.keys(marketStocks);
+
+    console.log(`[SignalScan] Starting batch scan for ${market} market, ${symbols.length} symbols`);
+
+    // Fetch candle data for all stocks in parallel (max 3 concurrent to avoid rate limiting)
+    const results: Array<{
+      symbol: string;
+      data: ReturnType<typeof analyzeSignals> | null;
+      usedRealData: boolean;
+    }> = [];
+
+    // Process in batches of 3 to respect Finnhub rate limits
+    for (let i = 0; i < symbols.length; i += 3) {
+      const batch = symbols.slice(i, i + 3);
+      const batchResults = await Promise.all(
+        batch.map(async (symbol) => {
+          try {
+            const { candle, usedRealData } = await fetchCandleData(symbol);
+            if (!candle || candle.c.length < 30) {
+              console.warn(`[SignalScan] Insufficient data for ${symbol}`);
+              return { symbol, data: null, usedRealData: false };
+            }
+            const stockInfo = marketStocks[symbol] || { name: symbol, sector: market };
+            const analysis = analyzeSignals(candle, symbol, stockInfo);
+            return { symbol, data: analysis, usedRealData };
+          } catch (err) {
+            console.error(`[SignalScan] Error scanning ${symbol}:`, err);
+            return { symbol, data: null, usedRealData: false };
+          }
+        })
+      );
+      results.push(...batchResults);
+    }
+
+    const signals = results.filter(r => r.data !== null).map(r => r.data);
+    const realDataCount = results.filter(r => r.usedRealData).length;
+
+    console.log(`[SignalScan] Completed: ${signals.length}/${symbols.length} signals, ${realDataCount} using real Finnhub data`);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        signals,
+        summary: {
+          total: symbols.length,
+          scanned: signals.length,
+          realDataCount,
+          mockDataCount: signals.length - realDataCount,
+          market,
+        },
+      },
+      error: null,
+    });
+  } catch (error) {
+    console.error('Signal scan error:', error);
+    return NextResponse.json(
+      { success: false, data: null, error: '运行信号扫描失败' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * GET /api/signals/scan?symbol=AAPL
- * Auto-fetches candle data and runs signal scan
+ * Single symbol scan
  */
 export async function GET(request: NextRequest) {
   try {
@@ -181,56 +348,47 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const candleData = await fetchCandleData(symbol);
-    if (!candleData || candleData.c.length < 30) {
+    // Find stock info across all markets
+    let stockInfo = { name: symbol, sector: '未知' };
+    for (const marketStocks of Object.values(STOCK_SECTORS)) {
+      if (marketStocks[symbol]) {
+        stockInfo = marketStocks[symbol];
+        break;
+      }
+    }
+
+    const { candle, usedRealData } = await fetchCandleData(symbol);
+    if (!candle || candle.c.length < 30) {
       return NextResponse.json(
-        { error: '该股票数据不足以进行扫描' },
+        { success: false, data: null, error: '该股票数据不足以进行扫描' },
         { status: 400 }
       );
     }
 
-    const result = analyzeSignals(candleData, symbol);
-    return NextResponse.json(result);
+    const result = analyzeSignals(candle, symbol, stockInfo);
+
+    // Also return candle data for chart
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...result,
+        candleData: {
+          o: candle.o,
+          h: candle.h,
+          l: candle.l,
+          c: candle.c,
+          v: candle.v,
+          t: candle.t,
+        },
+        usedRealData,
+      },
+      error: null,
+    });
   } catch (error) {
     console.error('Signal scan error:', error);
     return NextResponse.json(
-      { error: '运行信号扫描失败' },
+      { success: false, data: null, error: '运行信号扫描失败' },
       { status: 500 }
     );
-  }
-}
-
-/**
- * POST /api/signals/scan
- * Run signal scanner with provided candle data
- */
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { symbol, candleData } = body as {
-      symbol: string;
-      candleData?: CandleData;
-    };
-
-    if (!symbol) {
-      return NextResponse.json({ error: '股票代码不能为空' }, { status: 400 });
-    }
-
-    if (candleData && candleData.c && candleData.c.length >= 30) {
-      const result = analyzeSignals(candleData, symbol);
-      return NextResponse.json(result);
-    }
-
-    // No candle data provided, auto-fetch
-    const data = await fetchCandleData(symbol);
-    if (!data || data.c.length < 30) {
-      return NextResponse.json({ error: '数据不足' }, { status: 400 });
-    }
-
-    const result = analyzeSignals(data, symbol);
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error('Signal scan error:', error);
-    return NextResponse.json({ error: '运行信号扫描失败' }, { status: 500 });
   }
 }

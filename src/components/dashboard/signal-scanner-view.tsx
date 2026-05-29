@@ -307,64 +307,7 @@ function analyzeIndicators(
   };
 }
 
-// ==================== Demo Signal Generator ====================
-
-function generateDemoSignals(market: 'A' | 'HK' | 'US'): ScanSignal[] {
-  const demoData: Record<string, Array<{
-    symbol: string;
-    name: string;
-    market: string;
-    signalType: 'BUY' | 'SELL' | 'HOLD';
-    strength: 'strong' | 'medium' | 'weak';
-    score: number;
-    indicators: ScanSignal['indicators'];
-    price: number;
-    changePercent: number;
-    sector: string;
-  }>> = {
-    A: [
-      { symbol: 'SH600519', name: '贵州茅台', market: 'A', signalType: 'BUY', strength: 'strong', score: 85, indicators: { maCross: 'golden', rsiSignal: 'oversold', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 1731.82, changePercent: 2.57, sector: '白酒' },
-      { symbol: 'SH601318', name: '中国平安', market: 'A', signalType: 'BUY', strength: 'medium', score: 72, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'golden' }, price: 48.35, changePercent: 1.85, sector: '保险' },
-      { symbol: 'SZ300750', name: '宁德时代', market: 'A', signalType: 'SELL', strength: 'medium', score: 38, indicators: { maCross: 'death', rsiSignal: 'overbought', macdCross: 'none', bollingerBreak: 'upper', kdjCross: 'death' }, price: 198.60, changePercent: -2.13, sector: '新能源' },
-      { symbol: 'SH600036', name: '招商银行', market: 'A', signalType: 'BUY', strength: 'weak', score: 62, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 35.28, changePercent: 0.92, sector: '银行' },
-      { symbol: 'SZ000858', name: '五粮液', market: 'A', signalType: 'HOLD', strength: 'weak', score: 45, indicators: { maCross: 'none', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 142.75, changePercent: 0.35, sector: '白酒' },
-      { symbol: 'SH600030', name: '中信证券', market: 'A', signalType: 'SELL', strength: 'strong', score: 25, indicators: { maCross: 'death', rsiSignal: 'overbought', macdCross: 'death', bollingerBreak: 'upper', kdjCross: 'death' }, price: 21.48, changePercent: -3.21, sector: '券商' },
-      { symbol: 'SH601899', name: '紫金矿业', market: 'A', signalType: 'BUY', strength: 'medium', score: 68, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 16.92, changePercent: 1.56, sector: '有色金属' },
-      { symbol: 'SZ002475', name: '立讯精密', market: 'A', signalType: 'BUY', strength: 'strong', score: 78, indicators: { maCross: 'golden', rsiSignal: 'oversold', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 34.15, changePercent: 2.89, sector: '电子' },
-    ],
-    HK: [
-      { symbol: 'HK00700', name: '腾讯控股', market: 'HK', signalType: 'BUY', strength: 'medium', score: 72, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 378.40, changePercent: 1.85, sector: '科技' },
-      { symbol: 'HK09988', name: '阿里巴巴', market: 'HK', signalType: 'BUY', strength: 'strong', score: 82, indicators: { maCross: 'golden', rsiSignal: 'oversold', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 82.35, changePercent: 3.42, sector: '电商' },
-      { symbol: 'HK03690', name: '美团', market: 'HK', signalType: 'SELL', strength: 'medium', score: 35, indicators: { maCross: 'death', rsiSignal: 'overbought', macdCross: 'death', bollingerBreak: 'upper', kdjCross: 'none' }, price: 128.50, changePercent: -2.15, sector: '本地生活' },
-      { symbol: 'HK00005', name: '汇丰控股', market: 'HK', signalType: 'HOLD', strength: 'weak', score: 48, indicators: { maCross: 'none', rsiSignal: 'neutral', macdCross: 'none', bollingerBreak: 'none', kdjCross: 'none' }, price: 62.15, changePercent: -0.32, sector: '银行' },
-      { symbol: 'HK01810', name: '小米集团', market: 'HK', signalType: 'BUY', strength: 'strong', score: 88, indicators: { maCross: 'golden', rsiSignal: 'oversold', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 52.80, changePercent: 4.12, sector: '消费电子' },
-      { symbol: 'HK01299', name: '友邦保险', market: 'HK', signalType: 'SELL', strength: 'weak', score: 42, indicators: { maCross: 'death', rsiSignal: 'neutral', macdCross: 'death', bollingerBreak: 'none', kdjCross: 'none' }, price: 58.30, changePercent: -1.05, sector: '保险' },
-      { symbol: 'HK09618', name: '京东集团', market: 'HK', signalType: 'BUY', strength: 'medium', score: 65, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'golden' }, price: 108.20, changePercent: 1.78, sector: '电商' },
-    ],
-    US: [
-      { symbol: 'NVDA', name: '英伟达', market: 'US', signalType: 'BUY', strength: 'strong', score: 90, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 875.30, changePercent: 3.45, sector: '半导体' },
-      { symbol: 'AAPL', name: '苹果', market: 'US', signalType: 'BUY', strength: 'medium', score: 68, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 182.50, changePercent: 1.12, sector: '科技' },
-      { symbol: 'TSLA', name: '特斯拉', market: 'US', signalType: 'SELL', strength: 'strong', score: 22, indicators: { maCross: 'death', rsiSignal: 'overbought', macdCross: 'death', bollingerBreak: 'upper', kdjCross: 'death' }, price: 178.25, changePercent: -4.32, sector: '汽车' },
-      { symbol: 'MSFT', name: '微软', market: 'US', signalType: 'HOLD', strength: 'weak', score: 52, indicators: { maCross: 'none', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'none' }, price: 415.80, changePercent: 0.45, sector: '科技' },
-      { symbol: 'META', name: 'Meta', market: 'US', signalType: 'BUY', strength: 'strong', score: 80, indicators: { maCross: 'golden', rsiSignal: 'oversold', macdCross: 'golden', bollingerBreak: 'lower', kdjCross: 'golden' }, price: 485.60, changePercent: 2.88, sector: '社交媒体' },
-      { symbol: 'AMD', name: 'AMD', market: 'US', signalType: 'SELL', strength: 'medium', score: 32, indicators: { maCross: 'death', rsiSignal: 'overbought', macdCross: 'death', bollingerBreak: 'none', kdjCross: 'death' }, price: 162.40, changePercent: -2.65, sector: '半导体' },
-      { symbol: 'GOOGL', name: '谷歌', market: 'US', signalType: 'BUY', strength: 'medium', score: 70, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'golden', bollingerBreak: 'none', kdjCross: 'golden' }, price: 155.20, changePercent: 1.55, sector: '科技' },
-      { symbol: 'JPM', name: '摩根大通', market: 'US', signalType: 'BUY', strength: 'weak', score: 58, indicators: { maCross: 'golden', rsiSignal: 'neutral', macdCross: 'none', bollingerBreak: 'none', kdjCross: 'none' }, price: 198.75, changePercent: 0.68, sector: '银行' },
-    ],
-  };
-
-  return (demoData[market] || demoData.US).map((d) => ({
-    symbol: d.symbol,
-    name: d.name,
-    price: d.price,
-    changePercent: d.changePercent,
-    signalType: d.signalType,
-    strength: d.strength,
-    indicators: d.indicators,
-    score: d.score,
-    sector: d.sector,
-  }));
-}
+// Demo generator removed — scanner now uses real data from backend API
 
 // ==================== Component ====================
 
@@ -460,7 +403,7 @@ export function SignalScannerView() {
     }
   }, [language]);
 
-  // Main scan function
+  // Main scan function — calls the batch scan API directly
   const handleScan = useCallback(async () => {
     if (scanning) return;
     abortRef.current = false;
@@ -469,142 +412,123 @@ export function SignalScannerView() {
     setSignals([]);
     setSelectedSignal(null);
     setIsDemoMode(false);
+    setIsOffline(false);
 
     try {
-      // Phase 1: Fetch sectors
+      // Phase 1: Fetch sectors in parallel with scan
       setScanPhase(t('scanner.scanningSectors'));
-      const sectorData = await fetchSectors(market);
+      const sectorPromise = fetchSectors(market);
+
+      // Phase 2: Call the batch scan API (handles Finnhub + indicators on backend)
+      setScanPhase(t('scanner.analyzingStocks'));
+      const scanPromise = fetch('/api/signals/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ market }),
+      });
+
+      // Wait for both
+      const [sectorData, scanRes] = await Promise.all([sectorPromise, scanPromise]);
       setSectors(sectorData);
 
       if (abortRef.current) return;
 
-      // Phase 2: Get stocks for this market and fetch quotes
-      setScanPhase(t('scanner.analyzingStocks'));
-      const stockList = MARKET_STOCKS[market] || [];
-      const symbols = stockList.map(s => s.symbol);
-      const quotes = await fetchBatchQuotes(symbols);
+      if (scanRes.ok) {
+        const scanData = await scanRes.json();
+        if (scanData.success && scanData.data?.signals) {
+          const apiSignals: ScanSignal[] = scanData.data.signals;
+          const summary = scanData.data.summary;
 
-      if (abortRef.current) return;
+          // Sort signals by score (best first)
+          apiSignals.sort((a: ScanSignal, b: ScanSignal) => {
+            const aScore = a.signalType === 'BUY' ? a.score : a.signalType === 'SELL' ? 100 - a.score : 30;
+            const bScore = b.signalType === 'BUY' ? b.score : b.signalType === 'SELL' ? 100 - b.score : 30;
+            return bScore - aScore;
+          });
 
-      // Phase 3: Fetch indicators for each stock and generate signals
-      setScanPhase(t('scanner.generatingSignals'));
-      const generatedSignals: ScanSignal[] = [];
+          const hasRealData = summary?.realDataCount > 0;
+          const hasMockData = summary?.mockDataCount > 0;
 
-      for (const stock of stockList) {
-        if (abortRef.current) return;
+          setSignals(apiSignals);
+          setIsDemoMode(!hasRealData && hasMockData);
+          setIsOffline(!hasRealData);
 
-        const quoteData = quotes.find(q => q.symbol === stock.symbol);
-        const currentPrice = quoteData?.currentPrice || 0;
-        const changePercent = quoteData?.changePercent || 0;
-        const stockName = quoteData?.name || stock.name;
-
-        // Find which sector this stock belongs to
-        const stockSector = sectorData.length > 0
-          ? sectorData.reduce((best, s) => {
-              if (s.leadingStock === stockName || s.leadingStock === stock.symbol) return s.name;
-              return best;
-            }, sectorData[0]?.name || market)
-          : market;
-
-        // Try to fetch indicators
-        const indicatorData = await fetchIndicators(stock.symbol);
-
-        if (indicatorData && currentPrice > 0) {
-          const signal = analyzeIndicators(indicatorData, currentPrice, stockSector, stock.symbol, stockName, changePercent);
-          generatedSignals.push(signal);
-        } else if (currentPrice > 0) {
-          // Fallback: generate mock indicators-based signal
-          const mockSignal: ScanSignal = {
-            symbol: stock.symbol,
-            name: stockName,
-            price: currentPrice,
-            changePercent,
-            signalType: changePercent > 1 ? 'BUY' : changePercent < -1 ? 'SELL' : 'HOLD',
-            strength: Math.abs(changePercent) > 3 ? 'strong' : Math.abs(changePercent) > 1.5 ? 'medium' : 'weak',
-            indicators: {
-              maCross: changePercent > 1 ? 'golden' : changePercent < -1 ? 'death' : 'none',
-              rsiSignal: changePercent > 2 ? 'overbought' : changePercent < -2 ? 'oversold' : 'neutral',
-              macdCross: changePercent > 0.5 ? 'golden' : changePercent < -0.5 ? 'death' : 'none',
-              bollingerBreak: 'none',
-              kdjCross: 'none',
-            },
-            score: Math.round(50 + changePercent * 5),
-            sector: stockSector,
-          };
-          generatedSignals.push(mockSignal);
-        }
-      }
-
-      // Sort signals by score (best first)
-      generatedSignals.sort((a, b) => {
-        const aScore = a.signalType === 'BUY' ? a.score : a.signalType === 'SELL' ? 100 - a.score : 30;
-        const bScore = b.signalType === 'BUY' ? b.score : b.signalType === 'SELL' ? 100 - b.score : 30;
-        return bScore - aScore;
-      });
-
-      if (generatedSignals.length === 0) {
-        // No real signals found — fall back to demo signals
-        const demo = generateDemoSignals(market);
-        setSignals(demo);
-        setIsDemoMode(true);
-        setIsOffline(true);
-        if (demo.length > 0) {
-          setSelectedSignal(demo[0]);
+          if (apiSignals.length > 0) {
+            setSelectedSignal(apiSignals[0]);
+            loadSignalDetail(apiSignals[0]);
+          }
+        } else {
+          setScanError(scanData.error || t('scanner.scanError'));
+          setIsOffline(true);
         }
       } else {
-        setSignals(generatedSignals);
-        setIsDemoMode(false);
-        if (generatedSignals.length > 0) {
-          setSelectedSignal(generatedSignals[0]);
-          // Fetch detail for first signal
-          loadSignalDetail(generatedSignals[0]);
-        }
+        setScanError(t('scanner.scanError'));
+        setIsOffline(true);
       }
     } catch {
       setScanError(t('scanner.scanError'));
       setIsOffline(true);
-      // Fall back to demo signals on error
-      const demo = generateDemoSignals(market);
-      setSignals(demo);
-      setIsDemoMode(true);
-      if (demo.length > 0) {
-        setSelectedSignal(demo[0]);
-      }
     } finally {
       setScanning(false);
       setScanPhase('');
     }
-  }, [market, scanning, fetchSectors, fetchBatchQuotes, fetchIndicators, t]);
+  }, [market, scanning, fetchSectors, t]);
 
-  // Load detail for a selected signal
+  // Load detail for a selected signal — uses GET /api/signals/scan for comprehensive data
   const loadSignalDetail = useCallback(async (signal: ScanSignal) => {
     setLoading(true);
     setSelectedSignal(signal);
     try {
-      let quoteRes: Response | null = null;
-      try { quoteRes = await fetch(`/api/fusion/market/quote?symbol=${signal.symbol}`); } catch { /* ignore */ }
-
-      if (quoteRes && quoteRes.ok) {
-        const data = await quoteRes.json();
+      // Use the scan API which returns both signal analysis AND candle data
+      const res = await fetch(`/api/signals/scan?symbol=${encodeURIComponent(signal.symbol)}`);
+      if (res.ok) {
+        const data = await res.json();
         if (data.success && data.data) {
-          setQuote(data.data);
+          const detail = data.data;
+
+          // Update quote from scan result
+          setQuote({
+            symbol: detail.symbol,
+            name: detail.name,
+            currentPrice: detail.price,
+            change: detail.price * detail.changePercent / 100,
+            changePercent: detail.changePercent,
+            high: 0, low: 0, open: 0, prevClose: 0, volume: 0,
+            market: market,
+          });
+
+          // Set indicators from scan result
+          if (detail.technicalDetails) {
+            setIndicators({
+              ma: detail.technicalDetails.ma,
+              rsi: { rsi14: detail.technicalDetails.rsi, rsi6: 0, rsi12: 0 },
+              macd: detail.technicalDetails.macd,
+              bollinger: detail.technicalDetails.bollinger,
+              kdj: detail.technicalDetails.kdj,
+            });
+          }
+
+          // Format candle data for chart
+          if (detail.candleData && detail.candleData.c?.length > 0) {
+            const locale = language === 'zh' ? 'zh-CN' : 'en-US';
+            const formatted: CandleData[] = detail.candleData.c.map((c: number, i: number) => ({
+              time: new Date(detail.candleData.t[i] * 1000).toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
+              open: detail.candleData.o[i],
+              high: detail.candleData.h[i],
+              low: detail.candleData.l[i],
+              close: c,
+              volume: detail.candleData.v[i],
+            }));
+            setCandleData(formatted);
+          }
         }
-      }
-
-      // Fetch kline for chart
-      await fetchKline(signal.symbol);
-
-      // Fetch fresh indicators
-      const indData = await fetchIndicators(signal.symbol);
-      if (indData) {
-        setIndicators(indData);
       }
     } catch {
       // Keep existing data
     } finally {
       setLoading(false);
     }
-  }, [fetchKline, fetchIndicators]);
+  }, [market, language]);
 
   const currentPrice = quote?.currentPrice || selectedSignal?.price || 0;
   const priceChange = quote?.change || 0;
