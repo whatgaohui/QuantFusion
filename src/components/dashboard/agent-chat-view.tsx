@@ -12,18 +12,15 @@ import {
   Loader2,
   Zap,
   Brain,
-  Wifi,
-  WifiOff,
-  AlertTriangle,
-  RefreshCw,
-  Settings,
-  Cpu,
+  AlertCircle,
+  Trash2,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+// ScrollArea removed — using plain div with overflow-y-auto for reliable scroll-to-bottom
 import {
   Select,
   SelectContent,
@@ -31,18 +28,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useLanguage } from '@/lib/i18n';
 
 type ChatMode = 'quick' | 'deep';
 
 interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant' | 'error';
+  role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  isOffline?: boolean;
-  errorDetail?: string;
   provider?: string;
+  tokens?: number;
 }
 
 interface ChatSession {
@@ -50,6 +54,65 @@ interface ChatSession {
   title: string;
   messages: ChatMessage[];
   createdAt: string;
+  updatedAt: string;
+}
+
+const CHAT_SESSIONS_KEY = 'quantfusion-chat-sessions';
+const MAX_MESSAGES_PER_SESSION = 50;
+const MAX_SESSIONS = 10;
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+// localStorage helpers
+function loadSessions(): ChatSession[] {
+  try {
+    const raw = localStorage.getItem(CHAT_SESSIONS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    // Clean up sessions older than 7 days
+    const now = Date.now();
+    const valid = parsed.filter((s: ChatSession) => {
+      const created = new Date(s.createdAt).getTime();
+      const updated = new Date(s.updatedAt || s.createdAt).getTime();
+      return (now - updated) < SESSION_TTL_MS || (now - created) < SESSION_TTL_MS;
+    });
+
+    // Limit to last 10 sessions, trim messages to last 50 per session
+    const trimmed = valid.slice(0, MAX_SESSIONS).map((s: ChatSession) => ({
+      ...s,
+      messages: (s.messages || []).slice(-MAX_MESSAGES_PER_SESSION),
+      updatedAt: s.updatedAt || s.createdAt,
+    }));
+
+    return trimmed;
+  } catch {
+    return [];
+  }
+}
+
+function saveSessions(sessions: ChatSession[]): void {
+  try {
+    // Trim before saving
+    const trimmed = sessions.slice(0, MAX_SESSIONS).map((s) => ({
+      ...s,
+      messages: (s.messages || []).slice(-MAX_MESSAGES_PER_SESSION),
+      updatedAt: s.updatedAt || s.createdAt,
+    }));
+    localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(trimmed));
+  } catch {
+    // localStorage might be full or unavailable
+  }
+}
+
+function createDefaultSession(): ChatSession {
+  return {
+    id: Date.now().toString(),
+    title: 'New Analysis Session',
+    messages: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 const suggestedPrompts = [
@@ -58,35 +121,100 @@ const suggestedPrompts = [
   { key: 'chat.quickPrompt3', icon: '💎' },
 ];
 
+/** Check if a line is a markdown table separator (e.g., |---|---|) */
+function isTableSeparator(line: string): boolean {
+  return /^\|[\s\-:]+\|$/.test(line.trim()) || /^\|[\s\-:]+\|/.test(line.trim());
+}
+
 function formatMarkdown(text: string): React.ReactNode[] {
   const lines = text.split('\n');
   const elements: React.ReactNode[] = [];
 
-  for (let i = 0; i < lines.length; i++) {
+  let i = 0;
+  while (i < lines.length) {
     const line = lines[i];
+
+    // Detect consecutive table rows (lines starting with |)
+    if (line.trim().startsWith('|')) {
+      // Collect all consecutive table lines
+      const tableLines: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+
+      // Filter out separator rows and parse cells
+      const dataRows = tableLines.filter((l) => !isTableSeparator(l));
+      const parsedRows = dataRows.map((l) =>
+        l.split('|')
+          .map((cell) => cell.trim())
+          .filter((_, idx, arr) => idx > 0 && idx < arr.length) // remove empty first/last from split
+      );
+
+      if (parsedRows.length > 0) {
+        const headerRow = parsedRows[0];
+        const bodyRows = parsedRows.slice(1);
+        const colCount = headerRow.length;
+
+        elements.push(
+          <div key={`table-${i}`} className="my-2 overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-[#0a0a0f]">
+                  {headerRow.map((cell, ci) => (
+                    <th
+                      key={ci}
+                      className="text-left px-3 py-1.5 text-zinc-300 font-semibold border border-[#1e1e2e] whitespace-nowrap"
+                    >
+                      {formatInline(cell)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {bodyRows.map((row, ri) => (
+                  <tr key={ri} className="even:bg-[#0a0a0f]/50">
+                    {Array.from({ length: colCount }).map((_, ci) => (
+                      <td
+                        key={ci}
+                        className="px-3 py-1.5 text-zinc-300 border border-[#1e1e2e] whitespace-nowrap"
+                      >
+                        {formatInline(row[ci] || '')}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+      // Don't increment i here — already advanced in the while loop above
+      continue;
+    }
+
     if (line.startsWith('## ')) {
       elements.push(<h2 key={i} className="text-base font-semibold text-emerald-400 mt-3 mb-1">{line.slice(3)}</h2>);
     } else if (line.startsWith('### ')) {
       elements.push(<h3 key={i} className="text-sm font-semibold text-white mt-2 mb-1">{line.slice(4)}</h3>);
     } else if (line.startsWith('- ')) {
       elements.push(<li key={i} className="text-sm text-zinc-300 ml-4 leading-relaxed">{formatInline(line.slice(2))}</li>);
-    } else if (line.startsWith('| ')) {
-      elements.push(<p key={i} className="text-xs text-zinc-400 font-mono leading-relaxed">{line}</p>);
     } else if (line.startsWith('**') && line.endsWith('**')) {
       elements.push(<p key={i} className="text-sm text-zinc-300 font-semibold mt-1">{line.slice(2, -2)}</p>);
-    } else if (line.startsWith('---')) {
-      elements.push(<Separator key={i} className="bg-[#1e1e2e] my-2" />);
     } else if (line.trim() === '') {
       elements.push(<div key={i} className="h-1" />);
     } else {
       elements.push(<p key={i} className="text-sm text-zinc-300 leading-relaxed">{formatInline(line)}</p>);
     }
+
+    i++;
   }
 
   return elements;
 }
 
 function formatInline(text: string): React.ReactNode {
+  // Simple bold formatting
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
@@ -98,36 +226,54 @@ function formatInline(text: string): React.ReactNode {
 
 export function AgentChatView() {
   const { t, language } = useLanguage();
-  const [sessions, setSessions] = useState<ChatSession[]>([
-    {
-      id: '1',
-      title: language === 'zh' ? '新建分析会话' : 'New Analysis Session',
-      messages: [],
-      createdAt: new Date().toISOString(),
-    },
-  ]);
-  const [activeSessionId, setActiveSessionId] = useState('1');
+  // Load sessions once and derive both state initialisers from it
+  const [initialSessions] = useState(() => loadSessions());
+  const [sessions, setSessions] = useState<ChatSession[]>(() =>
+    initialSessions.length > 0 ? initialSessions : [createDefaultSession()]
+  );
+  const [activeSessionId, setActiveSessionId] = useState(() =>
+    initialSessions.length > 0 ? initialSessions[0].id : Date.now().toString()
+  );
   const [inputValue, setInputValue] = useState('');
   const [chatMode, setChatMode] = useState<ChatMode>('quick');
   const [sending, setSending] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [aiConnected, setAiConnected] = useState<boolean | null>(null);
-  const [currentProvider, setCurrentProvider] = useState<string>('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const isNearBottomRef = useRef(true);
+  const [error, setError] = useState<string | null>(null);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Debounced save to localStorage
+  const persistSessions = useCallback((sessionData: ChatSession[]) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      saveSessions(sessionData);
+    }, 300);
   }, []);
 
-  // Only auto-scroll if user is near the bottom
+  // Save sessions whenever they change
   useEffect(() => {
-    if (isNearBottomRef.current) {
-      scrollToBottom();
+    persistSessions(sessions);
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [sessions, persistSessions]);
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
     }
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
   }, [activeSession?.messages, scrollToBottom]);
 
   const handleSend = useCallback(async (message?: string) => {
@@ -136,7 +282,7 @@ export function AgentChatView() {
 
     setInputValue('');
     setSending(true);
-    isNearBottomRef.current = true;
+    setError(null);
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -145,128 +291,131 @@ export function AgentChatView() {
       timestamp: new Date().toISOString(),
     };
 
-    setSessions((prev) =>
-      prev.map((s) =>
+    setSessions((prev) => {
+      const updated = prev.map((s) =>
         s.id === activeSessionId
-          ? { ...s, messages: [...s.messages, userMessage], title: s.messages.length === 0 ? msg.slice(0, 30) : s.title }
+          ? {
+              ...s,
+              messages: [...s.messages, userMessage],
+              title: s.messages.length === 0 ? msg.slice(0, 30) : s.title,
+              updatedAt: new Date().toISOString(),
+            }
           : s
-      )
-    );
+      );
+      // Save immediately on user message
+      saveSessions(updated);
+      return updated;
+    });
 
+    // Build chat history for context
+    const currentSession = sessions.find((s) => s.id === activeSessionId);
+    const history = (currentSession?.messages || []).slice(-10).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    // Call AI chat API
     try {
       const res = await fetch('/api/fusion/agent/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg, mode: chatMode, session_id: activeSessionId }),
+        body: JSON.stringify({
+          message: msg,
+          mode: chatMode,
+          session_id: activeSessionId,
+          history,
+        }),
       });
 
-      const data = await res.json();
-
-      if (res.ok && data.success && data.data?.response) {
-        // Real AI response received!
-        setAiConnected(true);
-        setCurrentProvider(data.data.provider || 'unknown');
+      if (res.ok) {
+        const data = await res.json();
+        const isMock = data.provider === 'mock';
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: data.data.response,
+          content: data.content || data.message || data.response || 'Analysis complete.',
           timestamp: new Date().toISOString(),
-          isOffline: false,
-          provider: data.data.provider,
+          provider: data.provider,
+          tokens: data.tokens,
         };
-        setSessions((prev) =>
-          prev.map((s) =>
+        setSessions((prev) => {
+          const updated = prev.map((s) =>
             s.id === activeSessionId
-              ? { ...s, messages: [...s.messages, assistantMessage] }
+              ? {
+                  ...s,
+                  messages: [...s.messages, assistantMessage],
+                  updatedAt: new Date().toISOString(),
+                }
               : s
-          )
-        );
+          );
+          // Save immediately on assistant message
+          saveSessions(updated);
+          return updated;
+        });
+        if (isMock) {
+          setError(language === 'zh'
+            ? 'AI 服务暂不可用，当前为模拟回复。请在设置中配置 LLM 或检查 Z.ai 服务状态。'
+            : 'AI service unavailable, showing simulated response. Please configure LLM in Settings or check Z.ai status.');
+          setTimeout(() => setError(null), 8000);
+        }
+        setSending(false);
+        return;
       } else {
-        // AI service returned an error — show clear error message
-        setAiConnected(false);
-        const isConfigError = (data.error || data.data?.error || '').includes('API Key') || (data.error || data.data?.error || '').includes('设置页面');
-        const errorMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          role: 'error',
-          content: isConfigError
-            ? (language === 'zh'
-              ? '⚠️ AI服务未配置，请在设置页面配置API Key后重试。'
-              : '⚠️ AI service not configured. Please configure API Key in Settings.')
-            : (language === 'zh'
-              ? '⚠️ AI分析服务暂时不可用，请稍后重试。'
-              : '⚠️ AI analysis service is temporarily unavailable. Please try again later.'),
-          timestamp: new Date().toISOString(),
-          errorDetail: data.error || data.data?.error || undefined,
-        };
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === activeSessionId
-              ? { ...s, messages: [...s.messages, errorMessage] }
-              : s
-          )
-        );
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.error || `HTTP ${res.status}`;
+        setError(language === 'zh' ? `请求失败: ${errMsg}` : `Request failed: ${errMsg}`);
       }
     } catch {
-      // Network error — show clear error message
-      setAiConnected(false);
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'error',
-        content: language === 'zh'
-          ? '⚠️ 网络连接失败，请检查网络后重试。'
-          : '⚠️ Network connection failed. Please check your connection and try again.',
-        timestamp: new Date().toISOString(),
-        errorDetail: language === 'zh' ? '无法连接到AI分析服务' : 'Cannot connect to AI analysis service',
-      };
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === activeSessionId
-            ? { ...s, messages: [...s.messages, errorMessage] }
-            : s
-        )
-      );
+      setError(language === 'zh' ? '网络错误，请检查连接' : 'Network error, please check connection');
     }
 
     setSending(false);
-  }, [inputValue, sending, chatMode, activeSessionId, language]);
+    // Clear error after a few seconds
+    setTimeout(() => setError(null), 8000);
+  }, [inputValue, sending, chatMode, activeSessionId, sessions, t, language]);
 
-  const handleNewChat = () => {
+  const handleNewChat = useCallback(() => {
     const newSession: ChatSession = {
       id: Date.now().toString(),
       title: t('chat.sessionTitle'),
       messages: [],
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
-    setSessions((prev) => [newSession, ...prev]);
+    setSessions((prev) => {
+      const updated = [newSession, ...prev].slice(0, MAX_SESSIONS);
+      saveSessions(updated);
+      return updated;
+    });
     setActiveSessionId(newSession.id);
-  };
+  }, [t]);
+
+  const handleClearHistory = useCallback(() => {
+    setClearConfirmOpen(true);
+  }, []);
+
+  const confirmClearHistory = useCallback(() => {
+    try {
+      localStorage.removeItem(CHAT_SESSIONS_KEY);
+    } catch {
+      // ignore
+    }
+    const defaultSession = createDefaultSession();
+    defaultSession.title = t('chat.sessionTitle');
+    setSessions([defaultSession]);
+    setActiveSessionId(defaultSession.id);
+    setClearConfirmOpen(false);
+  }, [t]);
 
   const handleSuggestedPrompt = (key: string) => {
     const prompt = t(key);
     handleSend(prompt);
   };
 
-  const handleRetryLastMessage = () => {
-    // Find the last user message and resend
-    if (!activeSession) return;
-    const lastUserMsg = [...activeSession.messages].reverse().find(m => m.role === 'user');
-    if (lastUserMsg) {
-      // Remove the last error message and resend
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === activeSessionId
-            ? { ...s, messages: s.messages.filter(m => m.role !== 'error').slice(0, -1) }
-            : s
-        )
-      );
-      setTimeout(() => handleSend(lastUserMsg.content), 100);
-    }
-  };
-
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-[calc(100vh-10rem)]">
       {/* Header */}
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-emerald-400" />
@@ -275,32 +424,6 @@ export function AgentChatView() {
           <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[10px]">
             {t(chatMode === 'quick' ? 'chat.modeQuick' : 'chat.modeDeep')}
           </Badge>
-          {/* AI Connection Status */}
-          <div className="flex items-center gap-1">
-            {aiConnected === true && (
-              <>
-                <Wifi className="w-3 h-3 text-emerald-500" />
-                <span className="text-[10px] text-emerald-500">
-                  {t('chat.realtimeMode')}
-                  {currentProvider && currentProvider !== 'zai' && (
-                    <span className="ml-1 text-zinc-500">({currentProvider})</span>
-                  )}
-                </span>
-              </>
-            )}
-            {aiConnected === false && (
-              <>
-                <WifiOff className="w-3 h-3 text-red-500" />
-                <span className="text-[10px] text-red-500">{t('chat.aiUnavailable')}</span>
-              </>
-            )}
-            {aiConnected === null && (
-              <>
-                <div className="w-2 h-2 rounded-full bg-zinc-600" />
-                <span className="text-[10px] text-zinc-500">{t('chat.aiWaiting')}</span>
-              </>
-            )}
-          </div>
         </div>
         <div className="flex items-center gap-2">
           <Select value={chatMode} onValueChange={(v) => setChatMode(v as ChatMode)}>
@@ -327,6 +450,15 @@ export function AgentChatView() {
             {t('chat.history')}
           </Button>
           <Button
+            variant="outline"
+            size="sm"
+            onClick={handleClearHistory}
+            className="border-[#1e1e2e] bg-[#0a0a0f] text-red-400/70 hover:text-red-400 hover:bg-red-600/10 hover:border-red-600/20 gap-1.5"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            {t('chat.clearHistory')}
+          </Button>
+          <Button
             size="sm"
             onClick={handleNewChat}
             className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
@@ -337,9 +469,17 @@ export function AgentChatView() {
         </div>
       </div>
 
+      {/* Error Banner */}
+      {error && (
+        <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-yellow-600/10 border border-yellow-600/20 rounded-lg">
+          <AlertCircle className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0" />
+          <p className="text-xs text-yellow-400">{error}</p>
+        </div>
+      )}
+
       {/* History Sidebar */}
       {showHistory && (
-        <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl mb-3 flex-shrink-0">
+        <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl mb-4">
           <CardContent className="p-3">
             <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
               {sessions.map((session) => (
@@ -361,55 +501,28 @@ export function AgentChatView() {
       )}
 
       {/* Chat Messages */}
-      <Card className="flex-1 min-h-0 bg-[#111118] border-[#1e1e2e] rounded-xl flex flex-col overflow-hidden">
-        <div
-          ref={scrollAreaRef}
-          className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4"
-          onScroll={(e) => {
-            const el = e.currentTarget;
-            const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-            isNearBottomRef.current = distanceFromBottom < 100;
-          }}
-        >
+      <Card className="flex-1 min-h-0 bg-[#111118] border-[#1e1e2e] rounded-xl flex flex-col overflow-hidden p-0 gap-0">
+      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 custom-scrollbar">
           {activeSession && activeSession.messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full min-h-[300px] px-4">
-              {/* Welcome Panel */}
-              <div className="w-20 h-20 rounded-2xl bg-emerald-600/10 border border-emerald-600/20 flex items-center justify-center mb-5">
-                <Brain className="w-10 h-10 text-emerald-400" />
+            <div className="flex flex-col items-center justify-center h-full min-h-[300px]">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-600/10 flex items-center justify-center mb-4">
+                <Bot className="w-8 h-8 text-emerald-400" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2 text-center">
-                {t('chat.welcome')}
-              </h3>
-              <p className="text-zinc-400 text-sm mb-6 text-center max-w-md leading-relaxed">
-                {t('chat.welcomeDesc')}
-              </p>
-
-              {/* AI Powered Badge */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-600/10 border border-emerald-600/20 mb-6">
-                <Wifi className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-xs text-emerald-400">{t('chat.poweredByAI')}</span>
-              </div>
-
-              {/* Capability Tags */}
-              <div className="flex flex-wrap gap-2 justify-center mb-6 max-w-lg">
-                {['📊 股票分析', '📈 市场趋势', '🎯 交易洞察', '💡 策略建议'].map((tag) => (
-                  <span key={tag} className="px-2.5 py-1 rounded-full bg-[#0a0a0f] border border-[#1e1e2e] text-[11px] text-zinc-400">
-                    {tag}
-                  </span>
-                ))}
-              </div>
+              <p className="text-zinc-300 text-sm mb-6">{t('chat.welcomeMessage')}</p>
 
               {/* Suggested Prompts */}
-              <div className="flex flex-col gap-2 w-full max-w-sm">
+              <div className="flex flex-wrap gap-2 justify-center max-w-lg">
                 {suggestedPrompts.map((prompt) => (
                   <Button
                     key={prompt.key}
                     variant="outline"
+                    size="sm"
                     onClick={() => handleSuggestedPrompt(prompt.key)}
-                    className="border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-emerald-600/10 hover:text-emerald-400 hover:border-emerald-600/20 gap-2 justify-start text-left h-auto py-2.5 px-4"
+                    disabled={sending}
+                    className="border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-emerald-600/10 hover:text-emerald-400 hover:border-emerald-600/20 gap-2"
                   >
-                    <span className="text-base">{prompt.icon}</span>
-                    <span className="text-sm">{t(prompt.key)}</span>
+                    <span>{prompt.icon}</span>
+                    {t(prompt.key)}
                   </Button>
                 ))}
               </div>
@@ -423,49 +536,26 @@ export function AgentChatView() {
                       <Bot className="w-4 h-4 text-emerald-400" />
                     </div>
                   )}
-                  {msg.role === 'error' && (
-                    <div className="w-8 h-8 rounded-lg bg-red-600/10 flex items-center justify-center flex-shrink-0 mt-1">
-                      <AlertTriangle className="w-4 h-4 text-red-400" />
-                    </div>
-                  )}
                   <div className={`max-w-[80%] rounded-xl p-3 ${
                     msg.role === 'user'
                       ? 'bg-emerald-600/15 border border-emerald-600/20'
-                      : msg.role === 'error'
-                      ? 'bg-red-600/10 border border-red-600/20'
                       : 'bg-[#0a0a0f] border border-[#1e1e2e]'
                   }`}>
                     {msg.role === 'assistant' ? (
-                      <div className="space-y-0.5">
-                        {formatMarkdown(msg.content)}
-                        {/* AI source badge */}
-                        <div className="flex items-center gap-1 mt-2 pt-1 border-t border-[#1e1e2e]">
-                          <Wifi className="w-2.5 h-2.5 text-emerald-500" />
-                          <span className="text-[9px] text-emerald-500">{t('chat.realAIResponse')}</span>
-                        </div>
-                      </div>
-                    ) : msg.role === 'error' ? (
-                      <div className="space-y-2">
-                        <p className="text-sm text-red-300">{msg.content}</p>
-                        {msg.errorDetail && (
-                          <p className="text-xs text-red-400/60">{msg.errorDetail}</p>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleRetryLastMessage}
-                          className="border-red-600/30 bg-red-600/10 text-red-300 hover:bg-red-600/20 hover:text-red-200 gap-1.5 h-7 text-xs"
-                        >
-                          <RefreshCw className="w-3 h-3" />
-                          {t('chat.retry')}
-                        </Button>
-                      </div>
+                      <div className="space-y-0.5">{formatMarkdown(msg.content)}</div>
                     ) : (
                       <p className="text-sm text-white">{msg.content}</p>
                     )}
-                    <p className="text-[10px] text-zinc-600 mt-1.5">
-                      {new Date(msg.timestamp).toLocaleTimeString()}
-                    </p>
+                    <div className="flex items-center justify-between mt-1.5">
+                      <p className="text-[10px] text-zinc-600">
+                        {new Date(msg.timestamp).toLocaleTimeString()}
+                      </p>
+                      {msg.role === 'assistant' && msg.provider && (
+                        <Badge className="bg-purple-600/10 text-purple-400 border-purple-600/20 text-[8px] px-1 py-0">
+                          {msg.provider}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   {msg.role === 'user' && (
                     <div className="w-8 h-8 rounded-lg bg-zinc-600/10 flex items-center justify-center flex-shrink-0 mt-1">
@@ -483,35 +573,30 @@ export function AgentChatView() {
                     <div className="flex items-center gap-2">
                       <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
                       <span className="text-sm text-zinc-400">
-                        {t(chatMode === 'deep' ? 'chat.deepThinking' : 'chat.thinking')}
+                        {chatMode === 'deep' ? t('chat.deepAnalysisProgress') : t('chat.thinking')}
                       </span>
                     </div>
-                    {chatMode === 'deep' && (
-                      <p className="text-[10px] text-zinc-600 mt-1">{t('chat.deepThinkingHint')}</p>
-                    )}
                   </div>
                 </div>
               )}
-              <div ref={messagesEndRef} />
             </div>
           )}
-        </div>
+      </div>
 
         {/* Suggested Prompts (when chat has messages) */}
         {activeSession && activeSession.messages.length > 0 && !sending && (
-          <div className="px-4 pb-2 flex-shrink-0">
+          <div className="px-4 pb-2">
             <div className="flex items-center gap-1.5 mb-2">
               <Lightbulb className="w-3 h-3 text-yellow-400" />
-              <span className="text-[10px] text-zinc-500 uppercase tracking-wider">
-                {language === 'zh' ? '建议' : 'Suggest'}
-              </span>
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('chat.suggestions')}</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {suggestedPrompts.map((prompt) => (
                 <button
                   key={prompt.key}
                   onClick={() => handleSuggestedPrompt(prompt.key)}
-                  className="px-2.5 py-1 rounded-md bg-[#0a0a0f] border border-[#1e1e2e] text-[11px] text-zinc-400 hover:text-emerald-400 hover:border-emerald-600/20 transition-colors"
+                  disabled={sending}
+                  className="px-2.5 py-1 rounded-md bg-[#0a0a0f] border border-[#1e1e2e] text-[11px] text-zinc-400 hover:text-emerald-400 hover:border-emerald-600/20 transition-colors disabled:opacity-50"
                 >
                   {prompt.icon} {t(prompt.key)}
                 </button>
@@ -520,10 +605,10 @@ export function AgentChatView() {
           </div>
         )}
 
-        <Separator className="bg-[#1e1e2e] flex-shrink-0" />
+        <Separator className="bg-[#1e1e2e]" />
 
         {/* Input Area */}
-        <div className="p-3 flex gap-2 flex-shrink-0">
+        <div className="p-3 flex gap-2">
           <div className="flex-1 relative">
             <Input
               placeholder={t('chat.inputPlaceholder')}
@@ -548,6 +633,37 @@ export function AgentChatView() {
           </Button>
         </div>
       </Card>
+
+      {/* Clear History Confirmation Dialog */}
+      <Dialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
+        <DialogContent className="bg-[#111118] border-[#1e1e2e] max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-red-400" />
+              {t('chat.clearConfirmTitle')}
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              {t('chat.clearConfirmDesc')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setClearConfirmOpen(false)}
+              className="border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300"
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              onClick={confirmClearHistory}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              {t('chat.clearAll')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -19,7 +19,7 @@ export async function GET() {
   } catch (error) {
     console.error('Get watchlist error:', error);
     return NextResponse.json(
-      { error: '获取自选股失败' },
+      { error: 'Failed to fetch watchlist' },
       { status: 500 }
     );
   }
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     if (!symbol) {
       return NextResponse.json(
-        { error: '股票代码不能为空' },
+        { error: 'Symbol is required' },
         { status: 400 }
       );
     }
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       return NextResponse.json(
-        { error: '该股票已在自选股中' },
+        { error: 'Symbol already in watchlist' },
         { status: 409 }
       );
     }
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Add watchlist error:', error);
     return NextResponse.json(
-      { error: '添加自选股失败' },
+      { error: 'Failed to add to watchlist' },
       { status: 500 }
     );
   }
@@ -91,7 +91,7 @@ export async function DELETE(request: NextRequest) {
 
     if (!symbol && !id) {
       return NextResponse.json(
-        { error: '股票代码或id为必填项' },
+        { error: 'Symbol or id is required' },
         { status: 400 }
       );
     }
@@ -101,13 +101,13 @@ export async function DELETE(request: NextRequest) {
 
       if (!existing) {
         return NextResponse.json(
-          { error: '未找到该自选股' },
+          { error: 'Item not found in watchlist' },
           { status: 404 }
         );
       }
 
       await db.watchlistItem.delete({ where: { id } });
-      return NextResponse.json({ message: '已从自选股中移除', id });
+      return NextResponse.json({ message: 'Removed from watchlist', id });
     }
 
     // Delete by symbol for the default user
@@ -118,7 +118,7 @@ export async function DELETE(request: NextRequest) {
 
     if (!existing) {
       return NextResponse.json(
-        { error: '该股票不在自选股中' },
+        { error: 'Symbol not found in watchlist' },
         { status: 404 }
       );
     }
@@ -127,11 +127,11 @@ export async function DELETE(request: NextRequest) {
       where: { userId_symbol: { userId: DEFAULT_USER_ID, symbol: upperSymbol } },
     });
 
-    return NextResponse.json({ message: '已从自选股中移除', symbol: upperSymbol });
+    return NextResponse.json({ message: 'Removed from watchlist', symbol: upperSymbol });
   } catch (error) {
     console.error('Delete watchlist error:', error);
     return NextResponse.json(
-      { error: '移除自选股失败' },
+      { error: 'Failed to remove from watchlist' },
       { status: 500 }
     );
   }

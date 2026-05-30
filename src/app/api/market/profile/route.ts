@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || '';
+import { getFinnhubApiKey } from '@/lib/finnhub-config';
 
 export async function GET(request: NextRequest) {
   try {
+    const FINNHUB_API_KEY = await getFinnhubApiKey();
     const { searchParams } = new URL(request.url);
     const symbol = searchParams.get('symbol');
 
     if (!symbol) {
       return NextResponse.json(
-        { error: '股票代码参数不能为空' },
+        { error: 'Symbol parameter is required' },
         { status: 400 }
       );
     }
 
     if (!FINNHUB_API_KEY) {
       return NextResponse.json(
-        { error: 'Finnhub API密钥未配置' },
+        { error: 'Finnhub API key not configured' },
         { status: 500 }
       );
     }
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: `Finnhub API错误: ${response.status}` },
+        { error: `Finnhub API error: ${response.status}` },
         { status: response.status }
       );
     }
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     if (!data || !data.name) {
       return NextResponse.json(
-        { error: '未找到该股票的公司资料' },
+        { error: 'No profile data found for symbol' },
         { status: 404 }
       );
     }
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Profile API error:', error);
     return NextResponse.json(
-      { error: '获取公司资料失败' },
+      { error: 'Failed to fetch company profile' },
       { status: 500 }
     );
   }

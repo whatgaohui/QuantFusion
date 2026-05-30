@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "QuantFusion — AI驱动的量化交易平台",
-  description: "专业AI驱动量化交易平台，支持多智能体分析、智能信号扫描、投资组合管理和市场分析。",
+  title: "QuantFusion — AI-Powered Trading Platform",
+  description: "Professional AI-powered quantitative trading platform with multi-agent analysis, intelligent signal scanning, portfolio management, and market analytics.",
   icons: {
     icon: "/logo.svg",
   },
@@ -27,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" className="dark" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0a0a0f] text-foreground`}
       >

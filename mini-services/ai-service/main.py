@@ -39,15 +39,12 @@ def create_app() -> FastAPI:
     # Health check endpoint
     @application.get("/api/health")
     async def health_check() -> dict:
-        from app.llm.router import _is_configured, _try_litellm
-        llm_configured = _is_configured() and _try_litellm
         return {
             "success": True,
             "data": {
                 "service": "ai-service",
                 "status": "healthy",
                 "version": "0.1.0",
-                "llm_mode": "live" if llm_configured else "mock",
             },
             "error": None,
         }

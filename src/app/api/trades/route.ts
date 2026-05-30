@@ -19,7 +19,7 @@ export async function GET() {
   } catch (error) {
     console.error('Get trades error:', error);
     return NextResponse.json(
-      { error: '获取交易记录失败' },
+      { error: 'Failed to fetch trade logs' },
       { status: 500 }
     );
   }

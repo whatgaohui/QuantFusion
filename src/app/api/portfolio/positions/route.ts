@@ -18,7 +18,7 @@ export async function GET() {
   } catch (error) {
     console.error('Get positions error:', error);
     return NextResponse.json(
-      { error: '获取持仓失败' },
+      { error: 'Failed to fetch positions' },
       { status: 500 }
     );
   }
@@ -36,14 +36,14 @@ export async function POST(request: NextRequest) {
 
     if (!symbol || avgCost === undefined || quantity === undefined) {
       return NextResponse.json(
-        { error: 'symbol、avgCost和quantity为必填项' },
+        { error: 'symbol, avgCost, and quantity are required' },
         { status: 400 }
       );
     }
 
     if (avgCost <= 0 || quantity <= 0) {
       return NextResponse.json(
-        { error: 'avgCost和quantity必须为正数' },
+        { error: 'avgCost and quantity must be positive' },
         { status: 400 }
       );
     }
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Create position error:', error);
     return NextResponse.json(
-      { error: '创建持仓失败' },
+      { error: 'Failed to create position' },
       { status: 500 }
     );
   }
@@ -109,7 +109,7 @@ export async function DELETE(request: NextRequest) {
 
     if (!id || closePrice === undefined) {
       return NextResponse.json(
-        { error: 'id和closePrice为必填项' },
+        { error: 'id and closePrice are required' },
         { status: 400 }
       );
     }
@@ -118,14 +118,14 @@ export async function DELETE(request: NextRequest) {
 
     if (!position) {
       return NextResponse.json(
-        { error: '未找到该持仓' },
+        { error: 'Position not found' },
         { status: 404 }
       );
     }
 
     if (position.status !== 'open') {
       return NextResponse.json(
-        { error: '该持仓已平仓' },
+        { error: 'Position is already closed' },
         { status: 400 }
       );
     }
@@ -164,7 +164,7 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     console.error('Close position error:', error);
     return NextResponse.json(
-      { error: '平仓失败' },
+      { error: 'Failed to close position' },
       { status: 500 }
     );
   }

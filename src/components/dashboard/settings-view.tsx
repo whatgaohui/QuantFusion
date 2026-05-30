@@ -13,13 +13,13 @@ import {
   Globe,
   Cpu,
   Database,
+  Clock,
   Server,
-  Wifi,
-  WifiOff,
   CheckCircle2,
-  XCircle,
+  Send,
   Loader2,
-  Zap,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,228 +29,778 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Slider } from '@/components/ui/slider';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/i18n';
 import type { Language } from '@/lib/i18n';
 
-// ==================== Provider Definitions ====================
-interface ProviderDefaults {
-  baseUrl: string;
-  model: string;
-  temperature: number;
-  maxTokens: number;
+/** 数据源状态面板组件 */
+function DataSourceStatusPanel() {
+  const { t, language } = useLanguage();
+  const [sources, setSources] = useState<Array<{
+    name: string; displayName: string; market: string; enabled: boolean;
+    health: { status: string; latencyMs: number; lastSuccessAt: string | null; consecutiveFailures: number };
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchStatus = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/fusion/market/data-sources');
+      if (res.ok) {
+        const data = await res.json();
+        setSources(data.dataSources || []);
+      }
+    } catch {
+      // 静默失败
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 60000);
+    return () => clearInterval(interval);
+  }, [fetchStatus]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'healthy': return 'bg-emerald-500';
+      case 'degraded': return 'bg-yellow-500';
+      case 'down': return 'bg-red-500';
+      default: return 'bg-zinc-500';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'healthy': return t('scanner.healthy');
+      case 'degraded': return t('scanner.degraded');
+      case 'down': return t('scanner.down');
+      default: return t('scanner.unknown');
+    }
+  };
+
+  const getSourceDisplayName = (name: string) => {
+    const nameMap: Record<string, string> = {
+      finnhub: t('scanner.finnhub'),
+      eastmoney: t('scanner.eastMoney'),
+      sina: t('scanner.sina'),
+      tencent: t('scanner.tencent'),
+      iwencai: t('scanner.iwencai'),
+    };
+    return nameMap[name] || name;
+  };
+
+  if (loading && sources.length === 0) {
+    return (
+      <div className="py-4 text-center">
+        <Loader2 className="w-4 h-4 text-zinc-400 animate-spin mx-auto" />
+        <p className="text-xs text-zinc-500 mt-2">{language === 'zh' ? '加载数据源状态...' : 'Loading source status...'}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-medium text-zinc-400">{t('scanner.dataSourceStatus')}</h4>
+        <Button variant="ghost" size="sm" onClick={fetchStatus} className="h-5 px-1.5 text-zinc-500 hover:text-white">
+          <RefreshCw className="w-3 h-3" />
+        </Button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {sources.map((source) => (
+          <div key={source.name} className="bg-[#0a0a0f] rounded-lg p-3 border border-[#1e1e2e]">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${getStatusColor(source.health.status)}`} />
+                <span className="text-xs font-medium text-white">{getSourceDisplayName(source.name)}</span>
+              </div>
+              <span className="text-[10px] text-zinc-500">{source.market}</span>
+            </div>
+            <div className="flex items-center justify-between text-[10px]">
+              <span className="text-zinc-500">{getStatusText(source.health.status)}</span>
+              {source.health.latencyMs > 0 && (
+                <span className="text-zinc-500">{source.health.latencyMs}ms</span>
+              )}
+            </div>
+            {source.health.lastSuccessAt && (
+              <p className="text-[10px] text-zinc-600 mt-1">
+                {t('scanner.lastSuccess')}: {new Date(source.health.lastSuccessAt).toLocaleTimeString(language === 'zh' ? 'zh-CN' : 'en-US')}
+              </p>
+            )}
+            {!source.enabled && (
+              <p className="text-[10px] text-zinc-600 mt-1">{language === 'zh' ? '已禁用' : 'Disabled'}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
-const PROVIDERS: Record<string, ProviderDefaults & { label: string; labelKey: string; isFree?: boolean }> = {
-  zai: { label: 'ZAI', labelKey: 'settings.llmProviderZai', baseUrl: '', model: 'z-ai-general', temperature: 0.7, maxTokens: 4096, isFree: true },
-  deepseek: { label: 'DeepSeek', labelKey: 'settings.llmProviderDeepseek', baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat', temperature: 0.7, maxTokens: 4096 },
-  openai: { label: 'OpenAI', labelKey: 'settings.llmProviderOpenai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', temperature: 0.7, maxTokens: 4096 },
-  anthropic: { label: 'Anthropic', labelKey: 'settings.llmProviderAnthropic', baseUrl: 'https://api.anthropic.com', model: 'claude-3.5-sonnet', temperature: 0.7, maxTokens: 4096 },
-  qwen: { label: '通义千问', labelKey: 'settings.llmProviderQwen', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', temperature: 0.7, maxTokens: 4096 },
-  glm: { label: '智谱AI', labelKey: 'settings.llmProviderGlm', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash', temperature: 0.7, maxTokens: 4096 },
-  custom: { label: '自定义', labelKey: 'settings.llmProviderCustom', baseUrl: '', model: '', temperature: 0.7, maxTokens: 4096 },
+// ============================================================
+// Storage keys
+// ============================================================
+
+const SETTINGS_KEY = 'quantfusion-settings';
+const LLM_PROVIDERS_KEY = 'quantfusion-llm-providers';
+
+// ============================================================
+// Provider-to-Model mapping & base URLs
+// ============================================================
+
+const PROVIDER_MODELS: Record<string, string[]> = {
+  'z-ai': ['default'],
+  deepseek: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'],
+  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'o3-mini', 'o4-mini'],
+  anthropic: ['claude-sonnet-4-20250514', 'claude-3.7-sonnet', 'claude-3.5-haiku'],
+  qwen: ['qwen-plus', 'qwen-turbo', 'qwen-max', 'qwen-plus-latest', 'qwen3-235b-a22b', 'qwen3-32b'],
+  glm: ['glm-4-flash', 'glm-4', 'glm-4-plus', 'glm-4-long', 'glm-4-air'],
 };
+
+const PROVIDER_BASE_URLS: Record<string, string> = {
+  'z-ai': '',  // Built-in SDK, no base URL needed
+  deepseek: 'https://api.deepseek.com/v1',
+  openai: 'https://api.openai.com/v1',
+  anthropic: 'https://api.anthropic.com/v1',
+  qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  glm: 'https://open.bigmodel.cn/api/paas/v4',
+};
+
+function getBaseUrl(provider: string): string {
+  return PROVIDER_BASE_URLS[provider] || '';
+}
+
+// ============================================================
+// Per-Provider Configuration
+// ============================================================
 
 interface ProviderConfig {
   apiKey: string;
   baseUrl: string;
   model: string;
-  temperature: number;
-  maxTokens: number;
-  enabled: boolean;
+  temperature: string;
+  maxTokens: string;
 }
 
-type ConnectionStatus = 'idle' | 'testing' | 'connected' | 'disconnected';
+const CUSTOM_PROVIDER_KEY = '__custom__';
 
-// ==================== Main Component ====================
-export function SettingsView() {
-  const { t, language, setLanguage } = useLanguage();
-  const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
+const LLM_PROVIDERS = [
+  { key: 'z-ai', label: 'Z.ai', isFree: true },
+  { key: 'deepseek', label: 'DeepSeek' },
+  { key: 'openai', label: 'OpenAI' },
+  { key: 'anthropic', label: 'Anthropic' },
+  { key: 'qwen', label: 'Qwen' },
+  { key: 'glm', label: 'GLM' },
+  { key: CUSTOM_PROVIDER_KEY, label: 'Custom' },
+] as const;
 
-  // LLM Config state
-  const [activeProvider, setActiveProvider] = useState('zai');
-  const [providerConfigs, setProviderConfigs] = useState<Record<string, ProviderConfig>>(() => {
-    const initial: Record<string, ProviderConfig> = {};
-    for (const [key, defaults] of Object.entries(PROVIDERS)) {
-      initial[key] = {
-        apiKey: '',
-        baseUrl: defaults.baseUrl,
-        model: defaults.model,
-        temperature: defaults.temperature,
-        maxTokens: defaults.maxTokens,
-        enabled: key === 'zai',
+function getDefaultProviderConfig(providerKey: string): ProviderConfig {
+  const models = PROVIDER_MODELS[providerKey] || [];
+  return {
+    apiKey: providerKey === 'z-ai' ? 'built-in' : '',
+    baseUrl: PROVIDER_BASE_URLS[providerKey] || '',
+    model: models[0] || '',
+    temperature: '0.7',
+    maxTokens: '4096',
+  };
+}
+
+interface AllProviderConfigs {
+  activeProvider: string;
+  providers: Record<string, ProviderConfig>;
+  customProviderName: string;
+}
+
+function getDefaultAllProviderConfigs(): AllProviderConfigs {
+  const providers: Record<string, ProviderConfig> = {};
+  for (const p of LLM_PROVIDERS) {
+    if (p.key !== CUSTOM_PROVIDER_KEY) {
+      providers[p.key] = getDefaultProviderConfig(p.key);
+    }
+  }
+  providers[CUSTOM_PROVIDER_KEY] = {
+    apiKey: '',
+    baseUrl: '',
+    model: '',
+    temperature: '0.7',
+    maxTokens: '4096',
+  };
+  return {
+    activeProvider: 'z-ai',
+    providers,
+    customProviderName: '',
+  };
+}
+
+function loadProviderConfigs(): AllProviderConfigs {
+  if (typeof window === 'undefined') return getDefaultAllProviderConfigs();
+  try {
+    const saved = localStorage.getItem(LLM_PROVIDERS_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const defaults = getDefaultAllProviderConfigs();
+      return {
+        activeProvider: parsed.activeProvider || defaults.activeProvider,
+        providers: { ...defaults.providers, ...parsed.providers },
+        customProviderName: parsed.customProviderName || '',
       };
     }
-    return initial;
+  } catch {
+    // Ignore parse errors
+  }
+  return getDefaultAllProviderConfigs();
+}
+
+function saveProviderConfigs(configs: AllProviderConfigs): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LLM_PROVIDERS_KEY, JSON.stringify(configs));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+// ============================================================
+// Legacy AppSettings (non-LLM fields)
+// ============================================================
+
+interface AppSettings {
+  llmProvider: string;
+  llmModel: string;
+  llmApiKey: string;
+  llmTemperature: string;
+  llmMaxTokens: string;
+  finnhubEnabled: boolean;
+  finnhubToken: string;
+  clsEnabled: boolean;
+  sinaEnabled: boolean;
+  positionSize: string;
+  stopLoss: string;
+  takeProfit: string;
+  cycleDays: string;
+  maxPortfolioRisk: string;
+  maxSinglePosition: string;
+  notifSignalAlerts: boolean;
+  notifPriceAlerts: boolean;
+  notifPositionUpdates: boolean;
+  notifDailyReport: boolean;
+  notifMarketNews: boolean;
+}
+
+const defaultSettings: AppSettings = {
+  llmProvider: 'deepseek',
+  llmModel: 'deepseek-chat',
+  llmApiKey: '',
+  llmTemperature: '0.7',
+  llmMaxTokens: '4096',
+  finnhubEnabled: true,
+  finnhubToken: '',
+  clsEnabled: true,
+  sinaEnabled: true,
+  positionSize: '10',
+  stopLoss: '8',
+  takeProfit: '15',
+  cycleDays: '7',
+  maxPortfolioRisk: '25',
+  maxSinglePosition: '15',
+  notifSignalAlerts: true,
+  notifPriceAlerts: true,
+  notifPositionUpdates: true,
+  notifDailyReport: false,
+  notifMarketNews: true,
+};
+
+function loadSettings(): AppSettings {
+  if (typeof window === 'undefined') return defaultSettings;
+  try {
+    const saved = localStorage.getItem(SETTINGS_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { ...defaultSettings, ...parsed };
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return defaultSettings;
+}
+
+function saveSettings(settings: AppSettings): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+// ============================================================
+// 渠道配置类型
+// ============================================================
+
+interface ChannelConfigField {
+  key: string;
+  label: string;
+  type: 'text' | 'password' | 'url';
+}
+
+interface ChannelInfo {
+  type: string;
+  label: string;
+  configFields: ChannelConfigField[];
+  isEnabled: boolean;
+  savedConfig: Record<string, string>;
+}
+
+export function SettingsView() {
+  const { t, language, setLanguage } = useLanguage();
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [testingLlm, setTestingLlm] = useState<string | null>(null);
+  const [llmTestResults, setLlmTestResults] = useState<Record<string, { success: boolean; error?: string }>>({});
+  const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
+  const [testingFinnhub, setTestingFinnhub] = useState(false);
+  const [finnhubTestResult, setFinnhubTestResult] = useState<{ success: boolean; error?: string } | null>(null);
+
+  // Load settings from localStorage on mount using lazy initializer (fast initial paint)
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    if (typeof window === 'undefined') return defaultSettings;
+    return loadSettings();
   });
-  const [connStatus, setConnStatus] = useState<Record<string, ConnectionStatus>>({});
-  const [connMessage, setConnMessage] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState<Record<string, boolean>>({});
-  const [configLoading, setConfigLoading] = useState(true);
 
-  // Data Sources
-  const [finnhubEnabled, setFinnhubEnabled] = useState(true);
-  const [finnhubToken, setFinnhubToken] = useState('cv1**********************3k');
-  const [clsEnabled, setClsEnabled] = useState(true);
-  const [sinaEnabled, setSinaEnabled] = useState(true);
+  // Per-provider LLM configs
+  const [providerConfigs, setProviderConfigs] = useState<AllProviderConfigs>(() => {
+    if (typeof window === 'undefined') return getDefaultAllProviderConfigs();
+    return loadProviderConfigs();
+  });
 
-  // Trading Parameters
-  const [positionSize, setPositionSize] = useState('10');
-  const [stopLoss, setStopLoss] = useState('8');
-  const [takeProfit, setTakeProfit] = useState('15');
-  const [cycleDays, setCycleDays] = useState('7');
-  const [maxPortfolioRisk, setMaxPortfolioRisk] = useState('25');
-  const [maxSinglePosition, setMaxSinglePosition] = useState('15');
-
-  // Notifications
-  const [notifSignalAlerts, setNotifSignalAlerts] = useState(true);
-  const [notifPriceAlerts, setNotifPriceAlerts] = useState(true);
-  const [notifPositionUpdates, setNotifPositionUpdates] = useState(true);
-  const [notifDailyReport, setNotifDailyReport] = useState(false);
-  const [notifMarketNews, setNotifMarketNews] = useState(true);
-
-  // Load LLM configs on mount
+  // On mount, load LLM settings from server and merge into provider configs
   useEffect(() => {
-    async function loadConfigs() {
+    (async () => {
       try {
         const res = await fetch('/api/settings/llm');
         if (res.ok) {
           const data = await res.json();
-          if (data.success && data.data) {
-            setProviderConfigs(prev => {
-              const updated = { ...prev };
-              for (const [provider, config] of Object.entries(data.data as Record<string, Record<string, string>>)) {
-                if (updated[provider]) {
-                  updated[provider] = {
-                    apiKey: config.apiKey || '',
-                    baseUrl: config.baseUrl || updated[provider].baseUrl,
-                    model: config.model || updated[provider].model,
-                    temperature: parseFloat(config.temperature) || updated[provider].temperature,
-                    maxTokens: parseInt(config.maxTokens) || updated[provider].maxTokens,
-                    enabled: config.enabled === 'true',
-                  };
-                }
-              }
-              return updated;
-            });
-          }
+          const serverProvider = data.provider || 'deepseek';
+          const serverBaseUrl = data.baseUrl || PROVIDER_BASE_URLS[serverProvider] || '';
+          setProviderConfigs(prev => ({
+            ...prev,
+            activeProvider: serverProvider,
+            providers: {
+              ...prev.providers,
+              [serverProvider]: {
+                ...(prev.providers[serverProvider] || getDefaultProviderConfig(serverProvider)),
+                apiKey: data.apiKey || prev.providers[serverProvider]?.apiKey || '',
+                baseUrl: serverBaseUrl || prev.providers[serverProvider]?.baseUrl || PROVIDER_BASE_URLS[serverProvider] || '',
+                model: data.model || prev.providers[serverProvider]?.model || '',
+                temperature: data.temperature != null ? String(data.temperature) : prev.providers[serverProvider]?.temperature || '0.7',
+                maxTokens: data.maxTokens != null ? String(data.maxTokens) : prev.providers[serverProvider]?.maxTokens || '4096',
+              },
+            },
+          }));
+          // Also update legacy settings for backward compat
+          setSettings(prev => ({
+            ...prev,
+            llmProvider: serverProvider,
+            llmModel: data.model || prev.llmModel,
+            llmApiKey: data.apiKey || prev.llmApiKey,
+            llmTemperature: data.temperature != null ? String(data.temperature) : prev.llmTemperature,
+            llmMaxTokens: data.maxTokens != null ? String(data.maxTokens) : prev.llmMaxTokens,
+          }));
         }
       } catch {
-        // Use defaults on error
-      } finally {
-        setConfigLoading(false);
+        // Fallback to localStorage values already loaded
       }
-    }
-    loadConfigs();
+    })();
   }, []);
 
-  const updateProviderConfig = useCallback((provider: string, field: keyof ProviderConfig, value: string | number | boolean) => {
+  // On mount, load data source settings from server
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/settings/data-sources');
+        if (res.ok) {
+          const data = await res.json();
+          setSettings(prev => ({
+            ...prev,
+            finnhubToken: data.finnhubApiKey || prev.finnhubToken,
+            finnhubEnabled: data.finnhubEnabled !== undefined ? data.finnhubEnabled : prev.finnhubEnabled,
+            sinaEnabled: data.sinaEnabled !== undefined ? data.sinaEnabled : prev.sinaEnabled,
+            clsEnabled: data.clsEnabled !== undefined ? data.clsEnabled : prev.clsEnabled,
+          }));
+        }
+      } catch {
+        // fallback to localStorage
+      }
+    })();
+  }, []);
+
+  // 渠道配置状态
+  const [channels, setChannels] = useState<ChannelInfo[]>([]);
+  const [channelsLoading, setChannelsLoading] = useState(true);
+  const [testingChannel, setTestingChannel] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, { success: boolean; error?: string }>>({});
+  const [channelConfigEdits, setChannelConfigEdits] = useState<Record<string, Record<string, string>>>({});
+  const [channelSaving, setChannelSaving] = useState<string | null>(null);
+
+  // Destructure for convenience
+  const finnhubEnabled = settings.finnhubEnabled;
+  const finnhubToken = settings.finnhubToken;
+  const clsEnabled = settings.clsEnabled;
+  const sinaEnabled = settings.sinaEnabled;
+  const positionSize = settings.positionSize;
+  const stopLoss = settings.stopLoss;
+  const takeProfit = settings.takeProfit;
+  const cycleDays = settings.cycleDays;
+  const maxPortfolioRisk = settings.maxPortfolioRisk;
+  const maxSinglePosition = settings.maxSinglePosition;
+  const notifSignalAlerts = settings.notifSignalAlerts;
+  const notifPriceAlerts = settings.notifPriceAlerts;
+  const notifPositionUpdates = settings.notifPositionUpdates;
+  const notifDailyReport = settings.notifDailyReport;
+  const notifMarketNews = settings.notifMarketNews;
+
+  // ============================================================
+  // Per-Provider Config helpers
+  // ============================================================
+
+  const getActiveConfig = useCallback((): ProviderConfig => {
+    return providerConfigs.providers[providerConfigs.activeProvider] || getDefaultProviderConfig(providerConfigs.activeProvider);
+  }, [providerConfigs]);
+
+  const updateProviderConfig = useCallback((providerKey: string, field: keyof ProviderConfig, value: string) => {
+    setProviderConfigs(prev => {
+      const existing = prev.providers[providerKey] || getDefaultProviderConfig(providerKey);
+      return {
+        ...prev,
+        providers: {
+          ...prev.providers,
+          [providerKey]: { ...existing, [field]: value },
+        },
+      };
+    });
+    setSaved(false);
+  }, []);
+
+  const setActiveProvider = useCallback((providerKey: string) => {
     setProviderConfigs(prev => ({
       ...prev,
-      [provider]: { ...prev[provider], [field]: value },
+      activeProvider: providerKey,
     }));
+    setSettings(prev => ({
+      ...prev,
+      llmProvider: providerKey,
+    }));
+    setSaved(false);
   }, []);
 
-  const handleSaveConfig = async (provider: string) => {
-    setSaving(prev => ({ ...prev, [provider]: true }));
+  // ============================================================
+  // Settings update (non-LLM)
+  // ============================================================
+
+  const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
+    setSaved(false);
+  };
+
+  /** Save active provider config to server + all configs to localStorage */
+  const handleSaveLlm = async () => {
+    setSaving(true);
     try {
-      const config = providerConfigs[provider];
-
-      // When enabling this provider, disable all others
-      if (config.enabled) {
-        // Disable all other providers in the UI state
-        setProviderConfigs(prev => {
-          const updated = { ...prev };
-          for (const key of Object.keys(updated)) {
-            if (key !== provider) {
-              updated[key] = { ...updated[key], enabled: false };
-            }
-          }
-          return updated;
-        });
-
-        // Disable all other providers in the backend
-        for (const otherProvider of Object.keys(PROVIDERS)) {
-          if (otherProvider !== provider) {
-            await fetch('/api/settings/llm', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ provider: otherProvider, enabled: false }),
-            });
-          }
-        }
-      }
-
+      const activeConfig = getActiveConfig();
+      const activeProvider = providerConfigs.activeProvider;
+      const isBuiltIn = activeProvider === 'z-ai';
+      // Save to server DB (active provider only)
       const res = await fetch('/api/settings/llm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          provider,
-          apiKey: config.apiKey,
-          baseUrl: config.baseUrl,
-          model: config.model,
-          temperature: config.temperature,
-          maxTokens: config.maxTokens,
-          enabled: config.enabled,
+          provider: activeProvider,
+          apiKey: isBuiltIn ? '' : activeConfig.apiKey,
+          baseUrl: isBuiltIn ? '' : (activeConfig.baseUrl || getBaseUrl(activeProvider)),
+          model: activeConfig.model,
+          temperature: parseFloat(activeConfig.temperature),
+          maxTokens: parseInt(activeConfig.maxTokens, 10),
+          enabled: true,
         }),
       });
-      const data = await res.json();
-      if (data.success) {
-        toast.success(t('settings.llmConfigSaved'));
+      if (res.ok) {
+        toast.success(language === 'zh' ? '设置已保存' : 'Settings saved successfully');
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
       } else {
-        toast.error(data.error || t('settings.llmConfigSaveFailed'));
+        toast.error(language === 'zh' ? '保存失败' : 'Failed to save settings');
       }
+      // Save all provider configs to localStorage
+      saveProviderConfigs(providerConfigs);
+      // Also update legacy settings
+      setSettings(prev => ({
+        ...prev,
+        llmProvider: activeProvider,
+        llmModel: activeConfig.model,
+        llmApiKey: activeConfig.apiKey,
+        llmTemperature: activeConfig.temperature,
+        llmMaxTokens: activeConfig.maxTokens,
+      }));
+      saveSettings(settings);
     } catch {
-      toast.error(t('settings.llmConfigSaveFailed'));
+      toast.error(language === 'zh' ? '网络错误' : 'Network error');
+      saveProviderConfigs(providerConfigs);
+      saveSettings(settings);
     } finally {
-      setSaving(prev => ({ ...prev, [provider]: false }));
+      setSaving(false);
     }
   };
 
-  const handleTestConnection = async (provider: string) => {
-    setConnStatus(prev => ({ ...prev, [provider]: 'testing' }));
-    setConnMessage(prev => ({ ...prev, [provider]: '' }));
+  /** Test LLM connection for a specific provider */
+  const handleTestLlm = async (providerKey: string) => {
+    const config = providerConfigs.providers[providerKey] || getDefaultProviderConfig(providerKey);
+    setTestingLlm(providerKey);
+    setLlmTestResults(prev => {
+      const next = { ...prev };
+      delete next[providerKey];
+      return next;
+    });
     try {
-      const config = providerConfigs[provider];
       const res = await fetch('/api/settings/llm/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          provider,
-          apiKey: config.apiKey,
-          baseUrl: config.baseUrl,
+          provider: providerKey === CUSTOM_PROVIDER_KEY ? 'openai' : providerKey,
+          apiKey: providerKey === 'z-ai' ? '' : config.apiKey,
+          baseUrl: config.baseUrl || getBaseUrl(providerKey),
           model: config.model,
         }),
       });
       const data = await res.json();
+      setLlmTestResults(prev => ({
+        ...prev,
+        [providerKey]: { success: data.success, error: data.error },
+      }));
       if (data.success) {
-        setConnStatus(prev => ({ ...prev, [provider]: 'connected' }));
-        setConnMessage(prev => ({ ...prev, [provider]: data.message }));
-        toast.success(t('settings.llmConnSuccess'));
+        toast.success(language === 'zh' ? '连接测试成功！' : 'Connection test passed!');
       } else {
-        setConnStatus(prev => ({ ...prev, [provider]: 'disconnected' }));
-        setConnMessage(prev => ({ ...prev, [provider]: data.message }));
-        toast.error(t('settings.llmConnFailed'));
+        toast.error(language === 'zh' ? `连接测试失败: ${data.error}` : `Connection test failed: ${data.error}`);
       }
     } catch {
-      setConnStatus(prev => ({ ...prev, [provider]: 'disconnected' }));
-      setConnMessage(prev => ({ ...prev, [provider]: '网络错误' }));
-      toast.error(t('settings.llmConnFailed'));
+      setLlmTestResults(prev => ({
+        ...prev,
+        [providerKey]: { success: false, error: 'Network error' },
+      }));
+      toast.error(language === 'zh' ? '网络错误' : 'Network error');
+    } finally {
+      setTestingLlm(null);
     }
   };
 
-  const handleSave = async () => {
-    setSaving(prev => ({ ...prev, _general: true }));
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setSaving(prev => ({ ...prev, _general: false }));
-    toast.success(language === 'zh' ? '设置已保存' : 'Settings saved successfully');
+  /** Save non-LLM settings */
+  const handleSaveGeneral = async () => {
+    setSaving(true);
+    try {
+      saveSettings(settings);
+      toast.success(language === 'zh' ? '设置已保存' : 'Settings saved successfully');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      toast.error(language === 'zh' ? '保存失败' : 'Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const currentConfig = providerConfigs[activeProvider];
-  const currentStatus = connStatus[activeProvider] || 'idle';
-  const currentMessage = connMessage[activeProvider] || '';
-  const currentSaving = saving[activeProvider] || false;
+  /** Save data source settings to server */
+  const handleSaveDataSources = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/settings/data-sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          finnhubApiKey: settings.finnhubToken,
+          finnhubEnabled: settings.finnhubEnabled,
+          sinaEnabled: settings.sinaEnabled,
+          clsEnabled: settings.clsEnabled,
+        }),
+      });
+      if (res.ok) {
+        saveSettings(settings); // also save to localStorage as backup
+        toast.success(language === 'zh' ? '设置已保存' : 'Settings saved successfully');
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      } else {
+        toast.error(language === 'zh' ? '保存失败' : 'Failed to save settings');
+      }
+    } catch {
+      toast.error(language === 'zh' ? '网络错误' : 'Network error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** Test Finnhub connectivity */
+  const handleTestFinnhub = async () => {
+    if (!settings.finnhubToken) {
+      toast.error(language === 'zh' ? '请先输入 Finnhub API Token' : 'Please enter Finnhub API Token first');
+      return;
+    }
+    setTestingFinnhub(true);
+    setFinnhubTestResult(null);
+    try {
+      const res = await fetch('/api/settings/data-sources/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: settings.finnhubToken }),
+      });
+      const data = await res.json();
+      setFinnhubTestResult(data);
+      if (data.success) {
+        toast.success(language === 'zh' ? 'Finnhub 连接测试成功！' : 'Finnhub connection test passed!');
+      } else {
+        toast.error(language === 'zh' ? `连接测试失败: ${data.error}` : `Connection test failed: ${data.error}`);
+      }
+    } catch {
+      setFinnhubTestResult({ success: false, error: 'Network error' });
+      toast.error(language === 'zh' ? '网络错误' : 'Network error');
+    } finally {
+      setTestingFinnhub(false);
+    }
+  };
+
+  // ============================================================
+  // 渠道配置相关
+  // ============================================================
+
+  const fetchChannels = useCallback(async () => {
+    setChannelsLoading(true);
+    try {
+      const res = await fetch('/api/fusion/notifications/channels');
+      if (res.ok) {
+        const data = await res.json();
+        setChannels(data.channels || []);
+        const edits: Record<string, Record<string, string>> = {};
+        for (const ch of data.channels || []) {
+          edits[ch.type] = { ...ch.savedConfig };
+        }
+        setChannelConfigEdits(edits);
+      }
+    } catch {
+      // 使用默认空列表
+    } finally {
+      setChannelsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchChannels();
+  }, [fetchChannels]);
+
+  /** 保存渠道配置 */
+  const saveChannelConfig = async (channelType: string) => {
+    setChannelSaving(channelType);
+    try {
+      const config = channelConfigEdits[channelType] || {};
+      const channel = channels.find(c => c.type === channelType);
+      const res = await fetch(`/api/fusion/notifications/channels/${channelType}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          config,
+          isEnabled: channel?.isEnabled ?? true,
+        }),
+      });
+      if (res.ok) {
+        toast.success(
+          language === 'zh'
+            ? `${channel?.label || channelType} 配置已保存`
+            : `${channel?.label || channelType} configuration saved`
+        );
+        fetchChannels();
+      } else {
+        toast.error(language === 'zh' ? '保存失败' : 'Failed to save');
+      }
+    } catch {
+      toast.error(language === 'zh' ? '网络错误' : 'Network error');
+    } finally {
+      setChannelSaving(null);
+    }
+  };
+
+  /** 切换渠道启用状态 */
+  const toggleChannelEnabled = async (channelType: string, isEnabled: boolean) => {
+    try {
+      const config = channelConfigEdits[channelType] || {};
+      const res = await fetch(`/api/fusion/notifications/channels/${channelType}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config, isEnabled }),
+      });
+      if (res.ok) {
+        setChannels(prev =>
+          prev.map(ch => ch.type === channelType ? { ...ch, isEnabled } : ch)
+        );
+      }
+    } catch {
+      // Ignore
+    }
+  };
+
+  /** 测试渠道连通性 */
+  const testChannel = async (channelType: string) => {
+    setTestingChannel(channelType);
+    try {
+      const res = await fetch(`/api/fusion/notifications/test/${channelType}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: channelConfigEdits[channelType] || {} }),
+      });
+      const data = await res.json();
+      setTestResults(prev => ({
+        ...prev,
+        [channelType]: { success: data.success, error: data.error },
+      }));
+      if (data.success) {
+        toast.success(
+          language === 'zh'
+            ? `${data.channelLabel} 连通测试成功！`
+            : `${data.channelLabel} connectivity test passed!`
+        );
+      } else {
+        toast.error(
+          language === 'zh'
+            ? `${data.channelLabel} 连通测试失败: ${data.error}`
+            : `${data.channelLabel} test failed: ${data.error}`
+        );
+      }
+    } catch {
+      setTestResults(prev => ({
+        ...prev,
+        [channelType]: { success: false, error: 'Network error' },
+      }));
+      toast.error(language === 'zh' ? '网络错误' : 'Network error');
+    } finally {
+      setTestingChannel(null);
+    }
+  };
+
+  /** 更新渠道配置编辑 */
+  const updateChannelConfigEdit = (channelType: string, key: string, value: string) => {
+    setChannelConfigEdits(prev => ({
+      ...prev,
+      [channelType]: {
+        ...(prev[channelType] || {}),
+        [key]: value,
+      },
+    }));
+  };
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -258,464 +808,314 @@ export function SettingsView() {
         <TabsList className="bg-[#111118] border border-[#1e1e2e]">
           <TabsTrigger value="llm" className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-400">
             <Cpu className="w-3.5 h-3.5 mr-1.5" />
-            大模型
+            LLM
           </TabsTrigger>
           <TabsTrigger value="data" className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-400">
             <Database className="w-3.5 h-3.5 mr-1.5" />
-            数据
+            Data
           </TabsTrigger>
           <TabsTrigger value="trading" className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-400">
             <Settings className="w-3.5 h-3.5 mr-1.5" />
-            交易
+            Trading
           </TabsTrigger>
           <TabsTrigger value="notifications" className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-400">
             <Bell className="w-3.5 h-3.5 mr-1.5" />
-            提醒
+            Alerts
           </TabsTrigger>
           <TabsTrigger value="system" className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-400">
             <Server className="w-3.5 h-3.5 mr-1.5" />
-            系统
+            System
           </TabsTrigger>
         </TabsList>
 
-        {/* ============ LLM Configuration ============ */}
-        <TabsContent value="llm" className="space-y-4">
-          {configLoading ? (
-            <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-              <CardContent className="flex items-center justify-center py-12">
-                <Loader2 className="w-5 h-5 text-emerald-400 animate-spin mr-2" />
-                <span className="text-zinc-400 text-sm">{t('settings.llmLoading')}</span>
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              {/* Provider Tab Bar */}
-              <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
-                {Object.entries(PROVIDERS).map(([key, provider]) => (
-                  <button
-                    key={key}
-                    onClick={() => setActiveProvider(key)}
-                    className={`
-                      flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all
-                      ${activeProvider === key
-                        ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-600/30'
-                        : 'bg-[#111118] text-zinc-400 border border-[#1e1e2e] hover:bg-[#1a1a2e] hover:text-zinc-300'
-                      }
-                    `}
-                  >
-                    {provider.isFree && (
-                      <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-600/30 text-[9px] px-1 py-0 mr-0.5">
-                        {t('settings.llmFreeBadge')}
-                      </Badge>
-                    )}
-                    {t(provider.labelKey)}
-                  </button>
-                ))}
+        {/* LLM Configuration — Per-Provider Tabs */}
+        <TabsContent value="llm" className="space-y-6">
+          <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-5 h-5 text-emerald-400" />
+                <CardTitle className="text-base font-semibold text-white">{t('settings.llmConfig')}</CardTitle>
               </div>
+            </CardHeader>
+            <CardContent>
+              {/* Inner per-provider tabs */}
+              <Tabs
+                value={providerConfigs.activeProvider}
+                onValueChange={(v) => setActiveProvider(v)}
+                className="space-y-4"
+              >
+                <TabsList className="bg-[#0a0a0f] border border-[#1e1e2e] w-full flex flex-wrap h-auto gap-1 p-1">
+                  {LLM_PROVIDERS.map((p) => (
+                    <TabsTrigger
+                      key={p.key}
+                      value={p.key}
+                      className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-400 text-xs px-2.5 py-1.5 flex items-center gap-1.5"
+                    >
+                      {p.key === providerConfigs.activeProvider && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                      )}
+                      {p.key === CUSTOM_PROVIDER_KEY
+                        ? (language === 'zh' ? '自定义' : 'Custom')
+                        : p.label}
+                      {'isFree' in p && p.isFree && (
+                        <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[8px] px-1 py-0 leading-tight">
+                          {language === 'zh' ? '免费' : 'Free'}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
 
-              {/* ZAI — Built-in Free Model */}
-              {activeProvider === 'zai' && (
-                <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-5 h-5 text-emerald-400" />
-                      <CardTitle className="text-base font-semibold text-white">{t('settings.llmZaiTitle')}</CardTitle>
-                      <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[10px]">✅ {t('settings.llmFreeBadge')}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Free model info */}
-                    <div className="p-4 bg-emerald-600/5 border border-emerald-600/10 rounded-lg space-y-3">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                        <span className="text-sm text-white font-medium">{t('settings.llmZaiDesc')}</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-zinc-400">
-                        <span className="flex items-center gap-1"><Cpu className="w-3 h-3" /> {t('settings.llmZaiModel')}</span>
-                        <span className="flex items-center gap-1"><Shield className="w-3 h-3" /> {t('settings.llmNoApiKey')}</span>
-                      </div>
-                    </div>
+    {LLM_PROVIDERS.map((p) => {
+                  const config = providerConfigs.providers[p.key] || getDefaultProviderConfig(p.key);
+                  const models = PROVIDER_MODELS[p.key] || [];
+                  const isCustom = p.key === CUSTOM_PROVIDER_KEY;
+                  const isBuiltIn = p.key === 'z-ai';
+                  const testResult = llmTestResults[p.key];
+                  const isTesting = testingLlm === p.key;
+                  const showKey = showApiKeys[p.key] || false;
+                  // Check if current model is a custom model (not in the preset list)
+                  const isCustomModel = config.model && models.length > 0 && !models.includes(config.model);
 
-                    {/* Model info fields (read-only) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-zinc-300 text-sm">{t('settings.llmModelName')}</Label>
-                        <Input
-                          value={currentConfig.model}
-                          readOnly
-                          className="bg-[#0a0a0f] border-[#1e1e2e] text-zinc-400"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-zinc-300 text-sm">{t('settings.llmTemperature')}</Label>
-                        <div className="flex items-center gap-3">
-                          <Slider
-                            value={[currentConfig.temperature]}
-                            min={0}
-                            max={2}
-                            step={0.1}
-                            onValueChange={([v]) => updateProviderConfig('zai', 'temperature', v)}
-                            className="flex-1"
-                          />
-                          <span className="text-xs text-zinc-400 w-8 text-right">{currentConfig.temperature.toFixed(1)}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-zinc-300 text-sm">{t('settings.llmMaxTokens')}</Label>
-                        <Input
-                          type="number"
-                          value={currentConfig.maxTokens}
-                          onChange={(e) => updateProviderConfig('zai', 'maxTokens', parseInt(e.target.value) || 4096)}
-                          className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-zinc-300 text-sm">{t('settings.llmConnStatus')}</Label>
-                        <div className="flex items-center gap-2">
-                          {currentStatus === 'connected' ? (
-                            <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20">
-                              <Wifi className="w-3 h-3 mr-1" /> {t('settings.llmConnected')}
-                            </Badge>
-                          ) : currentStatus === 'disconnected' ? (
-                            <Badge className="bg-red-600/15 text-red-400 border-red-600/20">
-                              <WifiOff className="w-3 h-3 mr-1" /> {t('settings.llmDisconnected')}
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-zinc-600/15 text-zinc-400 border-zinc-600/20">
-                              <WifiOff className="w-3 h-3 mr-1" /> {t('settings.llmDisconnected')}
-                            </Badge>
-                          )}
-                          {currentMessage && (
-                            <span className="text-[10px] text-zinc-500 truncate max-w-[150px]">{currentMessage}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <Button
-                        onClick={() => handleTestConnection('zai')}
-                        disabled={currentStatus === 'testing'}
-                        variant="outline"
-                        className="border-emerald-600/30 bg-emerald-600/5 text-emerald-400 hover:bg-emerald-600/10 gap-2"
-                      >
-                        {currentStatus === 'testing' ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Wifi className="w-4 h-4" />
+                  return (
+                    <TabsContent key={p.key} value={p.key} className="space-y-4">
+                      {/* Provider name badge + active indicator */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[10px]">
+                          {isCustom
+                            ? (language === 'zh' ? '自定义提供商' : 'Custom Provider')
+                            : isBuiltIn
+                              ? 'Z.ai'
+                              : p.label}
+                        </Badge>
+                        {isBuiltIn && (
+                          <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px]">
+                            {language === 'zh' ? '免费内置' : 'Free Built-in'}
+                          </Badge>
                         )}
-                        {currentStatus === 'testing' ? t('settings.llmTesting') : t('settings.llmTestConn')}
-                      </Button>
-                      <Button
-                        onClick={() => handleSaveConfig('zai')}
-                        disabled={currentSaving}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
-                      >
-                        <Save className="w-4 h-4" />
-                        {currentSaving ? t('settings.saving') : t('settings.llmSaveConfig')}
-                      </Button>
-                    </div>
+                        {p.key === providerConfigs.activeProvider && (
+                          <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px]">
+                            {language === 'zh' ? '当前使用' : 'Active'}
+                          </Badge>
+                        )}
+                      </div>
 
-                    <div className="flex items-center gap-2 p-3 bg-emerald-600/5 border border-emerald-600/10 rounded-lg">
-                      <Shield className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                      <p className="text-xs text-zinc-400">{t('settings.apiKeySecure')}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                      {/* z-ai info banner */}
+                      {isBuiltIn && (
+                        <div className="flex items-center gap-2 p-3 bg-emerald-600/5 border border-emerald-600/10 rounded-lg">
+                          <Cpu className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <p className="text-xs text-zinc-400">
+                            {language === 'zh'
+                              ? 'Z.ai 是内置的免费 AI 服务，无需配置 API Key 即可使用。所有 AI 分析功能默认使用此服务。'
+                              : 'Z.ai is a built-in free AI service. No API key needed. All AI analysis features use this by default.'}
+                          </p>
+                        </div>
+                      )}
 
-              {/* Other Provider Config Cards */}
-              {activeProvider !== 'zai' && activeProvider !== 'custom' && (
-                <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      <Cpu className="w-5 h-5 text-emerald-400" />
-                      <CardTitle className="text-base font-semibold text-white">
-                        {t(PROVIDERS[activeProvider].labelKey)} {t('settings.llmConfig')}
-                      </CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* API Key */}
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300 text-sm">{t('settings.llmApiKey')}</Label>
-                      <div className="flex items-center gap-2">
-                        <div className="relative flex-1">
+                      {/* Custom provider name input */}
+                      {isCustom && (
+                        <div className="space-y-2">
+                          <Label className="text-zinc-300 text-sm">
+                            {language === 'zh' ? '提供商名称' : 'Provider Name'}
+                          </Label>
                           <Input
-                            type={showApiKey[activeProvider] ? 'text' : 'password'}
-                            value={currentConfig.apiKey}
-                            onChange={(e) => updateProviderConfig(activeProvider, 'apiKey', e.target.value)}
-                            placeholder={t('settings.llmApiKeyPlaceholder')}
-                            className="bg-[#0a0a0f] border-[#1e1e2e] text-white pr-10"
+                            type="text"
+                            placeholder={language === 'zh' ? '例如: My Provider' : 'e.g. My Provider'}
+                            value={providerConfigs.customProviderName}
+                            onChange={(e) =>
+                              setProviderConfigs(prev => ({
+                                ...prev,
+                                customProviderName: e.target.value,
+                              }))
+                            }
+                            className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
                           />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowApiKey(prev => ({ ...prev, [activeProvider]: !prev[activeProvider] }))}
-                            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-zinc-500 hover:text-white"
-                          >
-                            {showApiKey[activeProvider] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </Button>
                         </div>
-                      </div>
-                    </div>
+                      )}
 
-                    {/* Base URL */}
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300 text-sm">{t('settings.llmBaseUrl')}</Label>
-                      <Input
-                        type="text"
-                        value={currentConfig.baseUrl}
-                        onChange={(e) => updateProviderConfig(activeProvider, 'baseUrl', e.target.value)}
-                        placeholder={t('settings.llmBaseUrlPlaceholder')}
-                        className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
-                      />
-                    </div>
+                      {/* API Key — hidden for z-ai */}
+                      {!isBuiltIn && (
+                        <div className="space-y-2">
+                          <Label className="text-zinc-300 text-sm">{t('settings.llmApiKey')}</Label>
+                          <div className="relative">
+                            <Input
+                              type={showKey ? 'text' : 'password'}
+                              value={config.apiKey}
+                              onChange={(e) => updateProviderConfig(p.key, 'apiKey', e.target.value)}
+                              className="bg-[#0a0a0f] border-[#1e1e2e] text-white pr-10"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                setShowApiKeys(prev => ({ ...prev, [p.key]: !prev[p.key] }))
+                              }
+                              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-zinc-500 hover:text-white"
+                            >
+                              {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
 
-                    {/* Model Name */}
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300 text-sm">{t('settings.llmModelName')}</Label>
-                      <Input
-                        type="text"
-                        value={currentConfig.model}
-                        onChange={(e) => updateProviderConfig(activeProvider, 'model', e.target.value)}
-                        placeholder={t('settings.llmModelPlaceholder')}
-                        className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
-                      />
-                    </div>
-
-                    {/* Temperature */}
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300 text-sm">{t('settings.llmTemperature')}</Label>
-                      <div className="flex items-center gap-3">
-                        <Slider
-                          value={[currentConfig.temperature]}
-                          min={0}
-                          max={2}
-                          step={0.1}
-                          onValueChange={([v]) => updateProviderConfig(activeProvider, 'temperature', v)}
-                          className="flex-1"
-                        />
-                        <span className="text-xs text-zinc-400 w-8 text-right">{currentConfig.temperature.toFixed(1)}</span>
-                      </div>
-                    </div>
-
-                    {/* Max Tokens */}
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300 text-sm">{t('settings.llmMaxTokens')}</Label>
-                      <Input
-                        type="number"
-                        value={currentConfig.maxTokens}
-                        onChange={(e) => updateProviderConfig(activeProvider, 'maxTokens', parseInt(e.target.value) || 4096)}
-                        className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
-                      />
-                    </div>
-
-                    {/* Connection Status */}
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300 text-sm">{t('settings.llmConnStatus')}</Label>
-                      <div className="flex items-center gap-2">
-                        {currentStatus === 'connected' ? (
-                          <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20">
-                            <Wifi className="w-3 h-3 mr-1" /> {t('settings.llmConnected')}
-                          </Badge>
-                        ) : currentStatus === 'disconnected' ? (
-                          <Badge className="bg-red-600/15 text-red-400 border-red-600/20">
-                            <WifiOff className="w-3 h-3 mr-1" /> {t('settings.llmDisconnected')}
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-zinc-600/15 text-zinc-400 border-zinc-600/20">
-                            <WifiOff className="w-3 h-3 mr-1" /> {t('settings.llmDisconnected')}
-                          </Badge>
-                        )}
-                        {currentMessage && (
-                          <span className="text-[10px] text-zinc-500 truncate max-w-[200px]">{currentMessage}</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-3">
-                      <Button
-                        onClick={() => handleTestConnection(activeProvider)}
-                        disabled={currentStatus === 'testing'}
-                        variant="outline"
-                        className="border-emerald-600/30 bg-emerald-600/5 text-emerald-400 hover:bg-emerald-600/10 gap-2"
-                      >
-                        {currentStatus === 'testing' ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Wifi className="w-4 h-4" />
-                        )}
-                        {currentStatus === 'testing' ? t('settings.llmTesting') : t('settings.llmTestConn')}
-                      </Button>
-                      <Button
-                        onClick={() => handleSaveConfig(activeProvider)}
-                        disabled={currentSaving}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
-                      >
-                        <Save className="w-4 h-4" />
-                        {currentSaving ? t('settings.saving') : t('settings.llmSaveConfig')}
-                      </Button>
-                    </div>
-
-                    <div className="flex items-center gap-2 p-3 bg-emerald-600/5 border border-emerald-600/10 rounded-lg">
-                      <Shield className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                      <p className="text-xs text-zinc-400">{t('settings.apiKeySecure')}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Custom Provider Config Card */}
-              {activeProvider === 'custom' && (
-                <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      <Cpu className="w-5 h-5 text-emerald-400" />
-                      <CardTitle className="text-base font-semibold text-white">
-                        {t('settings.llmProviderCustom')} {t('settings.llmConfig')}
-                      </CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* API Key */}
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300 text-sm">{t('settings.llmApiKey')}</Label>
-                      <div className="flex items-center gap-2">
-                        <div className="relative flex-1">
+                      {/* Base URL — hidden for z-ai */}
+                      {!isBuiltIn && (
+                        <div className="space-y-2">
+                          <Label className="text-zinc-300 text-sm">Base URL</Label>
                           <Input
-                            type={showApiKey[activeProvider] ? 'text' : 'password'}
-                            value={currentConfig.apiKey}
-                            onChange={(e) => updateProviderConfig(activeProvider, 'apiKey', e.target.value)}
-                            placeholder={t('settings.llmApiKeyPlaceholder')}
-                            className="bg-[#0a0a0f] border-[#1e1e2e] text-white pr-10"
+                            type="text"
+                            placeholder={PROVIDER_BASE_URLS[p.key] || 'https://api.example.com/v1'}
+                            value={config.baseUrl}
+                            onChange={(e) => updateProviderConfig(p.key, 'baseUrl', e.target.value)}
+                            className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
                           />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowApiKey(prev => ({ ...prev, [activeProvider]: !prev[activeProvider] }))}
-                            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-zinc-500 hover:text-white"
-                          >
-                            {showApiKey[activeProvider] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </Button>
+                          {!isCustom && PROVIDER_BASE_URLS[p.key] && (
+                            <p className="text-[10px] text-zinc-500">
+                              {language === 'zh' ? '默认: ' : 'Default: '}{PROVIDER_BASE_URLS[p.key]}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Model selector — combo: suggestions + custom input */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-zinc-300 text-sm">{t('settings.llmModel')}</Label>
+                          {models.length > 0 && (
+                            <span className="text-[10px] text-zinc-500">
+                              {language === 'zh' ? '可从列表选择或自行输入' : 'Select from list or type custom'}
+                            </span>
+                          )}
+                        </div>
+                        {models.length > 0 ? (
+                          <div className="space-y-2">
+                            <Select
+                              value={isCustomModel ? '__custom__' : config.model}
+                              onValueChange={(v) => {
+                                if (v === '__custom__') {
+                                  // Switch to custom mode — clear model to let user type
+                                  updateProviderConfig(p.key, 'model', '');
+                                } else {
+                                  updateProviderConfig(p.key, 'model', v);
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="bg-[#0a0a0f] border-[#1e1e2e] text-white">
+                                <SelectValue placeholder={isCustomModel ? config.model : undefined} />
+                              </SelectTrigger>
+                              <SelectContent className="bg-[#111118] border-[#1e1e2e]">
+                                {models.map((m) => (
+                                  <SelectItem key={m} value={m} className="text-zinc-300">{m}</SelectItem>
+                                ))}
+                                <SelectItem value="__custom__" className="text-emerald-400">
+                                  ✏️ {language === 'zh' ? '自定义模型...' : 'Custom model...'}
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {/* Show custom input when user selected custom or already has custom model */}
+                            {(isCustomModel || config.model === '' || (models.length > 0 && !models.includes(config.model))) && (
+                              <Input
+                                type="text"
+                                placeholder={language === 'zh' ? '输入自定义模型名称' : 'Enter custom model name'}
+                                value={config.model}
+                                onChange={(e) => updateProviderConfig(p.key, 'model', e.target.value)}
+                                className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
+                              />
+                            )}
+                          </div>
+                        ) : (
+                          <Input
+                            type="text"
+                            placeholder={language === 'zh' ? '输入模型名称' : 'Enter model name'}
+                            value={config.model}
+                            onChange={(e) => updateProviderConfig(p.key, 'model', e.target.value)}
+                            className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
+                          />
+                        )}
+                      </div>
+
+                      {/* Temperature & Max Tokens */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-zinc-300 text-sm">{t('settings.llmTemperature')}</Label>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="2"
+                            value={config.temperature}
+                            onChange={(e) => updateProviderConfig(p.key, 'temperature', e.target.value)}
+                            className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-zinc-300 text-sm">{t('settings.llmMaxTokens')}</Label>
+                          <Input
+                            type="number"
+                            value={config.maxTokens}
+                            onChange={(e) => updateProviderConfig(p.key, 'maxTokens', e.target.value)}
+                            className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
+                          />
                         </div>
                       </div>
-                    </div>
 
-                    {/* Base URL */}
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300 text-sm">{t('settings.llmBaseUrl')}</Label>
-                      <Input
-                        type="text"
-                        value={currentConfig.baseUrl}
-                        onChange={(e) => updateProviderConfig(activeProvider, 'baseUrl', e.target.value)}
-                        placeholder="https://api.example.com/v1"
-                        className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
-                      />
-                    </div>
+                      {/* Security note */}
+                      {!isBuiltIn && (
+                        <div className="flex items-center gap-2 p-3 bg-emerald-600/5 border border-emerald-600/10 rounded-lg">
+                          <Shield className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <p className="text-xs text-zinc-400">{t('settings.apiKeySecure')}</p>
+                        </div>
+                      )}
 
-                    {/* Model Name */}
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300 text-sm">{t('settings.llmModelName')}</Label>
-                      <Input
-                        type="text"
-                        value={currentConfig.model}
-                        onChange={(e) => updateProviderConfig(activeProvider, 'model', e.target.value)}
-                        placeholder={t('settings.llmModelPlaceholder')}
-                        className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
-                      />
-                    </div>
+                      {/* Test result */}
+                      {testResult && (
+                        <div className={`flex items-center gap-2 p-3 rounded-lg ${
+                          testResult.success
+                            ? 'bg-emerald-600/5 border border-emerald-600/10'
+                            : 'bg-red-600/5 border border-red-600/10'
+                        }`}>
+                          {testResult.success
+                            ? <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                            : <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                          }
+                          <p className={`text-xs ${testResult.success ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {testResult.success
+                              ? (language === 'zh' ? '连接测试成功' : 'Connection test passed')
+                              : (language === 'zh' ? `连接失败: ${testResult.error}` : `Failed: ${testResult.error}`)
+                            }
+                          </p>
+                        </div>
+                      )}
 
-                    {/* Temperature */}
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300 text-sm">{t('settings.llmTemperature')}</Label>
+                      {/* Action buttons */}
                       <div className="flex items-center gap-3">
-                        <Slider
-                          value={[currentConfig.temperature]}
-                          min={0}
-                          max={2}
-                          step={0.1}
-                          onValueChange={([v]) => updateProviderConfig(activeProvider, 'temperature', v)}
-                          className="flex-1"
-                        />
-                        <span className="text-xs text-zinc-400 w-8 text-right">{currentConfig.temperature.toFixed(1)}</span>
+                        <Button
+                          onClick={handleSaveLlm}
+                          disabled={saving}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                        >
+                          {saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                          {saved ? (language === 'zh' ? '已保存' : 'Saved') : saving ? t('settings.saving') : t('settings.saveParams')}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleTestLlm(p.key)}
+                          disabled={isTesting || (!isBuiltIn && !config.apiKey)}
+                          className="border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-[#1a1a2e] hover:text-white gap-2"
+                        >
+                          {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                          {isTesting ? (language === 'zh' ? '测试中...' : 'Testing...') : (language === 'zh' ? '测试连接' : 'Test Connection')}
+                        </Button>
                       </div>
-                    </div>
-
-                    {/* Max Tokens */}
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300 text-sm">{t('settings.llmMaxTokens')}</Label>
-                      <Input
-                        type="number"
-                        value={currentConfig.maxTokens}
-                        onChange={(e) => updateProviderConfig(activeProvider, 'maxTokens', parseInt(e.target.value) || 4096)}
-                        className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
-                      />
-                    </div>
-
-                    {/* Connection Status */}
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300 text-sm">{t('settings.llmConnStatus')}</Label>
-                      <div className="flex items-center gap-2">
-                        {currentStatus === 'connected' ? (
-                          <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20">
-                            <Wifi className="w-3 h-3 mr-1" /> {t('settings.llmConnected')}
-                          </Badge>
-                        ) : currentStatus === 'disconnected' ? (
-                          <Badge className="bg-red-600/15 text-red-400 border-red-600/20">
-                            <WifiOff className="w-3 h-3 mr-1" /> {t('settings.llmDisconnected')}
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-zinc-600/15 text-zinc-400 border-zinc-600/20">
-                            <WifiOff className="w-3 h-3 mr-1" /> {t('settings.llmDisconnected')}
-                          </Badge>
-                        )}
-                        {currentMessage && (
-                          <span className="text-[10px] text-zinc-500 truncate max-w-[200px]">{currentMessage}</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-3">
-                      <Button
-                        onClick={() => handleTestConnection(activeProvider)}
-                        disabled={currentStatus === 'testing'}
-                        variant="outline"
-                        className="border-emerald-600/30 bg-emerald-600/5 text-emerald-400 hover:bg-emerald-600/10 gap-2"
-                      >
-                        {currentStatus === 'testing' ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Wifi className="w-4 h-4" />
-                        )}
-                        {currentStatus === 'testing' ? t('settings.llmTesting') : t('settings.llmTestConn')}
-                      </Button>
-                      <Button
-                        onClick={() => handleSaveConfig(activeProvider)}
-                        disabled={currentSaving}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
-                      >
-                        <Save className="w-4 h-4" />
-                        {currentSaving ? t('settings.saving') : t('settings.llmSaveConfig')}
-                      </Button>
-                    </div>
-
-                    <div className="flex items-center gap-2 p-3 bg-emerald-600/5 border border-emerald-600/10 rounded-lg">
-                      <Shield className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                      <p className="text-xs text-zinc-400">{t('settings.apiKeySecure')}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          )}
+                    </TabsContent>
+                  );
+                })}
+              </Tabs>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        {/* ============ Data Sources ============ */}
+        {/* Data Sources */}
         <TabsContent value="data" className="space-y-6">
           <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
             <CardHeader className="pb-3">
@@ -732,18 +1132,47 @@ export function SettingsView() {
                     <span className="text-sm text-white font-medium">{t('settings.finnhub')}</span>
                     <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[9px]">US/HK</Badge>
                   </div>
-                  <p className="text-xs text-zinc-500 mb-2">实时行情、新闻、财报</p>
+                  <p className="text-xs text-zinc-500 mb-2">Real-time quotes, news, financials</p>
                   <div className="flex items-center gap-2 max-w-xs">
-                    <Input
-                      type="password"
-                      placeholder="API 令牌"
-                      value={finnhubToken}
-                      onChange={(e) => setFinnhubToken(e.target.value)}
-                      className="bg-[#0a0a0f] border-[#1e1e2e] text-white text-xs h-8"
-                    />
+                    <div className="relative flex-1">
+                      <Input
+                        type={showApiKeys['finnhub'] ? 'text' : 'password'}
+                        placeholder="API Token"
+                        value={finnhubToken}
+                        onChange={(e) => updateSetting('finnhubToken', e.target.value)}
+                        className="bg-[#0a0a0f] border-[#1e1e2e] text-white text-xs h-8 pr-8"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowApiKeys(prev => ({ ...prev, finnhub: !prev.finnhub }))}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-zinc-500 hover:text-white"
+                      >
+                        {showApiKeys['finnhub'] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      </Button>
+                    </div>
                   </div>
+                  {/* Finnhub test result */}
+                  {finnhubTestResult && (
+                    <div className={`flex items-center gap-2 p-2 mt-2 rounded-lg max-w-xs ${
+                      finnhubTestResult.success
+                        ? 'bg-emerald-600/5 border border-emerald-600/10'
+                        : 'bg-red-600/5 border border-red-600/10'
+                    }`}>
+                      {finnhubTestResult.success
+                        ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                        : <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                      }
+                      <p className={`text-[11px] ${finnhubTestResult.success ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {finnhubTestResult.success
+                          ? (language === 'zh' ? '连接测试成功' : 'Connection test passed')
+                          : (language === 'zh' ? `连接失败: ${finnhubTestResult.error}` : `Failed: ${finnhubTestResult.error}`)
+                        }
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <Switch checked={finnhubEnabled} onCheckedChange={setFinnhubEnabled} className="data-[state=checked]:bg-emerald-600" />
+                <Switch checked={finnhubEnabled} onCheckedChange={(v) => updateSetting('finnhubEnabled', v)} className="data-[state=checked]:bg-emerald-600" />
               </div>
               <Separator className="bg-[#1e1e2e]" />
 
@@ -754,9 +1183,9 @@ export function SettingsView() {
                     <span className="text-sm text-white font-medium">{t('settings.cls')}</span>
                     <Badge className="bg-red-600/15 text-red-400 border-red-600/20 text-[9px]">A-Share</Badge>
                   </div>
-                  <p className="text-xs text-zinc-500">中国财经新闻和市场数据</p>
+                  <p className="text-xs text-zinc-500">Chinese financial news and market data</p>
                 </div>
-                <Switch checked={clsEnabled} onCheckedChange={setClsEnabled} className="data-[state=checked]:bg-emerald-600" />
+                <Switch checked={clsEnabled} onCheckedChange={(v) => updateSetting('clsEnabled', v)} className="data-[state=checked]:bg-emerald-600" />
               </div>
               <Separator className="bg-[#1e1e2e]" />
 
@@ -767,24 +1196,40 @@ export function SettingsView() {
                     <span className="text-sm text-white font-medium">{t('settings.sina')}</span>
                     <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[9px]">A-Share</Badge>
                   </div>
-                  <p className="text-xs text-zinc-500">A股实时行情和新闻</p>
+                  <p className="text-xs text-zinc-500">A-share real-time quotes and news</p>
                 </div>
-                <Switch checked={sinaEnabled} onCheckedChange={setSinaEnabled} className="data-[state=checked]:bg-emerald-600" />
+                <Switch checked={sinaEnabled} onCheckedChange={(v) => updateSetting('sinaEnabled', v)} className="data-[state=checked]:bg-emerald-600" />
               </div>
 
-              <Button
-                onClick={handleSave}
-                disabled={saving._general}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
-              >
-                <Save className="w-4 h-4" />
-                {saving._general ? t('settings.saving') : t('settings.saveParams')}
-              </Button>
+              <Separator className="bg-[#1e1e2e]" />
+
+              {/* 数据源状态面板 */}
+              <DataSourceStatusPanel />
+
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={handleSaveDataSources}
+                  disabled={saving}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                >
+                  {saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                  {saved ? (language === 'zh' ? '已保存' : 'Saved') : saving ? t('settings.saving') : t('settings.saveParams')}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleTestFinnhub}
+                  disabled={testingFinnhub || !finnhubToken}
+                  className="border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-[#1a1a2e] hover:text-white gap-2"
+                >
+                  {testingFinnhub ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {testingFinnhub ? (language === 'zh' ? '测试中...' : 'Testing...') : (language === 'zh' ? '测试 Finnhub' : 'Test Finnhub')}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* ============ Trading Parameters ============ */}
+        {/* Trading Parameters */}
         <TabsContent value="trading" className="space-y-6">
           <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
             <CardHeader className="pb-3">
@@ -797,22 +1242,22 @@ export function SettingsView() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-zinc-300 text-sm">{t('settings.defaultPositionSize')}</Label>
-                  <Input type="number" value={positionSize} onChange={(e) => setPositionSize(e.target.value)} className="bg-[#0a0a0f] border-[#1e1e2e] text-white" />
+                  <Input type="number" value={positionSize} onChange={(e) => updateSetting('positionSize', e.target.value)} className="bg-[#0a0a0f] border-[#1e1e2e] text-white" />
                   <p className="text-[10px] text-zinc-500">{t('settings.pctOfCapital')}</p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-zinc-300 text-sm">{t('settings.defaultStopLoss')}</Label>
-                  <Input type="number" value={stopLoss} onChange={(e) => setStopLoss(e.target.value)} className="bg-[#0a0a0f] border-[#1e1e2e] text-white" />
+                  <Input type="number" value={stopLoss} onChange={(e) => updateSetting('stopLoss', e.target.value)} className="bg-[#0a0a0f] border-[#1e1e2e] text-white" />
                   <p className="text-[10px] text-zinc-500">{t('settings.maxLossAutoClose')}</p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-zinc-300 text-sm">{t('settings.defaultTakeProfit')}</Label>
-                  <Input type="number" value={takeProfit} onChange={(e) => setTakeProfit(e.target.value)} className="bg-[#0a0a0f] border-[#1e1e2e] text-white" />
+                  <Input type="number" value={takeProfit} onChange={(e) => updateSetting('takeProfit', e.target.value)} className="bg-[#0a0a0f] border-[#1e1e2e] text-white" />
                   <p className="text-[10px] text-zinc-500">{t('settings.targetProfitAutoClose')}</p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-zinc-300 text-sm">{t('settings.defaultCycleDays')}</Label>
-                  <Input type="number" value={cycleDays} onChange={(e) => setCycleDays(e.target.value)} className="bg-[#0a0a0f] border-[#1e1e2e] text-white" />
+                  <Input type="number" value={cycleDays} onChange={(e) => updateSetting('cycleDays', e.target.value)} className="bg-[#0a0a0f] border-[#1e1e2e] text-white" />
                   <p className="text-[10px] text-zinc-500">{t('settings.maxHoldingPeriod')}</p>
                 </div>
               </div>
@@ -824,23 +1269,23 @@ export function SettingsView() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-zinc-300 text-sm">{t('settings.maxPortfolioRisk')}</Label>
-                    <Input type="number" value={maxPortfolioRisk} onChange={(e) => setMaxPortfolioRisk(e.target.value)} className="bg-[#0a0a0f] border-[#1e1e2e] text-white" />
+                    <Input type="number" value={maxPortfolioRisk} onChange={(e) => updateSetting('maxPortfolioRisk', e.target.value)} className="bg-[#0a0a0f] border-[#1e1e2e] text-white" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-zinc-300 text-sm">{t('settings.maxSinglePosition')}</Label>
-                    <Input type="number" value={maxSinglePosition} onChange={(e) => setMaxSinglePosition(e.target.value)} className="bg-[#0a0a0f] border-[#1e1e2e] text-white" />
+                    <Input type="number" value={maxSinglePosition} onChange={(e) => updateSetting('maxSinglePosition', e.target.value)} className="bg-[#0a0a0f] border-[#1e1e2e] text-white" />
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <Button onClick={handleSave} disabled={saving._general} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
-                  <Save className="w-4 h-4" />
-                  {saving._general ? t('settings.saving') : t('settings.saveParams')}
+                <Button onClick={handleSaveGeneral} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+                  {saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                  {saved ? (language === 'zh' ? '已保存' : 'Saved') : saving ? t('settings.saving') : t('settings.saveParams')}
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => { setPositionSize('10'); setStopLoss('8'); setTakeProfit('15'); setCycleDays('7'); }}
+                  onClick={() => { setSettings(defaultSettings); setSaved(false); }}
                   className="border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-[#1a1a2e]"
                 >
                   {t('settings.resetDefaults')}
@@ -850,8 +1295,9 @@ export function SettingsView() {
           </Card>
         </TabsContent>
 
-        {/* ============ Notifications ============ */}
+        {/* Notifications */}
         <TabsContent value="notifications" className="space-y-6">
+          {/* 通知偏好 */}
           <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
@@ -865,7 +1311,7 @@ export function SettingsView() {
                   <p className="text-sm text-white">{t('settings.signalAlerts')}</p>
                   <p className="text-xs text-zinc-500">{t('settings.signalAlertsDesc')}</p>
                 </div>
-                <Switch checked={notifSignalAlerts} onCheckedChange={setNotifSignalAlerts} className="data-[state=checked]:bg-emerald-600" />
+                <Switch checked={notifSignalAlerts} onCheckedChange={(v) => updateSetting('notifSignalAlerts', v)} className="data-[state=checked]:bg-emerald-600" />
               </div>
               <Separator className="bg-[#1e1e2e]" />
               <div className="flex items-center justify-between py-3">
@@ -873,7 +1319,7 @@ export function SettingsView() {
                   <p className="text-sm text-white">{t('settings.priceAlerts')}</p>
                   <p className="text-xs text-zinc-500">{t('settings.priceAlertsDesc')}</p>
                 </div>
-                <Switch checked={notifPriceAlerts} onCheckedChange={setNotifPriceAlerts} className="data-[state=checked]:bg-emerald-600" />
+                <Switch checked={notifPriceAlerts} onCheckedChange={(v) => updateSetting('notifPriceAlerts', v)} className="data-[state=checked]:bg-emerald-600" />
               </div>
               <Separator className="bg-[#1e1e2e]" />
               <div className="flex items-center justify-between py-3">
@@ -881,7 +1327,7 @@ export function SettingsView() {
                   <p className="text-sm text-white">{t('settings.positionUpdates')}</p>
                   <p className="text-xs text-zinc-500">{t('settings.positionUpdatesDesc')}</p>
                 </div>
-                <Switch checked={notifPositionUpdates} onCheckedChange={setNotifPositionUpdates} className="data-[state=checked]:bg-emerald-600" />
+                <Switch checked={notifPositionUpdates} onCheckedChange={(v) => updateSetting('notifPositionUpdates', v)} className="data-[state=checked]:bg-emerald-600" />
               </div>
               <Separator className="bg-[#1e1e2e]" />
               <div className="flex items-center justify-between py-3">
@@ -889,7 +1335,7 @@ export function SettingsView() {
                   <p className="text-sm text-white">{t('settings.dailyReport')}</p>
                   <p className="text-xs text-zinc-500">{t('settings.dailyReportDesc')}</p>
                 </div>
-                <Switch checked={notifDailyReport} onCheckedChange={setNotifDailyReport} className="data-[state=checked]:bg-emerald-600" />
+                <Switch checked={notifDailyReport} onCheckedChange={(v) => updateSetting('notifDailyReport', v)} className="data-[state=checked]:bg-emerald-600" />
               </div>
               <Separator className="bg-[#1e1e2e]" />
               <div className="flex items-center justify-between py-3">
@@ -897,13 +1343,176 @@ export function SettingsView() {
                   <p className="text-sm text-white">{t('settings.marketNews')}</p>
                   <p className="text-xs text-zinc-500">{t('settings.marketNewsDesc')}</p>
                 </div>
-                <Switch checked={notifMarketNews} onCheckedChange={setNotifMarketNews} className="data-[state=checked]:bg-emerald-600" />
+                <Switch checked={notifMarketNews} onCheckedChange={(v) => updateSetting('notifMarketNews', v)} className="data-[state=checked]:bg-emerald-600" />
               </div>
+
+              {/* 路由映射说明 */}
+              <div className="mt-4 p-3 bg-zinc-800/30 border border-[#1e1e2e] rounded-lg">
+                <p className="text-xs text-zinc-400 font-medium mb-2">
+                  {language === 'zh' ? '通知路由映射' : 'Notification Routing Map'}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10px]">
+                  <div className="flex items-center gap-1.5">
+                    <Badge className="bg-blue-600/15 text-blue-400 border-blue-600/20 text-[9px] px-1 py-0">Signal</Badge>
+                    <span className="text-zinc-500">→</span>
+                    <span className="text-zinc-300">Webhook</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Badge className="bg-green-600/15 text-green-400 border-green-600/20 text-[9px] px-1 py-0">Price</Badge>
+                    <span className="text-zinc-500">→</span>
+                    <span className="text-zinc-300">{language === 'zh' ? '企业微信' : 'WeCom'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Badge className="bg-cyan-600/15 text-cyan-400 border-cyan-600/20 text-[9px] px-1 py-0">Position</Badge>
+                    <span className="text-zinc-500">→</span>
+                    <span className="text-zinc-300">{language === 'zh' ? '飞书' : 'Feishu'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Badge className="bg-orange-600/15 text-orange-400 border-orange-600/20 text-[9px] px-1 py-0">Daily</Badge>
+                    <span className="text-zinc-500">→</span>
+                    <span className="text-zinc-300">Email</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Badge className="bg-purple-600/15 text-purple-400 border-purple-600/20 text-[9px] px-1 py-0">News</Badge>
+                    <span className="text-zinc-500">→</span>
+                    <span className="text-zinc-300">Telegram</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-zinc-500 mt-2">
+                  {language === 'zh'
+                    ? '静默时段(22:00-08:00)低优先级不发送 | 同类型5分钟冷却 | 内容去重'
+                    : 'Silent hours (22:00-08:00) for low priority | 5min cooldown per type | Content dedup'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 渠道配置 */}
+          <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Key className="w-5 h-5 text-emerald-400" />
+                  <CardTitle className="text-base font-semibold text-white">
+                    {t('settings.channelConfigs')}
+                  </CardTitle>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={fetchChannels}
+                  className="text-zinc-400 hover:text-white text-xs"
+                >
+                  <Clock className="w-3 h-3 mr-1" />
+                  {language === 'zh' ? '刷新' : 'Refresh'}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {channelsLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="h-24 rounded-lg bg-[#0a0a0f] animate-pulse" />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">
+                  {channels.map((channel) => (
+                    <div
+                      key={channel.type}
+                      className="p-4 bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg space-y-3"
+                    >
+                      {/* 渠道头部 */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-white font-medium">{channel.label}</span>
+                          {channel.isEnabled && (
+                            <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[9px]">
+                              {language === 'zh' ? '已启用' : 'Active'}
+                            </Badge>
+                          )}
+                          {testResults[channel.type] && (
+                            <Badge className={`text-[9px] ${
+                              testResults[channel.type].success
+                                ? 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20'
+                                : 'bg-red-600/15 text-red-400 border-red-600/20'
+                            } border`}>
+                              {testResults[channel.type].success
+                                ? (language === 'zh' ? '连通' : 'Connected')
+                                : (language === 'zh' ? '失败' : 'Failed')}
+                            </Badge>
+                          )}
+                        </div>
+                        <Switch
+                          checked={channel.isEnabled}
+                          onCheckedChange={(v) => toggleChannelEnabled(channel.type, v)}
+                          className="data-[state=checked]:bg-emerald-600"
+                        />
+                      </div>
+
+                      {/* 配置字段 */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {channel.configFields.map((field) => (
+                          <div key={field.key} className="space-y-1">
+                            <Label className="text-zinc-400 text-xs">{field.label}</Label>
+                            <Input
+                              type={field.type === 'password' ? 'password' : 'text'}
+                              placeholder={field.label}
+                              value={channelConfigEdits[channel.type]?.[field.key] || ''}
+                              onChange={(e) => updateChannelConfigEdit(channel.type, field.key, e.target.value)}
+                              className="bg-[#111118] border-[#1e1e2e] text-white text-xs h-8"
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 操作按钮 */}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => testChannel(channel.type)}
+                          disabled={testingChannel === channel.type}
+                          className="border-[#1e1e2e] bg-[#111118] text-zinc-300 hover:bg-[#1a1a2e] hover:text-white text-xs h-7 gap-1"
+                        >
+                          {testingChannel === channel.type ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Send className="w-3 h-3" />
+                          )}
+                          {language === 'zh' ? '测试连通' : 'Test'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => saveChannelConfig(channel.type)}
+                          disabled={channelSaving === channel.type}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 gap-1"
+                        >
+                          {channelSaving === channel.type ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Save className="w-3 h-3" />
+                          )}
+                          {language === 'zh' ? '保存配置' : 'Save'}
+                        </Button>
+                      </div>
+
+                      {/* 测试结果详情 */}
+                      {testResults[channel.type] && !testResults[channel.type].success && testResults[channel.type].error && (
+                        <div className="flex items-start gap-1.5 p-2 bg-red-600/5 border border-red-600/10 rounded text-[10px] text-red-400">
+                          <AlertCircle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                          {testResults[channel.type].error}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* ============ System ============ */}
+        {/* System */}
         <TabsContent value="system" className="space-y-6">
           {/* Language */}
           <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
@@ -919,8 +1528,8 @@ export function SettingsView() {
                 <Button
                   variant={language === 'en' ? 'default' : 'outline'}
                   onClick={() => setLanguage('en')}
-                  className={language === 'en'
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white gap-2'
+                  className={language === 'en' 
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white gap-2' 
                     : 'border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-[#1a1a2e] gap-2'
                   }
                 >
@@ -929,8 +1538,8 @@ export function SettingsView() {
                 <Button
                   variant={language === 'zh' ? 'default' : 'outline'}
                   onClick={() => setLanguage('zh' as Language)}
-                  className={language === 'zh'
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white gap-2'
+                  className={language === 'zh' 
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white gap-2' 
                     : 'border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-[#1a1a2e] gap-2'
                   }
                 >

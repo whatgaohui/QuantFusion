@@ -52,3 +52,32 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Go binary
+mini-services/data-service/data-service
+
+# Database
+*.db
+*.db-journal
+
+# Screenshots & images
+*.png
+*.jpg
+*.jpeg
+
+# Agent context
+agent-ctx/
+
+# Download
+download/
+
+# Examples
+examples/

@@ -1,5 +1,4 @@
-import ZAI from 'z-ai-web-dev-sdk';
-import { getZAI } from '@/lib/ai-service';
+import { createChatCompletion } from '@/lib/ai-service';
 
 // ==================== Timeout Helper ====================
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -193,18 +192,15 @@ const RISK_MANAGER_SYSTEM = `你是一位风险管理经理，负责评估风险
 
 // ==================== Agent Functions ====================
 
-async function callLLM(zai: ZAI, systemPrompt: string, userPrompt: string, timeoutMs = 30000): Promise<string> {
-  const completion = await withTimeout(
-    zai.chat.completions.create({
-      messages: [
-        { role: 'assistant', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      thinking: { type: 'disabled' }
-    }),
-    timeoutMs
+async function callLLM(systemPrompt: string, userPrompt: string, timeoutMs = 30000): Promise<string> {
+  const result = await createChatCompletion(
+    [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ],
+    { timeout: timeoutMs }
   );
-  return completion.choices[0]?.message?.content || '';
+  return result.content || '';
 }
 
 function buildMarketContext(state: AnalysisState): string {
@@ -219,10 +215,10 @@ ${md.kline ? `最近5日收盘价: ${(md.kline as {c:number[]}).c?.slice(-5).joi
   `.trim();
 }
 
-async function runMarketAnalyst(state: AnalysisState, zai: ZAI): Promise<AnalysisState> {
+async function runMarketAnalyst(state: AnalysisState): Promise<AnalysisState> {
   try {
     const context = buildMarketContext(state);
-    const report = await callLLM(zai, MARKET_ANALYST_SYSTEM,
+    const report = await callLLM(MARKET_ANALYST_SYSTEM,
       `请基于以下市场数据对 ${state.stockName}(${state.symbol}) 进行技术分析:\n\n${context}`,
       30000
     );
@@ -233,10 +229,10 @@ async function runMarketAnalyst(state: AnalysisState, zai: ZAI): Promise<Analysi
   }
 }
 
-async function runFundamentalAnalyst(state: AnalysisState, zai: ZAI): Promise<AnalysisState> {
+async function runFundamentalAnalyst(state: AnalysisState): Promise<AnalysisState> {
   try {
     const context = buildMarketContext(state);
-    const report = await callLLM(zai, FUNDAMENTAL_ANALYST_SYSTEM,
+    const report = await callLLM(FUNDAMENTAL_ANALYST_SYSTEM,
       `请基于以下数据对 ${state.stockName}(${state.symbol}) 进行基本面分析:\n\n${context}`,
       30000
     );
@@ -247,10 +243,10 @@ async function runFundamentalAnalyst(state: AnalysisState, zai: ZAI): Promise<An
   }
 }
 
-async function runSentimentAnalyst(state: AnalysisState, zai: ZAI): Promise<AnalysisState> {
+async function runSentimentAnalyst(state: AnalysisState): Promise<AnalysisState> {
   try {
     const context = buildMarketContext(state);
-    const report = await callLLM(zai, SENTIMENT_ANALYST_SYSTEM,
+    const report = await callLLM(SENTIMENT_ANALYST_SYSTEM,
       `请基于以下数据对 ${state.stockName}(${state.symbol}) 进行市场情绪分析:\n\n${context}`,
       30000
     );
@@ -261,7 +257,7 @@ async function runSentimentAnalyst(state: AnalysisState, zai: ZAI): Promise<Anal
   }
 }
 
-async function runBullResearcher(state: AnalysisState, zai: ZAI, round: number, previousBearThesis?: string): Promise<AnalysisState> {
+async function runBullResearcher(state: AnalysisState, round: number, previousBearThesis?: string): Promise<AnalysisState> {
   try {
     const analystContext = `
 === 技术分析报告 ===
@@ -279,7 +275,7 @@ ${previousBearThesis ? `\n=== 空头研究员的反驳（请对此进行回应�
       ? `你是第${round}轮辩论的多头方。请基于以下分析师报告，从多头角度论证买入 ${state.stockName}(${state.symbol}) 的理由:\n\n${analystContext}`
       : `你是第${round}轮辩论的多头方。空头研究员提出了以下反驳，请回应并加强你的多头论点:\n\n${analystContext}`;
 
-    const thesis = await callLLM(zai, BULL_RESEARCHER_SYSTEM, prompt, 30000);
+    const thesis = await callLLM(BULL_RESEARCHER_SYSTEM, prompt, 30000);
     return {
       ...state,
       bullThesis: thesis,
@@ -292,7 +288,7 @@ ${previousBearThesis ? `\n=== 空头研究员的反驳（请对此进行回应�
   }
 }
 
-async function runBearResearcher(state: AnalysisState, zai: ZAI, round: number, previousBullThesis?: string): Promise<AnalysisState> {
+async function runBearResearcher(state: AnalysisState, round: number, previousBullThesis?: string): Promise<AnalysisState> {
   try {
     const analystContext = `
 === 技术分析报告 ===
@@ -310,7 +306,7 @@ ${previousBullThesis ? `\n=== 多头研究员的论点（请对此进行反驳�
       ? `你是第${round}轮辩论的空头方。请基于以下分析师报告，从空头角度论证卖出或规避 ${state.stockName}(${state.symbol}) 的理由:\n\n${analystContext}`
       : `你是第${round}轮辩论的空头方。多头研究员提出了以下论点，请反驳并加强你的空头论点:\n\n${analystContext}`;
 
-    const thesis = await callLLM(zai, BEAR_RESEARCHER_SYSTEM, prompt, 30000);
+    const thesis = await callLLM(BEAR_RESEARCHER_SYSTEM, prompt, 30000);
     return {
       ...state,
       bearThesis: thesis,
@@ -323,7 +319,7 @@ ${previousBullThesis ? `\n=== 多头研究员的论点（请对此进行反驳�
   }
 }
 
-async function runResearchManager(state: AnalysisState, zai: ZAI): Promise<AnalysisState> {
+async function runResearchManager(state: AnalysisState): Promise<AnalysisState> {
   try {
     const debateContext = `
 === 技术分析报告 ===
@@ -339,7 +335,7 @@ ${state.sentimentReport || '暂无'}
 ${state.debateHistory || '暂无辩论记录'}
     `.trim();
 
-    const plan = await callLLM(zai, RESEARCH_MANAGER_SYSTEM,
+    const plan = await callLLM(RESEARCH_MANAGER_SYSTEM,
       `作为研究经理，请评估以上多空辩论，为 ${state.stockName}(${state.symbol}) 给出投资建议:\n\n${debateContext}`,
       35000
     );
@@ -350,7 +346,7 @@ ${state.debateHistory || '暂无辩论记录'}
   }
 }
 
-async function runAggressiveAnalyst(state: AnalysisState, zai: ZAI, previousArgs?: string): Promise<AnalysisState> {
+async function runAggressiveAnalyst(state: AnalysisState, previousArgs?: string): Promise<AnalysisState> {
   try {
     const context = `
 === 投资建议 ===
@@ -358,7 +354,7 @@ ${state.investmentPlan || '暂无'}
 ${previousArgs ? `\n=== 其他风险分析师观点（请回应）===\n${previousArgs}` : ''}
     `.trim();
 
-    const arg = await callLLM(zai, AGGRESSIVE_ANALYST_SYSTEM,
+    const arg = await callLLM(AGGRESSIVE_ANALYST_SYSTEM,
       `请从激进风险角度，为 ${state.stockName}(${state.symbol}) 提出高风险高回报的投资策略:\n\n${context}`,
       30000
     );
@@ -374,7 +370,7 @@ ${previousArgs ? `\n=== 其他风险分析师观点（请回应）===\n${previou
   }
 }
 
-async function runConservativeAnalyst(state: AnalysisState, zai: ZAI, previousArgs?: string): Promise<AnalysisState> {
+async function runConservativeAnalyst(state: AnalysisState, previousArgs?: string): Promise<AnalysisState> {
   try {
     const context = `
 === 投资建议 ===
@@ -382,7 +378,7 @@ ${state.investmentPlan || '暂无'}
 ${previousArgs ? `\n=== 其他风险分析师观点（请回应）===\n${previousArgs}` : ''}
     `.trim();
 
-    const arg = await callLLM(zai, CONSERVATIVE_ANALYST_SYSTEM,
+    const arg = await callLLM(CONSERVATIVE_ANALYST_SYSTEM,
       `请从保守风险角度，为 ${state.stockName}(${state.symbol}) 提出稳健安全的投资策略:\n\n${context}`,
       30000
     );
@@ -398,7 +394,7 @@ ${previousArgs ? `\n=== 其他风险分析师观点（请回应）===\n${previou
   }
 }
 
-async function runNeutralAnalyst(state: AnalysisState, zai: ZAI, previousArgs?: string): Promise<AnalysisState> {
+async function runNeutralAnalyst(state: AnalysisState, previousArgs?: string): Promise<AnalysisState> {
   try {
     const context = `
 === 投资建议 ===
@@ -406,7 +402,7 @@ ${state.investmentPlan || '暂无'}
 ${previousArgs ? `\n=== 其他风险分析师观点（请回应）===\n${previousArgs}` : ''}
     `.trim();
 
-    const arg = await callLLM(zai, NEUTRAL_ANALYST_SYSTEM,
+    const arg = await callLLM(NEUTRAL_ANALYST_SYSTEM,
       `请从中性风险角度，为 ${state.stockName}(${state.symbol}) 提出平衡风险收益的投资策略:\n\n${context}`,
       30000
     );
@@ -422,7 +418,7 @@ ${previousArgs ? `\n=== 其他风险分析师观点（请回应）===\n${previou
   }
 }
 
-async function runRiskManager(state: AnalysisState, zai: ZAI): Promise<AnalysisState> {
+async function runRiskManager(state: AnalysisState): Promise<AnalysisState> {
   try {
     const riskContext = `
 === 投资建议 ===
@@ -432,7 +428,7 @@ ${state.investmentPlan || '暂无'}
 ${state.riskDebateHistory || '暂无辩论记录'}
     `.trim();
 
-    const decision = await callLLM(zai, RISK_MANAGER_SYSTEM,
+    const decision = await callLLM(RISK_MANAGER_SYSTEM,
       `作为风险管理经理，请评估以上风险辩论，为 ${state.stockName}(${state.symbol}) 做出最终风险决策:\n\n${riskContext}`,
       35000
     );
@@ -454,8 +450,6 @@ export async function runMultiAgentAnalysis(
   mode: AnalysisMode,
   onProgress?: (step: string, progress: number, agentName: string) => void
 ): Promise<AnalysisState> {
-  const zai = await getZAI();
-
   let state: AnalysisState = {
     symbol,
     stockName,
@@ -476,9 +470,9 @@ export async function runMultiAgentAnalysis(
       case 'quick': {
         // Market Analyst → Decision (2 steps)
         progress('技术分析', 10, '技术分析师');
-        state = await runMarketAnalyst(state, zai);
+        state = await runMarketAnalyst(state);
         progress('生成决策', 80, '决策引擎');
-        state = await runResearchManager(state, zai);
+        state = await runResearchManager(state);
         progress('分析完成', 100, '系统');
         break;
       }
@@ -486,11 +480,11 @@ export async function runMultiAgentAnalysis(
       case 'standard': {
         // Market → Sentiment → Decision (3 steps)
         progress('技术分析', 8, '技术分析师');
-        state = await runMarketAnalyst(state, zai);
+        state = await runMarketAnalyst(state);
         progress('情绪分析', 35, '情绪分析师');
-        state = await runSentimentAnalyst(state, zai);
+        state = await runSentimentAnalyst(state);
         progress('生成投资建议', 80, '研究经理');
-        state = await runResearchManager(state, zai);
+        state = await runResearchManager(state);
         progress('分析完成', 100, '系统');
         break;
       }
@@ -498,20 +492,20 @@ export async function runMultiAgentAnalysis(
       case 'full': {
         // Market → Fundamental → Sentiment → Risk Assessment → Decision (5 steps)
         progress('技术分析', 6, '技术分析师');
-        state = await runMarketAnalyst(state, zai);
+        state = await runMarketAnalyst(state);
         progress('基本面分析', 22, '基本面分析师');
-        state = await runFundamentalAnalyst(state, zai);
+        state = await runFundamentalAnalyst(state);
         progress('情绪分析', 40, '情绪分析师');
-        state = await runSentimentAnalyst(state, zai);
+        state = await runSentimentAnalyst(state);
 
         // For full mode, do a brief bull-bear debate
         progress('多头研究', 55, '多头研究员');
-        state = await runBullResearcher(state, zai, 1);
+        state = await runBullResearcher(state, 1);
         progress('空头研究', 68, '空头研究员');
-        state = await runBearResearcher(state, zai, 1, state.bullThesis);
+        state = await runBearResearcher(state, 1, state.bullThesis);
 
         progress('生成投资建议', 85, '研究经理');
-        state = await runResearchManager(state, zai);
+        state = await runResearchManager(state);
         progress('分析完成', 100, '系统');
         break;
       }
@@ -520,39 +514,39 @@ export async function runMultiAgentAnalysis(
         // Full multi-agent debate pipeline
         // Phase 1: Analyst reports
         progress('技术分析', 4, '技术分析师');
-        state = await runMarketAnalyst(state, zai);
+        state = await runMarketAnalyst(state);
         progress('基本面分析', 10, '基本面分析师');
-        state = await runFundamentalAnalyst(state, zai);
+        state = await runFundamentalAnalyst(state);
         progress('情绪分析', 16, '情绪分析师');
-        state = await runSentimentAnalyst(state, zai);
+        state = await runSentimentAnalyst(state);
 
         // Phase 2: Investment Debate (2 rounds)
         const debateRounds = 2;
         for (let round = 1; round <= debateRounds; round++) {
           progress(`多空辩论 第${round}轮 - 多头`, 22 + (round - 1) * 14, '多头研究员');
-          state = await runBullResearcher(state, zai, round, round > 1 ? state.bearThesis : undefined);
+          state = await runBullResearcher(state, round, round > 1 ? state.bearThesis : undefined);
           progress(`多空辩论 第${round}轮 - 空头`, 28 + (round - 1) * 14, '空头研究员');
-          state = await runBearResearcher(state, zai, round, state.bullThesis);
+          state = await runBearResearcher(state, round, state.bullThesis);
         }
 
         // Research Manager adjudicates
         progress('研究经理评估', 52, '研究经理');
-        state = await runResearchManager(state, zai);
+        state = await runResearchManager(state);
 
         // Phase 3: Risk Debate (2 rounds with 3 analysts)
         const riskDebateRounds = 2;
         for (let round = 1; round <= riskDebateRounds; round++) {
           progress(`风险辩论 第${round}轮 - 激进`, 58 + (round - 1) * 14, '激进风险分析师');
-          state = await runAggressiveAnalyst(state, zai, round > 1 ? [state.conservativeArgument, state.neutralArgument].filter(Boolean).join('\n') : undefined);
+          state = await runAggressiveAnalyst(state, round > 1 ? [state.conservativeArgument, state.neutralArgument].filter(Boolean).join('\n') : undefined);
           progress(`风险辩论 第${round}轮 - 保守`, 63 + (round - 1) * 14, '保守风险分析师');
-          state = await runConservativeAnalyst(state, zai, [state.aggressiveArgument].filter(Boolean).join('\n'));
+          state = await runConservativeAnalyst(state, [state.aggressiveArgument].filter(Boolean).join('\n'));
           progress(`风险辩论 第${round}轮 - 中性`, 68 + (round - 1) * 14, '中性风险分析师');
-          state = await runNeutralAnalyst(state, zai, [state.aggressiveArgument, state.conservativeArgument].filter(Boolean).join('\n'));
+          state = await runNeutralAnalyst(state, [state.aggressiveArgument, state.conservativeArgument].filter(Boolean).join('\n'));
         }
 
         // Risk Manager final decision
         progress('风险管理决策', 92, '风险管理经理');
-        state = await runRiskManager(state, zai);
+        state = await runRiskManager(state);
         progress('分析完成', 100, '系统');
         break;
       }
@@ -564,7 +558,7 @@ export async function runMultiAgentAnalysis(
     if (!state.finalDecision && !state.investmentPlan) {
       try {
         progress('降级处理', 90, '系统');
-        state = await runResearchManager(state, zai);
+        state = await runResearchManager(state);
       } catch {
         state = { ...state, investmentPlan: '分析过程中出现异常，无法生成投资建议。' };
       }

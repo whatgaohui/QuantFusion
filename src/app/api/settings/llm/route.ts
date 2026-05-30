@@ -1,104 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { invalidateProviderCache } from '@/lib/ai-service';
 
-// Provider default configurations
-const PROVIDER_DEFAULTS: Record<string, { baseUrl: string; model: string; temperature: number; maxTokens: number }> = {
-  zai: { baseUrl: '', model: 'z-ai-general', temperature: 0.7, maxTokens: 4096 },
-  deepseek: { baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat', temperature: 0.7, maxTokens: 4096 },
-  openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', temperature: 0.7, maxTokens: 4096 },
-  anthropic: { baseUrl: 'https://api.anthropic.com', model: 'claude-3.5-sonnet', temperature: 0.7, maxTokens: 4096 },
-  qwen: { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', temperature: 0.7, maxTokens: 4096 },
-  glm: { baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash', temperature: 0.7, maxTokens: 4096 },
-  custom: { baseUrl: '', model: '', temperature: 0.7, maxTokens: 4096 },
-};
-
-const CONFIG_KEYS = ['apiKey', 'baseUrl', 'model', 'temperature', 'maxTokens', 'enabled'] as const;
-
-// GET — Retrieve all LLM provider configs
+/** GET /api/settings/llm — read LLM config from SystemConfig table */
 export async function GET() {
   try {
+    const keys = ['llm_provider', 'llm_api_key', 'llm_base_url', 'llm_model', 'llm_temperature', 'llm_max_tokens', 'llm_enabled'];
     const configs = await db.systemConfig.findMany({
-      where: { category: 'llm' },
+      where: { key: { in: keys } },
     });
 
-    // Build response grouped by provider
-    const result: Record<string, Record<string, string>> = {};
-
-    // Initialize all providers with defaults
-    for (const [provider, defaults] of Object.entries(PROVIDER_DEFAULTS)) {
-      result[provider] = {
-        apiKey: '',
-        baseUrl: defaults.baseUrl,
-        model: defaults.model,
-        temperature: defaults.temperature.toString(),
-        maxTokens: defaults.maxTokens.toString(),
-        enabled: provider === 'zai' ? 'true' : 'false',
-      };
+    const configMap: Record<string, string> = {};
+    for (const c of configs) {
+      configMap[c.key] = c.value;
     }
 
-    // Override with saved configs
-    for (const config of configs) {
-      // Key format: llm_{provider}_{field}
-      const match = config.key.match(/^llm_(.+)_([a-zA-Z0-9]+)$/);
-      if (match) {
-        const provider = match[1];
-        const field = match[2];
-        if (result[provider] && CONFIG_KEYS.includes(field as typeof CONFIG_KEYS[number])) {
-          result[provider][field] = config.value;
-        }
-      }
-    }
-
-    return NextResponse.json({ success: true, data: result });
+    return NextResponse.json({
+      provider: configMap.llm_provider || 'deepseek',
+      apiKey: configMap.llm_api_key || '',
+      baseUrl: configMap.llm_base_url || '',
+      model: configMap.llm_model || 'deepseek-chat',
+      temperature: parseFloat(configMap.llm_temperature || '0.7'),
+      maxTokens: parseInt(configMap.llm_max_tokens || '4096', 10),
+      enabled: configMap.llm_enabled !== 'false',
+    });
   } catch (error) {
-    console.error('Failed to load LLM configs:', error);
-    return NextResponse.json({ success: false, error: '加载配置失败' }, { status: 500 });
+    console.error('[settings/llm] GET error:', error);
+    return NextResponse.json(
+      { error: 'Failed to load LLM settings' },
+      { status: 500 },
+    );
   }
 }
 
-// POST — Save a provider config
+/** POST /api/settings/llm — save LLM config to SystemConfig table */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { provider, apiKey, baseUrl, model, temperature, maxTokens, enabled } = body as {
-      provider: string;
-      apiKey?: string;
-      baseUrl?: string;
-      model?: string;
-      temperature?: number;
-      maxTokens?: number;
-      enabled?: boolean;
-    };
+    const { provider, apiKey, baseUrl, model, temperature, maxTokens, enabled } = body;
 
-    if (!provider || !PROVIDER_DEFAULTS[provider]) {
-      return NextResponse.json({ success: false, error: '无效的提供方' }, { status: 400 });
-    }
+    const entries = [
+      { key: 'llm_provider', value: provider || 'deepseek', category: 'llm', description: 'LLM provider name' },
+      { key: 'llm_api_key', value: apiKey || '', category: 'llm', description: 'LLM API key' },
+      { key: 'llm_base_url', value: baseUrl || '', category: 'llm', description: 'LLM API base URL' },
+      { key: 'llm_model', value: model || 'deepseek-chat', category: 'llm', description: 'LLM model name' },
+      { key: 'llm_temperature', value: String(temperature ?? 0.7), category: 'llm', description: 'LLM temperature' },
+      { key: 'llm_max_tokens', value: String(maxTokens ?? 4096), category: 'llm', description: 'LLM max tokens' },
+      { key: 'llm_enabled', value: String(enabled ?? true), category: 'llm', description: 'LLM enabled flag' },
+    ];
 
-    const fields: Record<string, string> = {};
-    if (apiKey !== undefined) fields.apiKey = apiKey;
-    if (baseUrl !== undefined) fields.baseUrl = baseUrl;
-    if (model !== undefined) fields.model = model;
-    if (temperature !== undefined) fields.temperature = temperature.toString();
-    if (maxTokens !== undefined) fields.maxTokens = maxTokens.toString();
-    if (enabled !== undefined) fields.enabled = enabled ? 'true' : 'false';
-
-    // Upsert each config field
-    for (const [field, value] of Object.entries(fields)) {
-      const key = `llm_${provider}_${field}`;
+    for (const entry of entries) {
       await db.systemConfig.upsert({
-        where: { key },
-        create: { key, value, category: 'llm' },
-        update: { value },
+        where: { key: entry.key },
+        update: { value: entry.value, category: entry.category, description: entry.description },
+        create: { key: entry.key, value: entry.value, category: entry.category, description: entry.description },
       });
     }
 
-    // Invalidate AI service provider cache so it picks up the new config
-    invalidateProviderCache();
-
-    return NextResponse.json({ success: true, message: '配置已保存' });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to save LLM config:', error);
-    return NextResponse.json({ success: false, error: '保存配置失败' }, { status: 500 });
+    console.error('[settings/llm] POST error:', error);
+    return NextResponse.json(
+      { error: 'Failed to save LLM settings' },
+      { status: 500 },
+    );
   }
 }

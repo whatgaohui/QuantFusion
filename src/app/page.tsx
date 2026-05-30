@@ -1,12 +1,71 @@
 'use client';
 
 import { useState } from 'react';
+import { Sidebar, type NavItem } from '@/components/dashboard/sidebar';
+import { DashboardView } from '@/components/dashboard/dashboard-view';
+import { AIAnalysisView } from '@/components/dashboard/ai-analysis-view';
+import { AgentChatView } from '@/components/dashboard/agent-chat-view';
+import { SignalScannerView } from '@/components/dashboard/signal-scanner-view';
+import { PositionsView } from '@/components/dashboard/positions-view';
+import { WatchlistView } from '@/components/dashboard/watchlist-view';
+import { StrategyCenterView } from '@/components/dashboard/strategy-center-view';
+import { MarketNewsView } from '@/components/dashboard/news-view';
+import { BacktestView } from '@/components/dashboard/backtest-view';
+import { SettingsView } from '@/components/dashboard/settings-view';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useLanguage } from '@/lib/i18n';
-import { Sidebar, type NavItem } from '@/components/dashboard/sidebar';
-import dynamic from 'next/dynamic';
+
+interface BacktestNavState {
+  strategy?: string;
+  symbol?: string;
+}
+
+interface AIAnalysisNavState {
+  symbol?: string;
+}
+
+function ViewRenderer({
+  activeView,
+  onNavigate,
+  backtestNavState,
+  aiAnalysisNavState,
+}: {
+  activeView: NavItem;
+  onNavigate: (view: NavItem, extra?: BacktestNavState & AIAnalysisNavState) => void;
+  backtestNavState: BacktestNavState;
+  aiAnalysisNavState: AIAnalysisNavState;
+}) {
+  switch (activeView) {
+    case 'dashboard':
+      return <DashboardView onNavigate={(v) => onNavigate(v)} />;
+    case 'aiAnalysis':
+      return <AIAnalysisView initialSymbol={aiAnalysisNavState.symbol} />;
+    case 'agentChat':
+      return <AgentChatView />;
+    case 'scanner':
+      return <SignalScannerView />;
+    case 'positions':
+      return <PositionsView />;
+    case 'watchlist':
+      return <WatchlistView onNavigate={(v, extra) => onNavigate(v, extra)} />;
+    case 'strategies':
+      return <StrategyCenterView onNavigate={(v, extra) => onNavigate(v, extra)} />;
+    case 'news':
+      return <MarketNewsView onNavigate={(v) => onNavigate(v)} />;
+    case 'backtest':
+      return <BacktestView
+        initialStrategy={backtestNavState.strategy}
+        initialSymbol={backtestNavState.symbol}
+        onNavigate={(v) => onNavigate(v as NavItem)}
+      />;
+    case 'settings':
+      return <SettingsView />;
+    default:
+      return <DashboardView onNavigate={(v) => onNavigate(v)} />;
+  }
+}
 
 const viewTitleKeys: Record<NavItem, string> = {
   dashboard: 'sidebar.dashboard',
@@ -21,59 +80,27 @@ const viewTitleKeys: Record<NavItem, string> = {
   settings: 'sidebar.settings',
 };
 
-// Use next/dynamic with ssr: false to reduce server compilation load
-const DashboardView = dynamic(() => import('@/components/dashboard/dashboard-view').then(m => ({ default: m.DashboardView })), { ssr: false });
-const AIAnalysisView = dynamic(() => import('@/components/dashboard/ai-analysis-view').then(m => ({ default: m.AIAnalysisView })), { ssr: false });
-const AgentChatView = dynamic(() => import('@/components/dashboard/agent-chat-view').then(m => ({ default: m.AgentChatView })), { ssr: false });
-const SignalScannerView = dynamic(() => import('@/components/dashboard/signal-scanner-view').then(m => ({ default: m.SignalScannerView })), { ssr: false });
-const PositionsView = dynamic(() => import('@/components/dashboard/positions-view').then(m => ({ default: m.PositionsView })), { ssr: false });
-const WatchlistView = dynamic(() => import('@/components/dashboard/watchlist-view').then(m => ({ default: m.WatchlistView })), { ssr: false });
-const StrategyCenterView = dynamic(() => import('@/components/dashboard/strategy-center-view').then(m => ({ default: m.StrategyCenterView })), { ssr: false });
-const MarketNewsView = dynamic(() => import('@/components/dashboard/news-view').then(m => ({ default: m.MarketNewsView })), { ssr: false });
-const BacktestView = dynamic(() => import('@/components/dashboard/backtest-view').then(m => ({ default: m.BacktestView })), { ssr: false });
-const SettingsView = dynamic(() => import('@/components/dashboard/settings-view').then(m => ({ default: m.SettingsView })), { ssr: false });
-
-function ViewFallback() {
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="animate-pulse h-32 rounded-xl bg-[#111118]" />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function HomePage() {
   const [activeView, setActiveView] = useState<NavItem>('dashboard');
+  const [backtestNavState, setBacktestNavState] = useState<BacktestNavState>({});
+  const [aiAnalysisNavState, setAIAnalysisNavState] = useState<AIAnalysisNavState>({});
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [backtestStrategy, setBacktestStrategy] = useState('');
   const { t, language } = useLanguage();
 
-  const handleBacktest = (strategyId: string) => {
-    setBacktestStrategy(strategyId);
-    setActiveView('backtest');
-  };
-
-  const renderView = () => {
-    switch (activeView) {
-      case 'dashboard': return <DashboardView />;
-      case 'aiAnalysis': return <AIAnalysisView />;
-      case 'agentChat': return <AgentChatView />;
-      case 'scanner': return <SignalScannerView />;
-      case 'positions': return <PositionsView />;
-      case 'watchlist': return <WatchlistView />;
-      case 'strategies': return <StrategyCenterView onBacktest={handleBacktest} />;
-      case 'news': return <MarketNewsView />;
-      case 'backtest': return <BacktestView initialStrategy={backtestStrategy} />;
-      case 'settings': return <SettingsView />;
-      default: return <DashboardView />;
+  const handleNavigate = (view: NavItem, extra?: BacktestNavState & AIAnalysisNavState) => {
+    setActiveView(view);
+    if (extra) {
+      if (view === 'backtest') {
+        setBacktestNavState({ strategy: extra.strategy, symbol: extra.symbol });
+      }
+      if (view === 'aiAnalysis') {
+        setAIAnalysisNavState({ symbol: extra.symbol });
+      }
     }
   };
 
   return (
-    <div className="h-screen overflow-hidden flex bg-[#0a0a0f]">
+    <div className="min-h-screen flex bg-[#0a0a0f]">
       {/* Desktop Sidebar */}
       <div className="hidden md:flex">
         <Sidebar activeItem={activeView} onItemChange={setActiveView} />
@@ -98,7 +125,7 @@ export default function HomePage() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 min-h-screen flex flex-col overflow-hidden">
         {/* Top Bar */}
         <header className="h-14 flex items-center justify-between px-4 md:px-6 border-b border-[#1e1e2e] bg-[#0d0d14]/80 backdrop-blur-sm flex-shrink-0">
           <div className="flex items-center gap-3 pl-10 md:pl-0">
@@ -116,8 +143,8 @@ export default function HomePage() {
         </header>
 
         {/* View Content */}
-        <div className={`flex-1 min-h-0 ${activeView === 'agentChat' ? 'overflow-hidden p-2 md:p-3' : 'overflow-y-auto custom-scrollbar p-4 md:p-6'}`}>
-          {renderView()}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6">
+          <ViewRenderer activeView={activeView} onNavigate={handleNavigate} backtestNavState={backtestNavState} aiAnalysisNavState={aiAnalysisNavState} />
         </div>
 
         {/* Footer */}

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || '';
+import { getFinnhubApiKey } from '@/lib/finnhub-config';
 
 // In-memory cache with 24-hour TTL
 interface CacheEntry {
@@ -13,12 +12,13 @@ const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 export async function GET(request: NextRequest) {
   try {
+    const FINNHUB_API_KEY = await getFinnhubApiKey();
     const { searchParams } = new URL(request.url);
     const exchange = searchParams.get('exchange') || 'US';
 
     if (!FINNHUB_API_KEY) {
       return NextResponse.json(
-        { error: 'Finnhub API密钥未配置' },
+        { error: 'Finnhub API key not configured' },
         { status: 500 }
       );
     }
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: `Finnhub API错误: ${response.status}` },
+        { error: `Finnhub API error: ${response.status}` },
         { status: response.status }
       );
     }
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Symbols API error:', error);
     return NextResponse.json(
-      { error: '获取股票列表失败' },
+      { error: 'Failed to fetch stock symbols' },
       { status: 500 }
     );
   }

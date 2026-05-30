@@ -1,162 +1,107 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { DEFAULT_USER_ID, ensureDefaultUser } from '@/lib/auth-utils';
 
-/**
- * GET /api/alerts
- * Get all alerts
- */
+// --- In-Memory Alert Store ---
+
+interface SignalAlert {
+  id: string;
+  symbol: string;
+  message: string;
+  type: 'signal' | 'price' | 'position' | 'risk';
+  priority: 'high' | 'medium' | 'low';
+  timestamp: string;
+  ttl: number; // expiration timestamp
+}
+
+const alertStore: SignalAlert[] = [];
+const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+let alertCounter = 0;
+
+// Clean expired alerts
+function cleanExpired() {
+  const now = Date.now();
+  const before = alertStore.length;
+  const idx = alertStore.findIndex(a => a.ttl <= now);
+  if (idx >= 0) {
+    alertStore.splice(idx, alertStore.length - idx > 100 ? alertStore.length : idx);
+  }
+  // Also prune from front if any expired
+  while (alertStore.length > 0 && alertStore[0].ttl <= now) {
+    alertStore.shift();
+  }
+}
+
+// Add an alert to the store
+function addAlert(symbol: string, message: string, type: SignalAlert['type'], priority: SignalAlert['priority']): SignalAlert {
+  cleanExpired();
+  const now = Date.now();
+  const alert: SignalAlert = {
+    id: `alert-${++alertCounter}-${now}`,
+    symbol: symbol.toUpperCase(),
+    message,
+    type,
+    priority,
+    timestamp: new Date(now).toISOString(),
+    ttl: now + TTL_MS,
+  };
+  alertStore.unshift(alert);
+
+  // Cap at 200 alerts
+  while (alertStore.length > 200) {
+    alertStore.pop();
+  }
+
+  return alert;
+}
+
+// --- GET /api/alerts ---
+
 export async function GET() {
   try {
-    await ensureDefaultUser();
-
-    const alerts = await db.alert.findMany({
-      where: { userId: DEFAULT_USER_ID },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return NextResponse.json(alerts);
+    cleanExpired();
+    const recent = alertStore.filter(a => a.ttl > Date.now());
+    return NextResponse.json(recent);
   } catch (error) {
     console.error('Get alerts error:', error);
     return NextResponse.json(
-      { error: '获取提醒失败' },
+      { error: 'Failed to fetch alerts' },
       { status: 500 }
     );
   }
 }
 
-/**
- * POST /api/alerts
- * Create a new alert
- * Body: { symbol, alertType, targetValue, notifyChannels? }
- */
+// --- POST /api/alerts ---
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { symbol, alertType, targetValue, notifyChannels } = body;
+    const { symbol, message, type, priority } = body as {
+      symbol?: string;
+      message?: string;
+      type?: SignalAlert['type'];
+      priority?: SignalAlert['priority'];
+    };
 
-    if (!symbol || alertType === undefined || targetValue === undefined) {
+    if (!symbol || !message) {
       return NextResponse.json(
-        { error: 'symbol、alertType和targetValue为必填项' },
+        { error: 'symbol and message are required' },
         { status: 400 }
       );
     }
 
-    const validAlertTypes = ['price_above', 'price_below', 'volume', 'rsi', 'macd', 'custom'];
-    if (!validAlertTypes.includes(alertType)) {
-      return NextResponse.json(
-        { error: `alertType必须是以下之一: ${validAlertTypes.join(', ')}` },
-        { status: 400 }
-      );
-    }
+    const alertType: SignalAlert['type'] = type || 'signal';
+    const alertPriority: SignalAlert['priority'] = priority || 'medium';
 
-    await ensureDefaultUser();
-
-    const alert = await db.alert.create({
-      data: {
-        userId: DEFAULT_USER_ID,
-        symbol: symbol.toUpperCase(),
-        alertType,
-        targetValue: parseFloat(targetValue),
-        isActive: true,
-        isTriggered: false,
-        notifyChannels: notifyChannels || null,
-      },
-    });
-
+    const alert = addAlert(symbol, message, alertType, alertPriority);
     return NextResponse.json(alert, { status: 201 });
   } catch (error) {
     console.error('Create alert error:', error);
     return NextResponse.json(
-      { error: '创建提醒失败' },
+      { error: 'Failed to create alert' },
       { status: 500 }
     );
   }
 }
 
-/**
- * PATCH /api/alerts
- * Update alert (activate/deactivate/trigger)
- * Body: { id, isActive?, isTriggered?, currentValue? }
- */
-export async function PATCH(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { id, isActive, isTriggered, currentValue } = body;
-
-    if (!id) {
-      return NextResponse.json(
-        { error: 'id为必填项' },
-        { status: 400 }
-      );
-    }
-
-    const existing = await db.alert.findUnique({ where: { id } });
-
-    if (!existing) {
-      return NextResponse.json(
-        { error: '未找到该提醒' },
-        { status: 404 }
-      );
-    }
-
-    const data: Record<string, unknown> = {};
-    if (isActive !== undefined) data.isActive = Boolean(isActive);
-    if (isTriggered !== undefined) {
-      data.isTriggered = Boolean(isTriggered);
-      if (isTriggered) data.triggeredAt = new Date();
-    }
-    if (currentValue !== undefined) data.currentValue = parseFloat(currentValue);
-
-    const alert = await db.alert.update({
-      where: { id },
-      data,
-    });
-
-    return NextResponse.json(alert);
-  } catch (error) {
-    console.error('Update alert error:', error);
-    return NextResponse.json(
-      { error: '更新提醒失败' },
-      { status: 500 }
-    );
-  }
-}
-
-/**
- * DELETE /api/alerts
- * Delete an alert
- * Body: { id }
- */
-export async function DELETE(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { id } = body;
-
-    if (!id) {
-      return NextResponse.json(
-        { error: 'id为必填项' },
-        { status: 400 }
-      );
-    }
-
-    const existing = await db.alert.findUnique({ where: { id } });
-
-    if (!existing) {
-      return NextResponse.json(
-        { error: '未找到该提醒' },
-        { status: 404 }
-      );
-    }
-
-    await db.alert.delete({ where: { id } });
-
-    return NextResponse.json({ message: '提醒已删除', id });
-  } catch (error) {
-    console.error('Delete alert error:', error);
-    return NextResponse.json(
-      { error: '删除提醒失败' },
-      { status: 500 }
-    );
-  }
-}
+// Export addAlert for use by the scan route
+export { addAlert };
+export type { SignalAlert };

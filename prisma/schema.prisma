@@ -365,6 +365,32 @@ model NotifyChannelConfig {
 // System
 // ============================================================
 
+// ============================================================
+// Agent Memory & Reflection (任务3.1)
+// ============================================================
+
+model AgentMemory {
+  id              String   @id @default(cuid())
+  symbol          String
+  market          String   // A / HK / US
+  analysisDate    DateTime @default(now())
+  recommendation  String   // BUY / HOLD / SELL
+  score           Int      @default(0) // 0-100 综合评分
+  entryPrice      Float    @default(0) // 分析时价格
+  actualReturn    Float?   // 实际收益率(%)，事后回填
+  wasCorrect      Boolean? // 建议是否正确，事后回填
+  keySignals      String?  // JSON string: 关键信号提取
+  analysisMode    String   // quick / standard / full / debate
+  summary         String?  // 分析摘要
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([symbol])
+  @@index([analysisDate])
+  @@index([symbol, analysisDate])
+  @@index([wasCorrect])
+}
+
 model SystemConfig {
   key         String   @id
   value       String

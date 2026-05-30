@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Eye,
   Search,
@@ -13,15 +13,14 @@ import {
   RefreshCw,
   X,
   Brain,
-  Globe,
-  AlertTriangle,
+  Loader2,
+  PlusCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -46,7 +45,26 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { useLanguage } from '@/lib/i18n';
+import { toast } from 'sonner';
+import { AddPositionDialog } from '@/components/dashboard/add-position-dialog';
 
+// ============================================================
+// Types
+// ============================================================
+
+/** Shape returned by the /api/watchlist Prisma model */
+interface WatchlistApiItem {
+  id: string;
+  userId: string;
+  symbol: string;
+  market: string;
+  name: string | null;
+  groupName: string | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
+/** UI-level watchlist item with price data */
 interface WatchlistItem {
   id: string;
   symbol: string;
@@ -55,7 +73,6 @@ interface WatchlistItem {
   change: number;
   changePercent: number;
   sparkline: { v: number }[];
-  market?: string;
 }
 
 interface AlertItem {
@@ -74,15 +91,69 @@ interface SearchResult {
   type: string;
 }
 
-// Map fusion API alert to our AlertItem interface
-interface FusionAlert {
-  id: string;
-  symbol: string;
-  alertType: string;
-  targetValue: number;
-  isActive: boolean;
-  isTriggered: boolean;
-  createdAt: string;
+// ============================================================
+// Helpers
+// ============================================================
+
+/** Map a Prisma WatchlistApiItem to a UI WatchlistItem with safe defaults */
+function mapApiItemToWatchlistItem(apiItem: WatchlistApiItem): WatchlistItem {
+  return {
+    id: apiItem.id,
+    symbol: apiItem.symbol,
+    name: apiItem.name || apiItem.symbol,
+    price: 0,
+    change: 0,
+    changePercent: 0,
+    sparkline: generateSparkline(),
+  };
+}
+
+/**
+ * 将API返回的alerts数据转换为前端AlertItem格式
+ * 支持两种数据源：SignalAlert（/api/alerts）和 DB Alert（Prisma）
+ */
+function normalizeAlertItem(raw: Record<string, unknown>): AlertItem | null {
+  // 已经是 AlertItem 格式（有 targetPrice）
+  if (typeof raw.targetPrice === 'number') {
+    return {
+      id: String(raw.id),
+      symbol: String(raw.symbol),
+      targetPrice: raw.targetPrice,
+      direction: (raw.direction as 'above' | 'below') || 'above',
+      active: raw.active !== false,
+      createdAt: String(raw.createdAt || new Date().toISOString().split('T')[0]),
+      expiryDate: String(raw.expiryDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]),
+    };
+  }
+
+  // DB Alert 格式（有 targetValue）
+  if (typeof raw.targetValue === 'number') {
+    return {
+      id: String(raw.id),
+      symbol: String(raw.symbol),
+      targetPrice: raw.targetValue,
+      direction: (raw.alertType as string)?.includes('below') ? 'below' : 'above',
+      active: raw.isActive !== false,
+      createdAt: String(raw.createdAt || new Date().toISOString().split('T')[0]),
+      expiryDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+    };
+  }
+
+  // SignalAlert 格式（/api/alerts 返回的格式）
+  if (raw.message && raw.type) {
+    return {
+      id: String(raw.id),
+      symbol: String(raw.symbol),
+      targetPrice: 0,
+      direction: 'above',
+      active: true,
+      createdAt: String(raw.timestamp || new Date().toISOString().split('T')[0]),
+      expiryDate: new Date((raw.ttl as number) || Date.now() + 30 * 86400000).toISOString().split('T')[0],
+    };
+  }
+
+  // 无法识别的格式，跳过
+  return null;
 }
 
 function generateSparkline(): { v: number }[] {
@@ -95,13 +166,26 @@ function generateSparkline(): { v: number }[] {
   return data;
 }
 
-export function WatchlistView() {
+const mockAlerts: AlertItem[] = [
+  { id: '1', symbol: 'AAPL', targetPrice: 195.00, direction: 'above', active: true, createdAt: '2024-01-15', expiryDate: '2024-02-15' },
+  { id: '2', symbol: 'TSLA', targetPrice: 240.00, direction: 'below', active: true, createdAt: '2024-01-14', expiryDate: '2024-02-14' },
+  { id: '3', symbol: 'NVDA', targetPrice: 650.00, direction: 'above', active: true, createdAt: '2024-01-13', expiryDate: '2024-02-13' },
+];
+
+// ============================================================
+// Component
+// ============================================================
+
+interface WatchlistViewProps {
+  onNavigate?: (view: string, extra?: Record<string, string>) => void;
+}
+
+export function WatchlistView({ onNavigate }: WatchlistViewProps) {
   const { t, language } = useLanguage();
   const [watchlist, setWatchlist] = useState<WatchlistItem[] | null>(null);
   const [alerts, setAlerts] = useState<AlertItem[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshingQuotes, setRefreshingQuotes] = useState(false);
-  const [quotesError, setQuotesError] = useState<string | null>(null);
+  const [refreshingPrices, setRefreshingPrices] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -112,253 +196,263 @@ export function WatchlistView() {
   const [alertDirection, setAlertDirection] = useState<'above' | 'below'>('above');
   const [alertExpiry, setAlertExpiry] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [addPositionOpen, setAddPositionOpen] = useState(false);
+  const [addPositionSymbol, setAddPositionSymbol] = useState('');
+  const [addPositionPrice, setAddPositionPrice] = useState<number | undefined>(undefined);
+  const priceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
-  // Fetch real-time quotes for all watchlist items
-  const fetchQuotes = useCallback(async (items: { symbol: string; id: string; name: string; market?: string }[]) => {
-    if (items.length === 0) return;
+  // Fetch real-time prices for all watchlist symbols
+  const fetchPrices = useCallback(async (items: WatchlistItem[]): Promise<WatchlistItem[]> => {
+    if (!items || items.length === 0) return items;
 
-    setRefreshingQuotes(true);
-    setQuotesError(null);
+    const updated = await Promise.all(
+      items.map(async (item) => {
+        try {
+          const [quoteRes, klineRes] = await Promise.allSettled([
+            fetch(`/api/fusion/market/quote?symbol=${encodeURIComponent(item.symbol)}`),
+            fetch(`/api/fusion/market/kline?symbol=${encodeURIComponent(item.symbol)}&period=D&count=20`),
+          ]);
 
-    try {
-      const symbols = items.map(item => item.symbol).join(',');
-      const res = await fetch(`/api/fusion/market/quote?symbols=${encodeURIComponent(symbols)}`);
+          let price = item.price;
+          let change = item.change;
+          let changePercent = item.changePercent;
+          let sparkline = item.sparkline;
 
-      if (res.ok) {
-        const result = await res.json();
-        if (result.success && Array.isArray(result.data)) {
-          const quoteMap = new Map<string, { currentPrice: number; change: number; changePercent: number }>();
-          for (const q of result.data) {
-            quoteMap.set(q.symbol, {
-              currentPrice: q.currentPrice,
-              change: q.change,
-              changePercent: q.changePercent,
-            });
+          if (quoteRes.status === 'fulfilled' && quoteRes.value.ok) {
+            const quoteData = await quoteRes.value.json();
+            if (quoteData.currentPrice && quoteData.currentPrice > 0) {
+              price = quoteData.currentPrice;
+              change = quoteData.change ?? 0;
+              changePercent = quoteData.changePercent ?? 0;
+            }
           }
 
-          setWatchlist(prev => {
-            if (!prev) return prev;
-            return prev.map(item => {
-              const quote = quoteMap.get(item.symbol);
-              if (quote) {
-                return {
-                  ...item,
-                  price: quote.currentPrice || item.price,
-                  change: quote.change ?? item.change,
-                  changePercent: quote.changePercent ?? item.changePercent,
-                };
-              }
-              return item;
-            });
-          });
-        }
-      } else {
-        setQuotesError(t('watch.quotesError'));
-      }
-    } catch {
-      setQuotesError(t('watch.quotesError'));
-    } finally {
-      setRefreshingQuotes(false);
-    }
-  }, [t]);
+          if (klineRes.status === 'fulfilled' && klineRes.value.ok) {
+            const klineData = await klineRes.value.json();
+            if (klineData.c && Array.isArray(klineData.c) && klineData.c.length > 0) {
+              // Use the last 20 close prices for sparkline
+              const closes = klineData.c.slice(-20);
+              sparkline = closes.map((v: number) => ({ v }));
+            }
+          }
 
+          return { ...item, price, change, changePercent, sparkline };
+        } catch {
+          return item;
+        }
+      })
+    );
+
+    return updated;
+  }, []);
+
+  // Initial data fetch
   const fetchData = useCallback(async () => {
     try {
-      let watchlistRes: Response | null = null;
-      let alertsRes: Response | null = null;
-      try { watchlistRes = await fetch('/api/watchlist'); } catch { /* ignore */ }
-      try { alertsRes = await fetch('/api/alerts'); } catch { /* ignore */ }
+      const [watchlistRes, alertsRes] = await Promise.allSettled([
+        fetch('/api/watchlist'),
+        fetch('/api/alerts'),
+      ]);
 
-      let watchlistItems: { symbol: string; id: string; name: string; market?: string }[] = [];
+      let currentWatchlist: WatchlistItem[];
 
-      if (watchlistRes && watchlistRes.ok) {
-        const data = await watchlistRes.json();
+      if (watchlistRes.status === 'fulfilled' && watchlistRes.value.ok) {
+        const data = await watchlistRes.value.json();
         if (Array.isArray(data) && data.length > 0) {
-          watchlistItems = data.map((item: { id: string; symbol: string; name?: string; market?: string }) => ({
-            id: item.id,
-            symbol: item.symbol,
-            name: item.name || item.symbol,
-            market: item.market,
-          }));
-          const mapped: WatchlistItem[] = data.map((item: { id: string; symbol: string; name?: string; market?: string }) => ({
-            id: item.id,
-            symbol: item.symbol,
-            name: item.name || item.symbol,
-            price: 0,
-            change: 0,
-            changePercent: 0,
-            sparkline: generateSparkline(),
-            market: item.market,
-          }));
-          setWatchlist(mapped);
+          // Properly map API items (Prisma model) to UI WatchlistItem format
+          currentWatchlist = (data as WatchlistApiItem[]).map(mapApiItemToWatchlistItem);
         } else {
-          setWatchlist([]);
-          watchlistItems = [];
+          // API returned empty array — show empty state, don't use mock data
+          currentWatchlist = [];
         }
       } else {
-        setWatchlist([]);
-        watchlistItems = [];
+        // API call completely failed — show empty state
+        currentWatchlist = [];
       }
 
-      // Fetch real quotes for watchlist items
-      if (watchlistItems.length > 0) {
-        await fetchQuotes(watchlistItems);
-      }
+      // Fetch real prices for the watchlist
+      const updatedWatchlist = await fetchPrices(currentWatchlist);
+      setWatchlist(updatedWatchlist);
 
-      // Process alerts from fusion API
-      if (alertsRes && alertsRes.ok) {
-        const data = await alertsRes.json();
+      if (alertsRes.status === 'fulfilled' && alertsRes.value.ok) {
+        const data = await alertsRes.value.json();
         if (Array.isArray(data) && data.length > 0) {
-          const mapped: AlertItem[] = data.map((a: FusionAlert) => ({
-            id: a.id,
-            symbol: a.symbol,
-            targetPrice: a.targetValue || 0,
-            direction: (a.alertType === 'price_below' ? 'below' : 'above') as 'above' | 'below',
-            active: a.isActive ?? true,
-            createdAt: a.createdAt ? new Date(a.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-            expiryDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-          }));
-          setAlerts(mapped);
+          // 将API数据转换为AlertItem格式，过滤掉无法识别的数据
+          const normalized = data
+            .map((item: Record<string, unknown>) => normalizeAlertItem(item))
+            .filter((item: AlertItem | null): item is AlertItem => item !== null);
+          setAlerts(normalized.length > 0 ? normalized : mockAlerts);
         } else {
-          setAlerts([]);
+          setAlerts(mockAlerts);
         }
       } else {
-        setAlerts([]);
+        setAlerts(mockAlerts);
       }
 
       setLastUpdated(new Date());
     } catch {
       setWatchlist([]);
-      setAlerts([]);
+      setAlerts(mockAlerts);
     } finally {
       setLoading(false);
     }
-  }, [fetchQuotes]);
+  }, [fetchPrices]);
+
+  // Periodic price refresh (every 30s)
+  const refreshPrices = useCallback(async () => {
+    if (!watchlist || watchlist.length === 0) return;
+    setRefreshingPrices(true);
+    try {
+      const updated = await fetchPrices(watchlist);
+      setWatchlist(updated);
+      setLastUpdated(new Date());
+    } catch {
+      // Silently fail on background refresh
+    } finally {
+      setRefreshingPrices(false);
+    }
+  }, [watchlist, fetchPrices]);
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(() => {
-      if (watchlist && watchlist.length > 0) {
-        fetchQuotes(watchlist);
-      }
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [fetchData, fetchQuotes, watchlist?.length]);
+  }, [fetchData]);
 
-  const handleRemoveFromWatchlist = async (id: string) => {
+  useEffect(() => {
+    priceIntervalRef.current = setInterval(refreshPrices, 30000);
+    return () => {
+      if (priceIntervalRef.current) {
+        clearInterval(priceIntervalRef.current);
+      }
+    };
+  }, [refreshPrices]);
+
+  // Close search dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowSearch(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleRemoveFromWatchlist = async (id: string, symbol: string) => {
+    // Optimistically remove from local state
+    setWatchlist((prev) => prev?.filter((item) => item.id !== id) || null);
+
     try {
-      const res = await fetch('/api/watchlist', {
+      // Try deleting by ID first
+      let res = await fetch('/api/watchlist', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
-      if (res.ok) {
-        setWatchlist((prev) => prev?.filter((item) => item.id !== id) || null);
+
+      // If ID-based delete fails (e.g. item not found), try by symbol
+      if (!res.ok) {
+        res = await fetch('/api/watchlist', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol }),
+        });
+      }
+
+      if (!res.ok) {
+        // If both fail, still keep the item removed from local state
+        // (it might have been a mock/phantom item)
+        console.warn(`Failed to delete watchlist item (id=${id}, symbol=${symbol}) from server`);
       }
     } catch {
-      setWatchlist((prev) => prev?.filter((item) => item.id !== id) || null);
+      // Network error — item already removed from local state
     }
   };
 
   const handleAddToWatchlist = async (symbol: string, name: string) => {
+    // Check if already in local watchlist
+    if (watchlist?.some((item) => item.symbol.toUpperCase() === symbol.toUpperCase())) {
+      toast.info(language === 'zh' ? '该股票已在自选股中' : 'Stock already in watchlist');
+      setShowSearch(false);
+      setSearchQuery('');
+      return;
+    }
+
     try {
       const res = await fetch('/api/watchlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symbol, name }),
       });
-      if (res.ok) {
-        const newItem = await res.json();
-        // Fetch the current price for the added stock
-        let price = 0, change = 0, changePercent = 0;
-        try {
-          const quoteRes = await fetch(`/api/fusion/market/quote?symbol=${symbol}`);
-          if (quoteRes.ok) {
-            const result = await quoteRes.json();
-            if (result.success && result.data) {
-              price = result.data.currentPrice || 0;
-              change = result.data.change || 0;
-              changePercent = result.data.changePercent || 0;
-            }
-          }
-        } catch { /* use defaults */ }
 
-        setWatchlist((prev) => [...(prev || []), {
-          id: newItem.id || Date.now().toString(),
-          symbol,
-          name,
-          price,
-          change,
-          changePercent,
+      if (res.status === 409) {
+        // Stock already in watchlist on server
+        toast.info(language === 'zh' ? '该股票已在自选股中' : 'Stock already in watchlist');
+        setShowSearch(false);
+        setSearchQuery('');
+        return;
+      }
+
+      if (res.ok) {
+        // Parse the server-returned item to get the real database ID
+        const serverItem = (await res.json()) as WatchlistApiItem;
+        const newItem: WatchlistItem = {
+          id: serverItem.id,
+          symbol: serverItem.symbol,
+          name: serverItem.name || serverItem.symbol,
+          price: 0,
+          change: 0,
+          changePercent: 0,
           sparkline: generateSparkline(),
-          market: newItem.market,
-        }]);
+        };
+
+        // Add to local state immediately, then fetch real price
+        setWatchlist((prev) => [...(prev || []), newItem]);
+
+        // Fetch real price in background and update
+        try {
+          const priced = await fetchPrices([newItem]);
+          if (priced[0]) {
+            setWatchlist((prev) =>
+              prev?.map((item) => item.id === serverItem.id ? priced[0] : item) || []
+            );
+          }
+        } catch {
+          // Price fetch failed, keep the item with defaults
+        }
+
+        toast.success(language === 'zh' ? `已添加 ${symbol} 到自选股` : `Added ${symbol} to watchlist`);
+      } else {
+        // Server error — don't add to local state, show error
+        toast.error(language === 'zh' ? '添加失败，请重试' : 'Failed to add, please retry');
       }
     } catch {
-      // API failed — add locally with zero price (will be refreshed on next fetch)
-      setWatchlist((prev) => [...(prev || []), {
-        id: Date.now().toString(),
-        symbol,
-        name,
-        price: 0,
-        change: 0,
-        changePercent: 0,
-        sparkline: generateSparkline(),
-      }]);
+      // Network error — don't add to local state
+      toast.error(language === 'zh' ? '网络错误，请重试' : 'Network error, please retry');
     }
+
     setShowSearch(false);
     setSearchQuery('');
   };
 
-  const handleCreateAlert = async () => {
+  const handleCreateAlert = () => {
     if (!alertSymbol || !alertTargetPrice) return;
-    try {
-      const res = await fetch('/api/alerts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbol: alertSymbol,
-          alertType: alertDirection === 'above' ? 'price_above' : 'price_below',
-          targetValue: parseFloat(alertTargetPrice),
-        }),
-      });
-      if (res.ok) {
-        const newAlertData = await res.json();
-        const newAlert: AlertItem = {
-          id: newAlertData.id || Date.now().toString(),
-          symbol: alertSymbol,
-          targetPrice: parseFloat(alertTargetPrice),
-          direction: alertDirection,
-          active: true,
-          createdAt: new Date().toISOString().split('T')[0],
-          expiryDate: alertExpiry || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-        };
-        setAlerts((prev) => [...(prev || []), newAlert]);
-      }
-    } catch {
-      // Fallback: add locally
-      const newAlert: AlertItem = {
-        id: Date.now().toString(),
-        symbol: alertSymbol,
-        targetPrice: parseFloat(alertTargetPrice),
-        direction: alertDirection,
-        active: true,
-        createdAt: new Date().toISOString().split('T')[0],
-        expiryDate: alertExpiry || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-      };
-      setAlerts((prev) => [...(prev || []), newAlert]);
-    }
+    const newAlert: AlertItem = {
+      id: Date.now().toString(),
+      symbol: alertSymbol,
+      targetPrice: parseFloat(alertTargetPrice),
+      direction: alertDirection,
+      active: true,
+      createdAt: new Date().toISOString().split('T')[0],
+      expiryDate: alertExpiry || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+    };
+    setAlerts((prev) => [...(prev || []), newAlert]);
     setAlertDialogOpen(false);
     setAlertSymbol('');
     setAlertTargetPrice('');
     setAlertDirection('above');
     setAlertExpiry('');
-  };
-
-  const handleRefreshQuotes = () => {
-    if (watchlist && watchlist.length > 0) {
-      fetchQuotes(watchlist);
-    }
   };
 
   // Debounced search
@@ -374,6 +468,8 @@ export function WatchlistView() {
         if (res.ok) {
           const data = await res.json();
           setSearchResults(Array.isArray(data) ? data.slice(0, 10) : []);
+        } else {
+          setSearchResults([]);
         }
       } catch {
         setSearchResults([]);
@@ -385,8 +481,14 @@ export function WatchlistView() {
   }, [searchQuery]);
 
   const filteredSearchResults = searchResults.filter(
-    (s) => !watchlist?.some((w) => w.symbol === s.symbol)
+    (s) => !watchlist?.some((w) => w.symbol.toUpperCase() === s.symbol.toUpperCase())
   );
+
+  /** Focus the search input (used by the "Add Stock" card) */
+  const focusSearchInput = useCallback(() => {
+    searchInputRef.current?.focus();
+    setShowSearch(true);
+  }, []);
 
   if (loading) {
     return (
@@ -404,9 +506,10 @@ export function WatchlistView() {
     <div className="space-y-6">
       {/* Header Actions */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+        <div className="relative flex-1" ref={searchContainerRef}>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
           <Input
+            ref={searchInputRef}
             placeholder={t('watch.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => {
@@ -416,32 +519,51 @@ export function WatchlistView() {
             onFocus={() => setShowSearch(true)}
             className="pl-9 bg-[#111118] border-[#1e1e2e] text-white placeholder:text-zinc-500 focus:border-emerald-600/50"
           />
-          {showSearch && searchQuery && filteredSearchResults.length > 0 && (
+          {/* Search dropdown */}
+          {showSearch && searchQuery && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-[#111118] border border-[#1e1e2e] rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto custom-scrollbar">
-              {filteredSearchResults.map((result) => (
-                <div
-                  key={result.symbol}
-                  className="flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a2e] transition-colors"
-                >
-                  <div>
-                    <span className="text-sm font-medium text-white">{result.symbol}</span>
-                    <span className="text-xs text-zinc-500 ml-2">{result.description}</span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleAddToWatchlist(result.symbol, result.description)}
-                    className="h-6 px-2 text-emerald-400 hover:text-emerald-300"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </Button>
+              {searching && (
+                <div className="flex items-center justify-center gap-2 px-4 py-4">
+                  <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+                  <span className="text-sm text-zinc-400">
+                    {language === 'zh' ? '搜索中...' : 'Searching...'}
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
-          {showSearch && searchQuery && filteredSearchResults.length === 0 && !searching && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-[#111118] border border-[#1e1e2e] rounded-lg shadow-xl z-50 p-4">
-              <p className="text-sm text-zinc-500 text-center">{t('watch.noStocksFound')}</p>
+              )}
+              {!searching && filteredSearchResults.length > 0 && (
+                filteredSearchResults.map((result) => (
+                  <div
+                    key={result.symbol}
+                    className="flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a2e] transition-colors cursor-pointer"
+                    onClick={() => handleAddToWatchlist(result.symbol, result.description)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-white">{result.symbol}</span>
+                      <span className="text-xs text-zinc-500 ml-2 truncate">{result.description}</span>
+                    </div>
+                    <Plus className="w-4 h-4 text-emerald-400 flex-shrink-0 ml-2" />
+                  </div>
+                ))
+              )}
+              {!searching && filteredSearchResults.length === 0 && searchResults.length > 0 && (
+                <div className="px-4 py-3">
+                  <p className="text-sm text-zinc-500 text-center">
+                    {language === 'zh' ? '所有搜索结果已在自选股中' : 'All results already in watchlist'}
+                  </p>
+                </div>
+              )}
+              {!searching && searchResults.length === 0 && (
+                <div className="px-4 py-3">
+                  <p className="text-sm text-zinc-500 text-center">{t('watch.noStocksFound')}</p>
+                  <button
+                    className="mt-2 w-full text-sm text-emerald-400 hover:text-emerald-300 py-1.5 rounded-md border border-emerald-600/30 hover:border-emerald-600/50 transition-colors"
+                    onClick={() => handleAddToWatchlist(searchQuery.toUpperCase().trim(), searchQuery.toUpperCase().trim())}
+                  >
+                    <Plus className="w-3.5 h-3.5 inline mr-1" />
+                    {language === 'zh' ? `直接添加 ${searchQuery.toUpperCase().trim()}` : `Add ${searchQuery.toUpperCase().trim()} directly`}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -464,7 +586,7 @@ export function WatchlistView() {
                 <div className="space-y-2">
                   <Label className="text-zinc-300 text-sm">{t('watch.symbol')}</Label>
                   <Input
-                    placeholder="例如 AAPL"
+                    placeholder="e.g., AAPL"
                     value={alertSymbol}
                     onChange={(e) => setAlertSymbol(e.target.value.toUpperCase())}
                     className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
@@ -474,7 +596,7 @@ export function WatchlistView() {
                   <Label className="text-zinc-300 text-sm">{t('watch.targetPrice')}</Label>
                   <Input
                     type="number"
-                    placeholder="例如 195.00"
+                    placeholder="e.g., 195.00"
                     value={alertTargetPrice}
                     onChange={(e) => setAlertTargetPrice(e.target.value)}
                     className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
@@ -521,32 +643,28 @@ export function WatchlistView() {
             </DialogContent>
           </Dialog>
           <Button
-            variant="outline"
-            onClick={handleRefreshQuotes}
-            disabled={refreshingQuotes}
-            className="border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-[#1a1a2e] gap-2"
+            variant="ghost"
+            size="icon"
+            onClick={refreshPrices}
+            disabled={refreshingPrices}
+            className="text-zinc-400 hover:text-white border-[#1e1e2e]"
           >
-            <RefreshCw className={`w-4 h-4 ${refreshingQuotes ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{t('watch.refreshQuotes')}</span>
+            <RefreshCw className={`w-4 h-4 ${refreshingPrices ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
 
-      {/* Status Bar */}
-      <div className="flex items-center gap-3">
-        {lastUpdated && (
-          <p className="text-[10px] text-zinc-600">{t('watch.lastUpdated')}: {lastUpdated.toLocaleTimeString()}</p>
-        )}
-        {quotesError && (
-          <div className="flex items-center gap-1">
-            <AlertTriangle className="w-3 h-3 text-yellow-400" />
-            <p className="text-[10px] text-yellow-400">{quotesError}</p>
-          </div>
-        )}
-        {refreshingQuotes && (
-          <p className="text-[10px] text-emerald-400">{t('watch.refreshing')}</p>
-        )}
-      </div>
+      {lastUpdated && (
+        <p className="text-[10px] text-zinc-600 -mt-4">
+          {t('watch.lastUpdated')}: {lastUpdated.toLocaleTimeString()}
+          {refreshingPrices && (
+            <span className="ml-2 text-emerald-500 inline-flex items-center gap-1">
+              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+              {t('watch.refreshing')}
+            </span>
+          )}
+        </p>
+      )}
 
       {/* Watchlist Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -565,18 +683,6 @@ export function WatchlistView() {
                     ) : (
                       <TrendingDown className="w-3.5 h-3.5 text-red-400" />
                     )}
-                    {item.market && (
-                      <Badge
-                        variant="secondary"
-                        className={`text-[8px] px-1 py-0 ${
-                          item.market === 'A' ? 'bg-red-600/15 text-red-400' :
-                          item.market === 'HK' ? 'bg-yellow-600/15 text-yellow-400' :
-                          'bg-emerald-600/15 text-emerald-400'
-                        }`}
-                      >
-                        {item.market}
-                      </Badge>
-                    )}
                   </div>
                   <p className="text-xs text-zinc-500 mt-0.5">{item.name}</p>
                 </div>
@@ -584,18 +690,32 @@ export function WatchlistView() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleRemoveFromWatchlist(item.id)}
-                    className="h-6 w-6 p-0 text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => {
+                      setAddPositionSymbol(item.symbol);
+                      setAddPositionPrice(item.price > 0 ? item.price : undefined);
+                      setAddPositionOpen(true);
+                    }}
+                    className="h-6 w-6 p-0 text-zinc-600 hover:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title={t('pos.addPosition')}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <PlusCircle className="w-3.5 h-3.5" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => onNavigate?.('aiAnalysis', { symbol: item.symbol })}
                     className="h-6 w-6 p-0 text-zinc-600 hover:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity"
                     title={t('watch.quickAnalyze')}
                   >
                     <Brain className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveFromWatchlist(item.id, item.symbol)}
+                    className="h-6 w-6 p-0 text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
               </div>
@@ -610,24 +730,30 @@ export function WatchlistView() {
                       </p>
                     </>
                   ) : (
-                    <div className="space-y-1">
-                      <Skeleton className="h-6 w-20 bg-[#1a1a2e]" />
-                      <Skeleton className="h-3 w-28 bg-[#1a1a2e]" />
-                    </div>
+                    <>
+                      <p className="text-lg font-bold text-zinc-500">--</p>
+                      <p className="text-xs text-zinc-600">{t('watch.loadingPrice')}</p>
+                    </>
                   )}
                 </div>
                 <div className="w-24 h-10">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={item.sparkline}>
-                      <Line
-                        type="monotone"
-                        dataKey="v"
-                        stroke={item.change >= 0 ? '#10b981' : '#ef4444'}
-                        strokeWidth={1.5}
-                        dot={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {item.sparkline && item.sparkline.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={item.sparkline}>
+                        <Line
+                          type="monotone"
+                          dataKey="v"
+                          stroke={item.change >= 0 ? '#10b981' : '#ef4444'}
+                          strokeWidth={1.5}
+                          dot={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Eye className="w-4 h-4 text-zinc-600" />
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -635,14 +761,11 @@ export function WatchlistView() {
         ))}
 
         {/* Add Stock Card */}
-        <Card className="bg-[#111118] border-[#1e1e2e] border-dashed rounded-xl hover:border-emerald-600/30 transition-colors cursor-pointer group">
-          <CardContent
-            className="p-4 flex flex-col items-center justify-center h-full min-h-[120px]"
-            onClick={() => {
-              const input = document.querySelector(`input[placeholder="${t('watch.searchPlaceholder')}"]`) as HTMLInputElement;
-              input?.focus();
-            }}
-          >
+        <Card
+          className="bg-[#111118] border-[#1e1e2e] border-dashed rounded-xl hover:border-emerald-600/30 transition-colors cursor-pointer group"
+          onClick={focusSearchInput}
+        >
+          <CardContent className="p-4 flex flex-col items-center justify-center h-full min-h-[120px]">
             <div className="w-10 h-10 rounded-full bg-emerald-600/10 flex items-center justify-center mb-2 group-hover:bg-emerald-600/20 transition-colors">
               <Plus className="w-5 h-5 text-emerald-400" />
             </div>
@@ -651,13 +774,36 @@ export function WatchlistView() {
         </Card>
       </div>
 
+      {/* Empty state when no stocks */}
+      {(!watchlist || watchlist.length === 0) && (
+        <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
+          <CardContent className="p-8 text-center">
+            <Eye className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
+            <p className="text-zinc-400 text-sm font-medium">
+              {language === 'zh' ? '自选股列表为空' : 'Your watchlist is empty'}
+            </p>
+            <p className="text-zinc-500 text-xs mt-1">
+              {language === 'zh' ? '使用上方搜索框搜索并添加股票' : 'Use the search bar above to find and add stocks'}
+            </p>
+            <Button
+              variant="outline"
+              className="mt-4 border-emerald-600/30 text-emerald-400 hover:bg-emerald-600/10 hover:text-emerald-300 gap-2"
+              onClick={focusSearchInput}
+            >
+              <Plus className="w-4 h-4" />
+              {language === 'zh' ? '添加第一只股票' : 'Add your first stock'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Active Alerts */}
       <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <CardTitle className="text-base font-semibold text-white">{t('watch.activeAlerts')}</CardTitle>
             <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[10px]">
-              {alerts?.filter(a => a.active).length || 0}
+              {alerts?.length || 0}
             </Badge>
           </div>
         </CardHeader>
@@ -696,7 +842,7 @@ export function WatchlistView() {
                               : 'bg-red-600/15 text-red-400 border-red-600/20'
                           }`}
                         >
-                          {alert.direction === 'above' ? '↑ 高于' : '↓ 低于'} ${alert.targetPrice.toFixed(2)}
+                          {alert.direction === 'above' ? '↑ Above' : '↓ Below'} ${(alert.targetPrice ?? 0).toFixed(2)}
                         </Badge>
                       </div>
                       <p className="text-[10px] text-zinc-500 mt-0.5">
@@ -707,15 +853,7 @@ export function WatchlistView() {
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={alert.active}
-                      onCheckedChange={async (checked) => {
-                        // Update alert status via API
-                        try {
-                          await fetch('/api/alerts', {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ id: alert.id, isActive: checked }),
-                          });
-                        } catch { /* local fallback */ }
+                      onCheckedChange={(checked) => {
                         setAlerts((prev) =>
                           prev?.map((a) => a.id === alert.id ? { ...a, active: checked } : a) || []
                         );
@@ -725,16 +863,7 @@ export function WatchlistView() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={async () => {
-                        try {
-                          await fetch('/api/alerts', {
-                            method: 'DELETE',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ id: alert.id }),
-                          });
-                        } catch { /* local fallback */ }
-                        setAlerts((prev) => prev?.filter((a) => a.id !== alert.id) || []);
-                      }}
+                      onClick={() => setAlerts((prev) => prev?.filter((a) => a.id !== alert.id) || [])}
                       className="h-6 w-6 p-0 text-zinc-500 hover:text-red-400"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -746,6 +875,14 @@ export function WatchlistView() {
           )}
         </CardContent>
       </Card>
+
+      {/* Add Position Dialog */}
+      <AddPositionDialog
+        open={addPositionOpen}
+        onOpenChange={setAddPositionOpen}
+        symbol={addPositionSymbol}
+        price={addPositionPrice}
+      />
     </div>
   );
 }

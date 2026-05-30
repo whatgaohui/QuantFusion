@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { DEFAULT_USER_ID, ensureDefaultUser } from '@/lib/auth-utils';
-
-const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || '';
+import { getFinnhubApiKey } from '@/lib/finnhub-config';
 
 /**
  * GET /api/portfolio/summary
@@ -10,6 +9,7 @@ const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || '';
  */
 export async function GET() {
   try {
+    const FINNHUB_API_KEY = await getFinnhubApiKey();
     await ensureDefaultUser();
 
     const positions = await db.position.findMany({
@@ -133,7 +133,7 @@ export async function GET() {
   } catch (error) {
     console.error('Portfolio summary error:', error);
     return NextResponse.json(
-      { error: '获取投资组合摘要失败' },
+      { error: 'Failed to get portfolio summary' },
       { status: 500 }
     );
   }

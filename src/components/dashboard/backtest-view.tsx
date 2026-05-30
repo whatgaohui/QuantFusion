@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FlaskConical,
   Play,
@@ -11,15 +11,18 @@ import {
   Activity,
   DollarSign,
   BarChart3,
-  WifiOff,
+  AlertCircle,
+  AlertTriangle,
+  Search,
+  Compass,
   Loader2,
+  X,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -36,37 +39,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  AreaChart,
-  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
+  Area,
+  AreaChart,
 } from 'recharts';
 import { useLanguage } from '@/lib/i18n';
-
-// ==================== Strategy list (matches StrategyCenterView) ====================
-
-const STRATEGY_LIST = [
-  { value: 'ma-golden-cross', label: '均线金叉' },
-  { value: 'rsi-divergence', label: 'RSI背离' },
-  { value: 'macd-momentum', label: 'MACD动量' },
-  { value: 'bollinger-breakout', label: '布林带突破' },
-  { value: 'kdj-golden-cross', label: 'KDJ金叉' },
-  { value: 'volume-breakout', label: '放量突破' },
-  { value: 'low-volume-pullback', label: '缩量回踩' },
-  { value: 'three-white-soldiers', label: '三白兵' },
-  { value: 'ma-death-cross', label: '均线死叉做空' },
-  { value: 'double-bottom', label: '双底形态' },
-  { value: 'atr-volatility', label: 'ATR波动率收缩' },
-  { value: 'rsi-overbought-oversold', label: 'RSI均值回归' },
-  { value: 'macd-divergence', label: 'MACD背离' },
-  { value: 'volume-profile', label: '成交量分布支撑' },
-  { value: 'channel-breakout', label: '通道突破' },
-];
-
-// ==================== Types ====================
 
 interface BacktestConfig {
   strategy: string;
@@ -100,146 +81,50 @@ interface BacktestResult {
   maxDrawdown: number;
   sharpeRatio: number;
   totalTrades: number;
-  profitFactor: number;
-  annualReturn: number;
-  avgHoldingDays: number;
   equityCurve: { date: string; equity: number }[];
   trades: TradeRecord[];
-  isOffline?: boolean;
+  /** Data source: 'finnhub'=real data, 'simulated'=simulated data */
+  dataSource?: 'finnhub' | 'simulated';
 }
 
-// ==================== Mock Data Generators ====================
-
-function generateRealisticEquityCurve(
-  startEquity: number,
-  totalReturnPct: number,
-  startDate: string,
-  endDate: string,
-): { date: string; equity: number }[] {
-  const data: { date: string; equity: number }[] = [];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const totalDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / 86400000));
-  const numPoints = Math.min(totalDays, Math.max(50, Math.floor(totalDays / 2)));
-  const step = totalDays / numPoints;
-
-  let equity = startEquity;
-  const targetEquity = startEquity * (1 + totalReturnPct / 100);
-  const drift = (targetEquity - startEquity) / numPoints;
-
-  for (let i = 0; i <= numPoints; i++) {
-    const date = new Date(start.getTime() + i * step * 86400000);
-    // Add trend + noise
-    const noise = equity * (Math.random() - 0.5) * 0.03;
-    const trendDrift = drift * (0.5 + Math.random());
-    equity = equity + trendDrift + noise;
-    equity = Math.max(startEquity * 0.5, equity); // Floor at 50% loss
-
-    data.push({
-      date: date.toISOString().split('T')[0],
-      equity: Number(equity.toFixed(2)),
-    });
-  }
-
-  return data;
+interface SearchResult {
+  symbol: string;
+  description: string;
+  type: string;
 }
 
-function generateRealisticTrades(
-  totalTrades: number,
-  winRate: number,
-  startDate: string,
-  endDate: string,
-): TradeRecord[] {
-  const symbols = ['AAPL', 'NVDA', 'MSFT', 'TSLA', 'AMZN', 'META', 'GOOGL', 'AMD', 'JPM', 'V'];
-  const trades: TradeRecord[] = [];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const totalDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / 86400000));
-  const avgHoldingDays = Math.max(3, Math.floor(totalDays / totalTrades));
-
-  let currentDate = new Date(start);
-
-  for (let i = 0; i < totalTrades; i++) {
-    const symbol = symbols[i % symbols.length];
-    const isWin = Math.random() < winRate / 100;
-    const side = i % 3 === 0 ? 'SELL' as const : 'BUY' as const;
-
-    const entryPrice = Number((50 + Math.random() * 350).toFixed(2));
-    const pnlPercent = isWin
-      ? Number((1 + Math.random() * 12).toFixed(2))  // Win: 1-13%
-      : Number((-1 - Math.random() * 8).toFixed(2));  // Loss: -1 to -9%
-    const exitPrice = Number((entryPrice * (1 + pnlPercent / 100)).toFixed(2));
-    const quantity = Math.floor(10 + Math.random() * 90);
-
-    const entryDate = new Date(currentDate);
-    const holdingDays = Math.max(1, Math.floor(avgHoldingDays * (0.5 + Math.random())));
-    const exitDate = new Date(currentDate.getTime() + holdingDays * 86400000);
-
-    trades.push({
-      id: String(i + 1),
-      symbol,
-      side,
-      entryDate: entryDate.toISOString().split('T')[0],
-      exitDate: exitDate.toISOString().split('T')[0],
-      entryPrice,
-      exitPrice,
-      quantity,
-      pnl: Number(((exitPrice - entryPrice) * quantity * (side === 'SELL' ? -1 : 1)).toFixed(2)),
-      pnlPercent,
-    });
-
-    // Advance date
-    currentDate = new Date(exitDate.getTime() + Math.floor(Math.random() * 3 + 1) * 86400000);
-    if (currentDate > end) break;
-  }
-
-  return trades;
+interface BacktestViewProps {
+  initialStrategy?: string;
+  initialSymbol?: string;
+  onNavigate?: (view: string) => void;
 }
 
-function generateMockBacktestResult(config: BacktestConfig): BacktestResult {
-  // Realistic random metrics
-  const totalReturnPct = Number((-20 + Math.random() * 100).toFixed(2)); // -20% to +80%
-  const totalReturn = Number((config.initialCapital * totalReturnPct / 100).toFixed(2));
-  const winRate = Number((40 + Math.random() * 25).toFixed(1)); // 40-65%
-  const maxDrawdown = Number(-(5 + Math.random() * 30).toFixed(1)); // -5% to -35%
-  const sharpeRatio = Number((0.3 + Math.random() * 2.2).toFixed(2)); // 0.3-2.5
-  const totalTrades = Math.floor(10 + Math.random() * 20); // 10-30
-  const profitFactor = Number((0.5 + Math.random() * 2.5).toFixed(2)); // 0.5-3.0
-  const daysDiff = Math.max(1, Math.floor((new Date(config.endDate).getTime() - new Date(config.startDate).getTime()) / 86400000));
-  const annualReturn = Number((totalReturnPct / daysDiff * 365).toFixed(2));
-  const avgHoldingDays = Math.max(2, Math.floor(daysDiff / totalTrades));
+// Synced with strategy center's builtInStrategies
+const builtInStrategies = [
+  { value: 'ma-golden-cross', label: 'MA Golden Cross', isCustom: false },
+  { value: 'macd-signal', label: 'MACD Signal', isCustom: false },
+  { value: 'rsi-oversold-overbought', label: 'RSI Oversold/Overbought', isCustom: false },
+  { value: 'bollinger-breakout', label: 'Bollinger Breakout', isCustom: false },
+  { value: 'kdj-golden-cross', label: 'KDJ Golden Cross', isCustom: false },
+  { value: 'volume-breakout', label: 'Volume Breakout', isCustom: false },
+  { value: 'shrink-pullback', label: 'Shrink Pullback', isCustom: false },
+  { value: 'wave-theory', label: 'Wave Theory', isCustom: false },
+  { value: 'box-oscillation', label: 'Box Oscillation', isCustom: false },
+  { value: 'event-driven', label: 'Event Driven', isCustom: false },
+];
 
-  const equityCurve = generateRealisticEquityCurve(
-    config.initialCapital,
-    totalReturnPct,
-    config.startDate,
-    config.endDate,
-  );
-
-  const trades = generateRealisticTrades(
-    totalTrades,
-    winRate,
-    config.startDate,
-    config.endDate,
-  );
-
-  return {
-    totalReturn,
-    totalReturnPct,
-    winRate,
-    maxDrawdown,
-    sharpeRatio,
-    totalTrades,
-    profitFactor,
-    annualReturn,
-    avgHoldingDays,
-    equityCurve,
-    trades,
-    isOffline: true,
-  };
+interface CustomStrategy {
+  id: string;
+  name: string;
+  entryConditions: string[];
+  exitConditions: string[];
+  description?: string;
 }
 
-// ==================== Default Config ====================
+function getTodayStr(): string {
+  const d = new Date();
+  return d.toISOString().slice(0, 10);
+}
 
 const defaultConfig: BacktestConfig = {
   strategy: 'ma-golden-cross',
@@ -249,70 +134,207 @@ const defaultConfig: BacktestConfig = {
   stopLossPct: 8,
   takeProfitPct: 15,
   cycleDays: 7,
-  startDate: '2024-01-01',
-  endDate: '2024-12-31',
+  startDate: '2024-06-01',
+  endDate: getTodayStr(),
 };
 
-// ==================== Component ====================
-
-interface BacktestViewProps {
-  initialStrategy?: string;
-}
-
-export function BacktestView({ initialStrategy }: BacktestViewProps) {
+export function BacktestView({ initialStrategy, initialSymbol, onNavigate }: BacktestViewProps) {
   const { t } = useLanguage();
-  const [config, setConfig] = useState<BacktestConfig>({
+  const [config, setConfig] = useState<BacktestConfig>(() => ({
     ...defaultConfig,
-    strategy: initialStrategy || defaultConfig.strategy,
-  });
+    ...(initialStrategy ? { strategy: initialStrategy } : {}),
+    ...(initialSymbol ? { symbol: initialSymbol } : {}),
+  }));
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Update strategy if prop changes
+  // Custom strategies loaded from API (database)
+  const [customStrategies, setCustomStrategies] = useState<CustomStrategy[]>([]);
+
+  // Combined strategies list for dropdown
+  const allStrategies = [
+    ...builtInStrategies,
+    ...customStrategies.map((s) => ({ value: s.id, label: `${s.name} (Custom)`, isCustom: true })),
+  ];
+
+  // Symbol search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch custom strategies from API on mount
+  useEffect(() => {
+    async function fetchCustomStrategies() {
+      try {
+        const res = await fetch('/api/fusion/strategies');
+        if (res.ok) {
+          const data = await res.json();
+          const custom = data
+            .filter((s: { source?: string }) => s.source === 'custom')
+            .map((s: { id: string; name: string; entryCondition?: string; exitCondition?: string; description?: string }) => ({
+              id: s.id,
+              name: s.name,
+              entryConditions: s.entryCondition ? s.entryCondition.split('；').filter(Boolean) : [],
+              exitConditions: s.exitCondition ? s.exitCondition.split('；').filter(Boolean) : [],
+              description: s.description || '',
+            }));
+          setCustomStrategies(custom);
+        }
+      } catch {
+        // Failed to fetch custom strategies, keep empty
+      }
+    }
+    fetchCustomStrategies();
+  }, []);
+
+  // Update config when props change (e.g. navigation from strategy center)
   useEffect(() => {
     if (initialStrategy) {
-      setConfig(prev => ({ ...prev, strategy: initialStrategy }));
+      setConfig((prev) => ({ ...prev, strategy: initialStrategy }));
     }
+    // Also refresh custom strategies when navigating from strategy center
+    async function refetchCustomStrategies() {
+      try {
+        const res = await fetch('/api/fusion/strategies');
+        if (res.ok) {
+          const data = await res.json();
+          const custom = data
+            .filter((s: { source?: string }) => s.source === 'custom')
+            .map((s: { id: string; name: string; entryCondition?: string; exitCondition?: string; description?: string }) => ({
+              id: s.id,
+              name: s.name,
+              entryConditions: s.entryCondition ? s.entryCondition.split('；').filter(Boolean) : [],
+              exitConditions: s.exitCondition ? s.exitCondition.split('；').filter(Boolean) : [],
+              description: s.description || '',
+            }));
+          setCustomStrategies(custom);
+        }
+      } catch {
+        // Failed to refresh custom strategies
+      }
+    }
+    refetchCustomStrategies();
   }, [initialStrategy]);
+
+  useEffect(() => {
+    if (initialSymbol) {
+      setConfig((prev) => ({ ...prev, symbol: initialSymbol }));
+    }
+  }, [initialSymbol]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Symbol search with debounce
+  const handleSymbolSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+    setConfig((prev) => ({ ...prev, symbol: query.toUpperCase() }));
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (!query.trim()) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    setSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/market/search?q=${encodeURIComponent(query)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(Array.isArray(data) ? data.slice(0, 8) : []);
+          setShowDropdown(true);
+        }
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+  }, []);
+
+  const handleSelectSymbol = (symbol: string) => {
+    setConfig((prev) => ({ ...prev, symbol }));
+    setSearchQuery(symbol);
+    setShowDropdown(false);
+    inputRef.current?.blur();
+  };
 
   const handleRunBacktest = async () => {
     setRunning(true);
+    setError(null);
     setResult(null);
-
     try {
+      // Check if this is a custom strategy (either old localStorage 'custom-' prefix or DB cuid)
+      const isBuiltInStrategy = builtInStrategies.some((s) => s.value === config.strategy);
+      const isCustomStrategy = !isBuiltInStrategy;
+      const requestBody: Record<string, unknown> = { ...config };
+
+      // For custom strategies, send the strategy details
+      if (isCustomStrategy) {
+        const customStrat = customStrategies.find((s) => s.id === config.strategy);
+        if (customStrat) {
+          requestBody.customStrategy = {
+            name: customStrat.name,
+            entryConditions: customStrat.entryConditions,
+            exitConditions: customStrat.exitConditions,
+            description: customStrat.description,
+          };
+        }
+      }
+
       const res = await fetch('/api/fusion/backtest/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify(requestBody),
       });
 
       if (res.ok) {
         const data = await res.json();
-        // Check if the response looks like a valid backtest result
-        if (data && (data.totalReturn !== undefined || data.equityCurve || data.trades)) {
-          setResult({
-            ...data,
-            isOffline: false,
-          });
-        } else {
-          // API returned something unexpected, use mock
-          setResult(generateMockBacktestResult(config));
-        }
+        setResult(data);
       } else {
-        // API failed (502 or other), use realistic mock
-        setResult(generateMockBacktestResult(config));
+        let errorMsg = t('back.backtestFailed');
+        try {
+          const errData = await res.json();
+          if (errData.error) {
+            errorMsg = errData.error;
+          }
+        } catch {
+          // JSON parse failed, use default error message
+        }
+        setError(errorMsg);
       }
     } catch {
-      // Network error, use realistic mock
-      setResult(generateMockBacktestResult(config));
+      setError(t('back.networkError'));
     } finally {
       setRunning(false);
     }
   };
 
   const handleReset = () => {
-    setConfig({ ...defaultConfig, strategy: initialStrategy || defaultConfig.strategy });
+    setConfig({ ...defaultConfig, endDate: getTodayStr() });
     setResult(null);
+    setError(null);
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowDropdown(false);
   };
 
   return (
@@ -325,11 +347,22 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
               <FlaskConical className="w-5 h-5 text-emerald-400" />
               <CardTitle className="text-base font-semibold text-white">{t('back.config')}</CardTitle>
             </div>
+            {onNavigate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onNavigate('strategies')}
+                className="text-zinc-400 hover:text-emerald-400 gap-1.5 text-xs"
+              >
+                <Compass className="w-3.5 h-3.5" />
+                {t('back.goToStrategyCenter')}
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Strategy + Symbol */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Strategy Selector + Symbol */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
             <div className="space-y-2">
               <Label className="text-zinc-300 text-sm">{t('back.strategy')}</Label>
               <Select value={config.strategy} onValueChange={(v) => setConfig({ ...config, strategy: v })}>
@@ -337,9 +370,9 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
                   <SelectValue placeholder={t('back.selectStrategy')} />
                 </SelectTrigger>
                 <SelectContent className="bg-[#111118] border-[#1e1e2e]">
-                  {STRATEGY_LIST.map((s) => (
+                  {allStrategies.map((s) => (
                     <SelectItem key={s.value} value={s.value} className="text-zinc-300 focus:text-white focus:bg-[#1a1a2e]">
-                      {s.label}
+                      {s.isCustom ? `⭐ ${s.label}` : s.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -347,12 +380,55 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
             </div>
             <div className="space-y-2">
               <Label className="text-zinc-300 text-sm">{t('back.symbol')}</Label>
-              <Input
-                placeholder="例如 AAPL"
-                value={config.symbol}
-                onChange={(e) => setConfig({ ...config, symbol: e.target.value.toUpperCase() })}
-                className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
-              />
+              <div className="relative" ref={dropdownRef}>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+                  <Input
+                    ref={inputRef}
+                    placeholder={t('back.searchSymbol')}
+                    value={searchQuery || config.symbol}
+                    onChange={(e) => handleSymbolSearch(e.target.value)}
+                    onFocus={() => {
+                      if (searchResults.length > 0) setShowDropdown(true);
+                    }}
+                    className="pl-9 pr-8 bg-[#0a0a0f] border-[#1e1e2e] text-white uppercase"
+                  />
+                  {searching && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 animate-spin" />
+                  )}
+                  {!searching && searchQuery && (
+                    <button
+                      onClick={() => {
+                        handleSymbolSearch('');
+                        inputRef.current?.focus();
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                {/* Autocomplete Dropdown */}
+                {showDropdown && searchResults.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-[#111118] border border-[#1e1e2e] rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto custom-scrollbar">
+                    {searchResults.map((stock) => (
+                      <button
+                        key={stock.symbol}
+                        onClick={() => handleSelectSymbol(stock.symbol)}
+                        className="w-full px-3 py-2 flex items-center justify-between hover:bg-[#1a1a2e] transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm font-medium text-white">{stock.symbol}</span>
+                          <span className="text-xs text-zinc-400 truncate">{stock.description}</span>
+                        </div>
+                        <Badge className="bg-[#1e1e2e] text-zinc-500 text-[9px] border-0 flex-shrink-0">
+                          {stock.type}
+                        </Badge>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -407,18 +483,21 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
               <Input
                 type="date"
                 value={config.startDate}
+                max={config.endDate}
                 onChange={(e) => setConfig({ ...config, startDate: e.target.value })}
                 className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="max-w-xs">
             <div className="space-y-2">
               <Label className="text-zinc-300 text-sm">{t('back.endDate')}</Label>
               <Input
                 type="date"
                 value={config.endDate}
+                min={config.startDate}
+                max={getTodayStr()}
                 onChange={(e) => setConfig({ ...config, endDate: e.target.value })}
                 className="bg-[#0a0a0f] border-[#1e1e2e] text-white"
               />
@@ -428,7 +507,7 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
           <div className="flex items-center gap-3">
             <Button
               onClick={handleRunBacktest}
-              disabled={running}
+              disabled={running || !config.symbol}
               className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
             >
               <Play className="w-4 h-4" />
@@ -449,110 +528,93 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
       {/* Results */}
       {result && (
         <div className="space-y-6">
-          {/* Offline / Simulated Data Warning */}
-          {result.isOffline && (
-            <div className="flex items-center gap-3 p-4 bg-yellow-600/10 border border-yellow-600/30 rounded-xl">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-yellow-600/20 flex items-center justify-center">
-                <WifiOff className="w-5 h-5 text-yellow-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-yellow-400">{t('back.simulatedWarning')}</p>
-                <p className="text-xs text-yellow-500/80 mt-0.5">{t('back.simulatedWarningDesc')}</p>
-              </div>
-              <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[10px] flex-shrink-0">
-                {t('back.offlineMode')}
-              </Badge>
-            </div>
+          {/* Simulated Data Warning Banner */}
+          {result.dataSource === 'simulated' && (
+            <Card className="bg-yellow-900/20 border-yellow-600/30 rounded-xl">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge className="bg-yellow-600/20 text-yellow-400 border-yellow-600/30 border text-xs font-semibold">
+                        {t('back.simulatedData')}
+                      </Badge>
+                    </div>
+                    <p className="text-yellow-300/80 text-sm leading-relaxed">
+                      {t('back.simulatedWarning')}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Result Metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <DollarSign className="w-3 h-3 text-emerald-400" />
-                  <span className="text-[9px] text-zinc-500 uppercase tracking-wider">{t('back.totalReturn')}</span>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('back.totalReturn')}</span>
                 </div>
-                <p className={`text-base font-bold ${result.totalReturn >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <p className={`text-lg font-bold ${result.totalReturn >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {result.totalReturn >= 0 ? '+' : ''}${Math.abs(result.totalReturn).toLocaleString()}
                 </p>
               </CardContent>
             </Card>
             <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 mb-1">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
                   {result.totalReturnPct >= 0 ? (
-                    <TrendingUp className="w-3 h-3 text-emerald-400" />
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
                   ) : (
-                    <TrendingDown className="w-3 h-3 text-red-400" />
+                    <TrendingDown className="w-3.5 h-3.5 text-red-400" />
                   )}
-                  <span className="text-[9px] text-zinc-500 uppercase tracking-wider">{t('back.returnPercent')}</span>
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('back.returnPercent')}</span>
                 </div>
-                <p className={`text-base font-bold ${result.totalReturnPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <p className={`text-lg font-bold ${result.totalReturnPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {result.totalReturnPct >= 0 ? '+' : ''}{result.totalReturnPct.toFixed(2)}%
                 </p>
               </CardContent>
             </Card>
             <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Target className="w-3 h-3 text-emerald-400" />
-                  <span className="text-[9px] text-zinc-500 uppercase tracking-wider">{t('back.winRate')}</span>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Target className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('back.winRate')}</span>
                 </div>
-                <p className={`text-base font-bold ${result.winRate >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <p className={`text-lg font-bold ${result.winRate >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {result.winRate.toFixed(1)}%
                 </p>
               </CardContent>
             </Card>
             <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <TrendingDown className="w-3 h-3 text-red-400" />
-                  <span className="text-[9px] text-zinc-500 uppercase tracking-wider">{t('back.maxDrawdown')}</span>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingDown className="w-3.5 h-3.5 text-red-400" />
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('back.maxDrawdown')}</span>
                 </div>
-                <p className="text-base font-bold text-red-400">{result.maxDrawdown.toFixed(1)}%</p>
+                <p className="text-lg font-bold text-red-400">{result.maxDrawdown.toFixed(1)}%</p>
               </CardContent>
             </Card>
             <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Activity className="w-3 h-3 text-emerald-400" />
-                  <span className="text-[9px] text-zinc-500 uppercase tracking-wider">{t('back.sharpeRatio')}</span>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('back.sharpeRatio')}</span>
                 </div>
-                <p className={`text-base font-bold ${result.sharpeRatio >= 1 ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                <p className={`text-lg font-bold ${result.sharpeRatio >= 1 ? 'text-emerald-400' : 'text-yellow-400'}`}>
                   {result.sharpeRatio.toFixed(2)}
                 </p>
               </CardContent>
             </Card>
             <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <BarChart3 className="w-3 h-3 text-emerald-400" />
-                  <span className="text-[9px] text-zinc-500 uppercase tracking-wider">{t('back.totalTrades')}</span>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t('back.totalTrades')}</span>
                 </div>
-                <p className="text-base font-bold text-white">{result.totalTrades}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <DollarSign className="w-3 h-3 text-emerald-400" />
-                  <span className="text-[9px] text-zinc-500 uppercase tracking-wider">{t('back.profitFactor')}</span>
-                </div>
-                <p className={`text-base font-bold ${result.profitFactor >= 1 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {result.profitFactor.toFixed(2)}
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <TrendingUp className="w-3 h-3 text-emerald-400" />
-                  <span className="text-[9px] text-zinc-500 uppercase tracking-wider">{t('back.annualReturn')}</span>
-                </div>
-                <p className={`text-base font-bold ${result.annualReturn >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {result.annualReturn >= 0 ? '+' : ''}{result.annualReturn.toFixed(1)}%
-                </p>
+                <p className="text-lg font-bold text-white">{result.totalTrades}</p>
               </CardContent>
             </Card>
           </div>
@@ -560,7 +622,17 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
           {/* Equity Curve */}
           <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-white">{t('back.equityCurve')}</CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base font-semibold text-white">{t('back.equityCurve')}</CardTitle>
+                <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[10px]">
+                  {config.symbol}
+                </Badge>
+                {result.dataSource === 'simulated' && (
+                  <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[10px]">
+                    {t('back.simulatedData')}
+                  </Badge>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="h-72">
@@ -573,12 +645,12 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
-                    <XAxis dataKey="date" stroke="#71717a" tick={{ fontSize: 10 }} tickLine={false} axisLine={{ stroke: '#1e1e2e' }} interval={Math.floor(result.equityCurve.length / 6)} />
+                    <XAxis dataKey="date" stroke="#71717a" tick={{ fontSize: 10 }} tickLine={false} axisLine={{ stroke: '#1e1e2e' }} interval={29} />
                     <YAxis stroke="#71717a" tick={{ fontSize: 10 }} tickLine={false} axisLine={{ stroke: '#1e1e2e' }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                     <RechartsTooltip
                       contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #2e2e3e', borderRadius: '8px', fontSize: '12px' }}
                       itemStyle={{ color: '#10b981' }}
-                      formatter={(value: number) => [`¥${value.toLocaleString()}`, '权益']}
+                      formatter={(value: number) => [`$${value.toLocaleString()}`, 'Equity']}
                     />
                     <Area type="monotone" dataKey="equity" stroke="#10b981" strokeWidth={2} fill="url(#equityGradient)" />
                   </AreaChart>
@@ -594,17 +666,14 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
                 <CardTitle className="text-base font-semibold text-white">{t('back.tradeList')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto max-h-96 overflow-y-auto custom-scrollbar">
+                <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="border-[#1e1e2e] hover:bg-transparent">
-                        <TableHead className="text-zinc-400 text-xs">{t('back.symbol')}</TableHead>
-                        <TableHead className="text-zinc-400 text-xs">方向</TableHead>
-                        <TableHead className="text-zinc-400 text-xs">{t('back.entryDate')}</TableHead>
-                        <TableHead className="text-zinc-400 text-xs">{t('back.exitDate')}</TableHead>
-                        <TableHead className="text-zinc-400 text-xs">{t('back.entryPrice')}</TableHead>
-                        <TableHead className="text-zinc-400 text-xs">{t('back.exitPrice')}</TableHead>
-                        <TableHead className="text-zinc-400 text-xs">{t('back.quantity')}</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">Symbol</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">Side</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">Entry</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">Exit</TableHead>
                         <TableHead className="text-zinc-400 text-xs">{t('back.tradePnl')}</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -614,16 +683,13 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
                           <TableCell className="text-sm font-medium text-white">{trade.symbol}</TableCell>
                           <TableCell>
                             <Badge className={`text-[10px] px-1.5 py-0 ${trade.side === 'BUY' ? 'bg-emerald-600/15 text-emerald-400' : 'bg-red-600/15 text-red-400'}`}>
-                              {trade.side === 'BUY' ? '买入' : '卖出'}
+                              {trade.side}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-xs text-zinc-300">{trade.entryDate}</TableCell>
-                          <TableCell className="text-xs text-zinc-300">{trade.exitDate}</TableCell>
-                          <TableCell className="text-xs text-zinc-300">${trade.entryPrice.toFixed(2)}</TableCell>
-                          <TableCell className="text-xs text-zinc-300">${trade.exitPrice.toFixed(2)}</TableCell>
-                          <TableCell className="text-xs text-zinc-300">{trade.quantity}</TableCell>
+                          <TableCell className="text-sm text-zinc-300">${trade.entryPrice.toFixed(2)}</TableCell>
+                          <TableCell className="text-sm text-zinc-300">${trade.exitPrice.toFixed(2)}</TableCell>
                           <TableCell>
-                            <span className={`text-xs font-medium ${trade.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            <span className={`text-sm font-medium ${trade.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                               {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(2)} ({trade.pnlPercent >= 0 ? '+' : ''}{trade.pnlPercent.toFixed(1)}%)
                             </span>
                           </TableCell>
@@ -638,8 +704,19 @@ export function BacktestView({ initialStrategy }: BacktestViewProps) {
         </div>
       )}
 
+      {/* Error State */}
+      {error && !running && (
+        <Card className="bg-[#111118] border-red-900/30 rounded-xl">
+          <CardContent className="py-12 text-center">
+            <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+            <p className="text-red-400 text-sm font-medium mb-2">{t('back.backtestFailed')}</p>
+            <p className="text-zinc-400 text-xs max-w-md mx-auto">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* No Results State */}
-      {!result && !running && (
+      {!result && !running && !error && (
         <Card className="bg-[#111118] border-[#1e1e2e] border-dashed rounded-xl">
           <CardContent className="py-16 text-center">
             <FlaskConical className="w-12 h-12 text-zinc-600 mx-auto mb-3" />

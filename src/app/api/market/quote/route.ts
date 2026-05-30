@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || '';
+import { getFinnhubApiKey } from '@/lib/finnhub-config';
 
 // Fallback data for market indices (Finnhub free plan doesn't support CFD indices)
 const INDEX_QUOTES: Record<string, { currentPrice: number; change: number; changePercent: number; high: number; low: number; open: number; prevClose: number }> = {
@@ -11,12 +10,13 @@ const INDEX_QUOTES: Record<string, { currentPrice: number; change: number; chang
 
 export async function GET(request: NextRequest) {
   try {
+    const FINNHUB_API_KEY = await getFinnhubApiKey();
     const { searchParams } = new URL(request.url);
     const symbol = searchParams.get('symbol');
 
     if (!symbol) {
       return NextResponse.json(
-        { error: '股票代码参数不能为空' },
+        { error: 'Symbol parameter is required' },
         { status: 400 }
       );
     }
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     if (!FINNHUB_API_KEY) {
       return NextResponse.json(
-        { error: 'Finnhub API密钥未配置' },
+        { error: 'Finnhub API key not configured' },
         { status: 500 }
       );
     }
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: `Finnhub API错误: ${response.status}` },
+        { error: `Finnhub API error: ${response.status}` },
         { status: response.status }
       );
     }
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     // Finnhub returns { c: current, d: change, dp: changePercent, h: high, l: low, o: open, pc: prevClose, t: timestamp }
     if (!data || (data.c === 0 && data.h === 0 && data.l === 0)) {
       return NextResponse.json(
-        { error: '未找到行情数据' },
+        { error: 'No quote data found for symbol' },
         { status: 404 }
       );
     }
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Quote API error:', error);
     return NextResponse.json(
-      { error: '获取股票行情失败' },
+      { error: 'Failed to fetch stock quote' },
       { status: 500 }
     );
   }

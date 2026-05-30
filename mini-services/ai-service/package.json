@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "QuantFusion AI Service - Intelligence engine for stock analysis",
   "scripts": {
-    "dev": "python3 main.py",
-    "start": "python3 main.py"
+    "dev": "uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
+    "start": "uvicorn main:app --host 0.0.0.0 --port 8000"
   }
 }
