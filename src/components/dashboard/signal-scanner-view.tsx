@@ -447,11 +447,13 @@ export function SignalScannerView() {
           });
 
           const hasRealData = summary?.realDataCount > 0;
+          const hasSemiRealData = (summary?.semiRealDataCount || 0) > 0;
           const hasMockData = summary?.mockDataCount > 0;
 
           setSignals(apiSignals);
-          setIsDemoMode(!hasRealData && hasMockData);
-          setIsOffline(!hasRealData);
+          // Semi-real data (real prices, simulated candles) is good enough to not show "demo mode"
+          setIsDemoMode(!hasRealData && !hasSemiRealData && hasMockData);
+          setIsOffline(!hasRealData && !hasSemiRealData);
 
           if (apiSignals.length > 0) {
             setSelectedSignal(apiSignals[0]);

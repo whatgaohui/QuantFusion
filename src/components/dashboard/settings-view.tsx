@@ -156,6 +156,32 @@ export function SettingsView() {
     setSaving(prev => ({ ...prev, [provider]: true }));
     try {
       const config = providerConfigs[provider];
+
+      // When enabling this provider, disable all others
+      if (config.enabled) {
+        // Disable all other providers in the UI state
+        setProviderConfigs(prev => {
+          const updated = { ...prev };
+          for (const key of Object.keys(updated)) {
+            if (key !== provider) {
+              updated[key] = { ...updated[key], enabled: false };
+            }
+          }
+          return updated;
+        });
+
+        // Disable all other providers in the backend
+        for (const otherProvider of Object.keys(PROVIDERS)) {
+          if (otherProvider !== provider) {
+            await fetch('/api/settings/llm', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ provider: otherProvider, enabled: false }),
+            });
+          }
+        }
+      }
+
       const res = await fetch('/api/settings/llm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

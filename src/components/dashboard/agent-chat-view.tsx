@@ -16,6 +16,8 @@ import {
   WifiOff,
   AlertTriangle,
   RefreshCw,
+  Settings,
+  Cpu,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,6 +42,7 @@ interface ChatMessage {
   timestamp: string;
   isOffline?: boolean;
   errorDetail?: string;
+  provider?: string;
 }
 
 interface ChatSession {
@@ -109,6 +112,7 @@ export function AgentChatView() {
   const [sending, setSending] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [aiConnected, setAiConnected] = useState<boolean | null>(null);
+  const [currentProvider, setCurrentProvider] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
@@ -161,12 +165,14 @@ export function AgentChatView() {
       if (res.ok && data.success && data.data?.response) {
         // Real AI response received!
         setAiConnected(true);
+        setCurrentProvider(data.data.provider || 'unknown');
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
           content: data.data.response,
           timestamp: new Date().toISOString(),
           isOffline: false,
+          provider: data.data.provider,
         };
         setSessions((prev) =>
           prev.map((s) =>
@@ -178,12 +184,17 @@ export function AgentChatView() {
       } else {
         // AI service returned an error — show clear error message
         setAiConnected(false);
+        const isConfigError = (data.error || data.data?.error || '').includes('API Key') || (data.error || data.data?.error || '').includes('设置页面');
         const errorMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: 'error',
-          content: language === 'zh'
-            ? '⚠️ AI分析服务暂时不可用，请稍后重试。'
-            : '⚠️ AI analysis service is temporarily unavailable. Please try again later.',
+          content: isConfigError
+            ? (language === 'zh'
+              ? '⚠️ AI服务未配置，请在设置页面配置API Key后重试。'
+              : '⚠️ AI service not configured. Please configure API Key in Settings.')
+            : (language === 'zh'
+              ? '⚠️ AI分析服务暂时不可用，请稍后重试。'
+              : '⚠️ AI analysis service is temporarily unavailable. Please try again later.'),
           timestamp: new Date().toISOString(),
           errorDetail: data.error || data.data?.error || undefined,
         };
@@ -269,7 +280,12 @@ export function AgentChatView() {
             {aiConnected === true && (
               <>
                 <Wifi className="w-3 h-3 text-emerald-500" />
-                <span className="text-[10px] text-emerald-500">{t('chat.realtimeMode')}</span>
+                <span className="text-[10px] text-emerald-500">
+                  {t('chat.realtimeMode')}
+                  {currentProvider && currentProvider !== 'zai' && (
+                    <span className="ml-1 text-zinc-500">({currentProvider})</span>
+                  )}
+                </span>
               </>
             )}
             {aiConnected === false && (

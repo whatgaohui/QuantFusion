@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { invalidateProviderCache } from '@/lib/ai-service';
 
 // Provider default configurations
 const PROVIDER_DEFAULTS: Record<string, { baseUrl: string; model: string; temperature: number; maxTokens: number }> = {
@@ -91,6 +92,9 @@ export async function POST(request: NextRequest) {
         update: { value },
       });
     }
+
+    // Invalidate AI service provider cache so it picks up the new config
+    invalidateProviderCache();
 
     return NextResponse.json({ success: true, message: '配置已保存' });
   } catch (error) {

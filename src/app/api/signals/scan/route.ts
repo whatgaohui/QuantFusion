@@ -105,7 +105,9 @@ function toFinnhubSymbol(symbol: string): string {
   return symbol;
 }
 
-async function fetchCandleData(symbol: string): Promise<{ candle: CandleData | null; usedRealData: boolean }> {
+type DataQuality = 'real' | 'semi-real' | 'mock';
+
+async function fetchCandleData(symbol: string): Promise<{ candle: CandleData | null; dataQuality: DataQuality }> {
   const finnhubSymbol = toFinnhubSymbol(symbol);
 
   // Try Finnhub candle API first
@@ -119,17 +121,18 @@ async function fetchCandleData(symbol: string): Promise<{ candle: CandleData | n
     );
 
     if (data && data.s === 'ok' && data.c && data.c.length >= 30) {
-      return { candle: { o: data.o, h: data.h, l: data.l, c: data.c, v: data.v, t: data.t }, usedRealData: true };
+      return { candle: { o: data.o, h: data.h, l: data.l, c: data.c, v: data.v, t: data.t }, dataQuality: 'real' };
     }
 
-    // Try getting current price from quote for better mock data
+    // Try getting current price from quote for semi-real data
     const quoteData = await finnhubFetch<{ c: number }>('quote', { symbol: finnhubSymbol });
     if (quoteData && quoteData.c && quoteData.c > 0) {
-      return { candle: generateMockCandleData(quoteData.c, 90), usedRealData: false };
+      // Real price + simulated candles = semi-real data
+      return { candle: generateMockCandleData(quoteData.c, 90), dataQuality: 'semi-real' };
     }
   }
 
-  return { candle: generateMockCandleData(150, 90), usedRealData: false };
+  return { candle: generateMockCandleData(150, 90), dataQuality: 'mock' };
 }
 
 async function fetchQuotePrice(symbol: string): Promise<number> {
@@ -278,7 +281,7 @@ export async function POST(request: NextRequest) {
     const results: Array<{
       symbol: string;
       data: ReturnType<typeof analyzeSignals> | null;
-      usedRealData: boolean;
+      dataQuality: DataQuality;
     }> = [];
 
     // Process in batches of 3 to respect Finnhub rate limits
@@ -287,17 +290,17 @@ export async function POST(request: NextRequest) {
       const batchResults = await Promise.all(
         batch.map(async (symbol) => {
           try {
-            const { candle, usedRealData } = await fetchCandleData(symbol);
+            const { candle, dataQuality } = await fetchCandleData(symbol);
             if (!candle || candle.c.length < 30) {
               console.warn(`[SignalScan] Insufficient data for ${symbol}`);
-              return { symbol, data: null, usedRealData: false };
+              return { symbol, data: null, dataQuality: 'mock' as DataQuality };
             }
             const stockInfo = marketStocks[symbol] || { name: symbol, sector: market };
             const analysis = analyzeSignals(candle, symbol, stockInfo);
-            return { symbol, data: analysis, usedRealData };
+            return { symbol, data: analysis, dataQuality };
           } catch (err) {
             console.error(`[SignalScan] Error scanning ${symbol}:`, err);
-            return { symbol, data: null, usedRealData: false };
+            return { symbol, data: null, dataQuality: 'mock' as DataQuality };
           }
         })
       );
@@ -305,9 +308,11 @@ export async function POST(request: NextRequest) {
     }
 
     const signals = results.filter(r => r.data !== null).map(r => r.data);
-    const realDataCount = results.filter(r => r.usedRealData).length;
+    const realDataCount = results.filter(r => r.dataQuality === 'real').length;
+    const semiRealCount = results.filter(r => r.dataQuality === 'semi-real').length;
+    const mockDataCount = results.filter(r => r.dataQuality === 'mock').length;
 
-    console.log(`[SignalScan] Completed: ${signals.length}/${symbols.length} signals, ${realDataCount} using real Finnhub data`);
+    console.log(`[SignalScan] Completed: ${signals.length}/${symbols.length} signals, real=${realDataCount}, semi-real=${semiRealCount}, mock=${mockDataCount}`);
 
     return NextResponse.json({
       success: true,
@@ -317,7 +322,8 @@ export async function POST(request: NextRequest) {
           total: symbols.length,
           scanned: signals.length,
           realDataCount,
-          mockDataCount: signals.length - realDataCount,
+          semiRealDataCount: semiRealCount,
+          mockDataCount,
           market,
         },
       },
@@ -357,7 +363,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const { candle, usedRealData } = await fetchCandleData(symbol);
+    const { candle, dataQuality } = await fetchCandleData(symbol);
     if (!candle || candle.c.length < 30) {
       return NextResponse.json(
         { success: false, data: null, error: '该股票数据不足以进行扫描' },
@@ -380,7 +386,7 @@ export async function GET(request: NextRequest) {
           v: candle.v,
           t: candle.t,
         },
-        usedRealData,
+        dataQuality,
       },
       error: null,
     });

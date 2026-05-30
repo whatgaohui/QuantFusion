@@ -16,16 +16,19 @@ export async function POST(request: NextRequest) {
     const sessionId = session_id || crypto.randomUUID();
     const chatMode = mode === 'deep' ? 'deep' : 'quick';
 
-    const { response, isOffline, error } = await chatWithAssistant(
+    const { response, isOffline, error, provider } = await chatWithAssistant(
       message,
       sessionId,
       chatMode
     );
 
-    console.log(`[Chat] ${chatMode} mode, offline: ${isOffline}, response length: ${response?.length || 0}, error: ${error || 'none'}`);
+    console.log(`[Chat] ${chatMode} mode, provider: ${provider || 'unknown'}, offline: ${isOffline}, response length: ${response?.length || 0}, error: ${error || 'none'}`);
 
     if (isOffline || !response) {
-      // AI service is unavailable — return error, NOT mock data
+      // AI service is unavailable — return error with helpful message
+      const errorDetail = error || 'AI服务暂时不可用';
+      const isConfigError = errorDetail.includes('API Key not configured');
+
       return NextResponse.json({
         success: false,
         data: {
@@ -33,9 +36,14 @@ export async function POST(request: NextRequest) {
           session_id: sessionId,
           source: 'ai',
           is_offline: true,
-          error: error || 'AI服务暂时不可用，请稍后重试',
+          error: isConfigError
+            ? '请在设置页面配置AI服务的API Key后重试'
+            : errorDetail,
+          provider: provider || 'unknown',
         },
-        error: 'AI服务暂时不可用，请稍后重试',
+        error: isConfigError
+          ? '请在设置页面配置AI服务的API Key后重试'
+          : 'AI服务暂时不可用，请稍后重试',
       }, { status: 503 });
     }
 
@@ -46,6 +54,7 @@ export async function POST(request: NextRequest) {
         session_id: sessionId,
         source: 'ai',
         is_offline: false,
+        provider: provider || 'unknown',
       },
       error: null,
     });

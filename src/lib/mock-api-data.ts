@@ -190,26 +190,3 @@ export function getMockBacktest(strategy: string, symbol: string) {
     trades: Array.from({length:10},(_,i)=>({id:i+1,entryPrice:+(100+Math.random()*200).toFixed(2),exitPrice:+(100+Math.random()*200).toFixed(2),quantity:Math.floor(10+Math.random()*90),pnl:+((Math.random()-0.4)*2000).toFixed(2)})),
   }, error: null };
 }
-
-export function getMockChatResponse(message: string) {
-  return { success: true, data: { response: '你好！我是QuantFusion AI助手，我可以帮你分析股票、解读市场趋势、提供交易洞察。请问有什么可以帮你的？', source: 'mock' }, error: null };
-}
-
-export function getMockAnalysis(symbol: string, mode: string) {
-  const sc = 40 + Math.floor(Math.random() * 40);
-  const rec = sc >= 65 ? 'BUY' : sc >= 45 ? 'HOLD' : 'SELL';
-  return { success: true, data: {
-    symbol, mode, source: 'mock',
-    technical: '短期趋势偏多，MACD金叉形成', fundamental: '行业龙头，估值合理',
-    sentiment: '市场情绪中性偏多', risk: '关注宏观经济不确定性',
-    recommendation: rec, score: sc, confidence: 'medium',
-    summary: `综合评分${sc}分，建议${rec === 'BUY' ? '买入' : rec === 'SELL' ? '卖出' : '持有'}`,
-  }, error: null };
-}
-
-export function getMockBrief() {
-  return { success: true, data: {
-    brief: '📊 今日市场简报\n\n🇨🇳 A股：集体收涨，半导体领涨\n🇭🇰 港股：小幅上涨，南向资金流入\n🇺🇸 美股：三大指数创新高\n\n💡 观点：短期市场偏多',
-    source: 'mock',
-  }, error: null };
-}
