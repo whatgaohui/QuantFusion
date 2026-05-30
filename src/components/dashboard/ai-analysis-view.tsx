@@ -26,6 +26,8 @@ import {
   Cpu,
   Wifi,
   WifiOff,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -129,173 +131,6 @@ function getRecIcon(rec: string) {
   }
 }
 
-// --- Mock data generators for offline mode ---
-
-const aShareStocks: Record<string, string> = {
-  '600519': '贵州茅台', '000858': '五粮液', '601318': '中国平安',
-  '300750': '宁德时代', '600036': '招商银行', '000333': '美的集团',
-  '601012': '隆基绿能', '600900': '长江电力', '000001': '平安银行',
-  '601398': '工商银行', '600276': '恒瑞医药', '002475': '立讯精密',
-};
-
-const usStocks: Record<string, string> = {
-  'AAPL': '苹果', 'NVDA': '英伟达', 'TSLA': '特斯拉',
-  'MSFT': '微软', 'GOOGL': '谷歌', 'AMZN': '亚马逊',
-  'META': 'Meta', 'JPM': '摩根大通', 'V': 'Visa',
-};
-
-const hkStocks: Record<string, string> = {
-  '00700': '腾讯控股', '09988': '阿里巴巴', '03690': '美团',
-  '09618': '京东集团', '01810': '小米集团', '02318': '中国平安',
-};
-
-function generateMockAnalysis(symbol: string, mode: AnalysisMode, lang: 'en' | 'zh'): AnalysisResult {
-  const score = Math.floor(Math.random() * 40) + 40; // 40-79
-  const recommendation: 'BUY' | 'HOLD' | 'SELL' = score >= 65 ? 'BUY' : score >= 45 ? 'HOLD' : 'SELL';
-  const riskScore = Math.floor(Math.random() * 50) + 15;
-  const riskLevel = riskScore < 30 ? 'LOW' : riskScore < 55 ? 'MEDIUM' : 'HIGH';
-  const tokens = Math.floor(Math.random() * 3000) + 1500;
-  const cost = +(tokens * 0.000008).toFixed(3);
-
-  // Detect market
-  const cleanSymbol = symbol.replace(/^(SH|SZ|HK)/i, '');
-  const stockName = aShareStocks[cleanSymbol] || usStocks[symbol] || hkStocks[cleanSymbol] || symbol;
-  const isAShare = symbol.match(/^(SH|SZ)\d+$/i) || aShareStocks[cleanSymbol];
-  const isHK = symbol.match(/^HK\d+$/i) || hkStocks[cleanSymbol];
-
-  const rsi = (50 + Math.random() * 25).toFixed(1);
-  const ma5 = isAShare ? (1500 + Math.random() * 500).toFixed(2) : (150 + Math.random() * 100).toFixed(2);
-  const supportLevel = isAShare ? (1700 + Math.random() * 200).toFixed(0) : (140 + Math.random() * 30).toFixed(2);
-  const resistLevel = isAShare ? (1900 + Math.random() * 200).toFixed(0) : (190 + Math.random() * 30).toFixed(2);
-
-  if (lang === 'zh') {
-    const technicalSummary = `${stockName}(${symbol})当前运行于5日均线上方，短期趋势偏强。RSI(14)为${rsi}，处于中性偏多区域。MACD红柱持续放大，DIF线在DEA线上方，确认多头动能。5日均线 ¥${ma5} 构成短线支撑，下方关键支撑 ¥${supportLevel}，上方阻力 ¥${resistLevel}。成交量温和放大，量价配合良好。`;
-
-    const peRatio = (15 + Math.random() * 30).toFixed(1);
-    const revenueGrowth = (5 + Math.random() * 20).toFixed(1);
-    const fundamentalSummary = `${stockName}最新财报显示营收同比增长${revenueGrowth}%，利润端表现稳健。市盈率${peRatio}倍，处于行业${parseFloat(peRatio) > 25 ? '偏高' : '合理'}水平。${isAShare ? '经营性现金流充裕，分红率稳定，具备防御价值。' : '核心业务竞争力突出，市场份额持续提升。'}毛利率保持稳定，费用管控良好。`;
-
-    const analystBuyPct = Math.floor(55 + Math.random() * 30);
-    const sentimentSummary = `市场情绪整体偏正面。${analystBuyPct}%的分析师给出买入/增持评级。近期新闻覆盖以正面为主，${isAShare ? '政策面持续释放利好信号，北向资金净流入趋势延续。' : '行业景气度回升，市场对盈利前景持乐观预期。'}社交媒体讨论热度上升，散户情绪指标从中性转向积极。`;
-
-    const bullCase = recommendation === 'BUY'
-      ? `核心业务增长强劲，行业景气周期延续。估值相对合理，存在上行空间。${isAShare ? '政策催化叠加资金面改善，有望迎来估值修复行情。' : '技术面多头排列，动能指标确认趋势。'}中长线配置价值突出。`
-      : `当前估值处于历史低位区间，安全边际较高。若宏观环境改善，存在估值修复空间。建议关注催化剂出现后的布局机会。`;
-
-    const bearCase = recommendation === 'SELL'
-      ? `${isAShare ? '行业监管不确定性增加，' : '竞争加剧导致市场份额承压，'}盈利增长预期下调。技术面破位下行，短期卖压明显。建议暂时规避，等待风险释放。`
-      : `宏观经济下行风险可能拖累业绩，${isAShare ? '地缘政治因素' : '利率环境变化'}带来不确定性。短期波动加剧，需关注关键支撑位得失。`;
-
-    const report = `# ${stockName}(${symbol}) 综合分析报告
-
-## 执行摘要
-${stockName}(${symbol}) 综合评分 **${score}/100**，投资建议为 **${recommendation === 'BUY' ? '买入' : recommendation === 'SELL' ? '卖出' : '持有'}**。${recommendation === 'BUY' ? '多个维度共振偏多，中长期配置价值突出。' : recommendation === 'SELL' ? '风险收益比不佳，建议谨慎应对。' : '多空因素交织，建议观望为主。'}
-
-## 技术分析
-- **趋势判断**: ${score >= 60 ? '短期趋势向上，均线多头排列' : '趋势不明朗，震荡格局'}
-- **动量指标**: RSI(14) = ${rsi}，${parseFloat(rsi) > 65 ? '接近超买区域' : '中性偏多区域'}
-- **MACD**: ${parseFloat(rsi) > 55 ? '红柱扩大，多头动能增强' : '绿柱收敛，空头动能减弱'}
-- **关键位**: 支撑 ¥${supportLevel} / 阻力 ¥${resistLevel}
-
-## 基本面分析
-- **营收增速**: ${revenueGrowth}% YoY
-- **估值水平**: PE ${peRatio}x
-- **盈利质量**: ${parseFloat(peRatio) < 25 ? '盈利质量优秀' : '需关注盈利持续性'}
-
-## 情绪分析
-- **分析师共识**: ${analystBuyPct}% 买入评级
-- **新闻情绪**: 偏正面
-- **资金流向**: ${isAShare ? '北向资金' : '主力资金'}${Math.random() > 0.4 ? '净流入' : '净流出'}
-
-## 风险评估
-- **风险等级**: ${riskLevel === 'LOW' ? '低' : riskLevel === 'HIGH' ? '高' : '中'} (评分: ${riskScore}/100)
-- **主要风险**: ${isAShare ? '政策变动、行业竞争、宏观经济' : '市场波动、行业周期、竞争格局'}
-
-## 总结
-${recommendation === 'BUY' ? '综合技术面、基本面及情绪面分析，当前具备较好的风险收益比，建议逢低布局。' : recommendation === 'SELL' ? '多个信号偏空，建议减仓或规避，等待更好的入场时机。' : '多空因素相对均衡，建议持有观望，关注关键位突破方向。'}`;
-
-    return {
-      symbol,
-      recommendation,
-      score,
-      technicalSummary,
-      fundamentalSummary,
-      sentimentSummary,
-      riskLevel,
-      riskScore,
-      bullCase: mode === 'debate' ? bullCase : undefined,
-      bearCase: mode === 'debate' ? bearCase : undefined,
-      report,
-      provider: 'mock-deepseek',
-      tokens,
-      cost,
-    };
-  }
-
-  // 中文 mock（英文回退也使用中文）
-  const technicalSummary = `${stockName}(${symbol})当前运行于5日均线上方，短期趋势偏强。RSI(14)为${rsi}，处于中性偏多区域。MACD红柱持续放大，DIF线在DEA线上方，确认多头动能。5日均线 ¥${ma5} 构成短线支撑，下方关键支撑 ¥${supportLevel}，上方阻力 ¥${resistLevel}。成交量温和放大，量价配合良好。`;
-
-  const peRatio = (15 + Math.random() * 30).toFixed(1);
-  const revenueGrowth = (5 + Math.random() * 20).toFixed(1);
-  const fundamentalSummary = `${stockName}最新财报显示营收同比增长${revenueGrowth}%，利润端表现稳健。市盈率${peRatio}倍，处于行业${parseFloat(peRatio) > 25 ? '偏高' : '合理'}水平。${isAShare ? '经营性现金流充裕，分红率稳定，具备防御价值。' : '核心业务竞争力突出，市场份额持续提升。'}毛利率保持稳定，费用管控良好。`;
-
-  const analystBuyPct = Math.floor(55 + Math.random() * 30);
-  const sentimentSummary = `市场情绪整体偏正面。${analystBuyPct}%的分析师给出买入/增持评级。近期新闻覆盖以正面为主，${isAShare ? '政策面持续释放利好信号，北向资金净流入趋势延续。' : '行业景气度回升，市场对盈利前景持乐观预期。'}社交媒体讨论热度上升，散户情绪指标从中性转向积极。`;
-
-  const bullCase = recommendation === 'BUY'
-    ? `核心业务增长强劲，行业景气周期延续。估值相对合理，存在上行空间。${isAShare ? '政策催化叠加资金面改善，有望迎来估值修复行情。' : '技术面多头排列，动能指标确认趋势。'}中长线配置价值突出。`
-    : `当前估值处于历史低位区间，安全边际较高。若宏观环境改善，存在估值修复空间。建议关注催化剂出现后的布局机会。`;
-
-  const bearCase = recommendation === 'SELL'
-    ? `${isAShare ? '行业监管不确定性增加，' : '竞争加剧导致市场份额承压，'}盈利增长预期下调。技术面破位下行，短期卖压明显。建议暂时规避，等待风险释放。`
-    : `宏观经济下行风险可能拖累业绩，${isAShare ? '地缘政治因素' : '利率环境变化'}带来不确定性。短期波动加剧，需关注关键支撑位得失。`;
-
-  const report = `# ${stockName}(${symbol}) 综合分析报告
-
-## 执行摘要
-${stockName}(${symbol}) 综合评分 **${score}/100**，投资建议为 **${recommendation === 'BUY' ? '买入' : recommendation === 'SELL' ? '卖出' : '持有'}**。${recommendation === 'BUY' ? '多个维度共振偏多，中长期配置价值突出。' : recommendation === 'SELL' ? '风险收益比不佳，建议谨慎应对。' : '多空因素交织，建议观望为主。'}
-
-## 技术分析
-- **趋势判断**: ${score >= 60 ? '短期趋势向上，均线多头排列' : '趋势不明朗，震荡格局'}
-- **动量指标**: RSI(14) = ${rsi}，${parseFloat(rsi) > 65 ? '接近超买区域' : '中性偏多区域'}
-- **MACD**: ${parseFloat(rsi) > 55 ? '红柱扩大，多头动能增强' : '绿柱收敛，空头动能减弱'}
-- **关键位**: 支撑 ¥${supportLevel} / 阻力 ¥${resistLevel}
-
-## 基本面分析
-- **营收增速**: ${revenueGrowth}% YoY
-- **估值水平**: PE ${peRatio}x
-- **盈利质量**: ${parseFloat(peRatio) < 25 ? '盈利质量优秀' : '需关注盈利持续性'}
-
-## 情绪分析
-- **分析师共识**: ${analystBuyPct}% 买入评级
-- **新闻情绪**: 偏正面
-- **资金流向**: ${isAShare ? '北向资金' : '主力资金'}${Math.random() > 0.4 ? '净流入' : '净流出'}
-
-## 风险评估
-- **风险等级**: ${riskLevel === 'LOW' ? '低' : riskLevel === 'HIGH' ? '高' : '中'} (评分: ${riskScore}/100)
-- **主要风险**: ${isAShare ? '政策变动、行业竞争、宏观经济' : '市场波动、行业周期、竞争格局'}
-
-## 总结
-${recommendation === 'BUY' ? '综合技术面、基本面及情绪面分析，当前具备较好的风险收益比，建议逢低布局。' : recommendation === 'SELL' ? '多个信号偏空，建议减仓或规避，等待更好的入场时机。' : '多空因素相对均衡，建议持有观望，关注关键位突破方向。'}`;
-
-  return {
-    symbol,
-    recommendation,
-    score,
-    technicalSummary,
-    fundamentalSummary,
-    sentimentSummary,
-    riskLevel,
-    riskScore,
-    bullCase: mode === 'debate' ? bullCase : undefined,
-    bearCase: mode === 'debate' ? bearCase : undefined,
-    report,
-    provider: 'mock-deepseek',
-    tokens,
-    cost,
-  };
-}
-
 export function AIAnalysisView() {
   const { t, language } = useLanguage();
   const [symbol, setSymbol] = useState('');
@@ -336,46 +171,6 @@ export function AIAnalysisView() {
     }, 300);
   };
 
-  const runMockAnalysis = useCallback(async (sym: string, analysisMode: AnalysisMode, reason?: string) => {
-    const modeAgents = modeConfig[analysisMode].agents;
-    const initialAgents: AgentState[] = modeAgents.map((id) => ({
-      id,
-      nameKey: agentInfo[id].nameKey,
-      status: 'pending' as AgentStatus,
-      icon: agentInfo[id].icon,
-    }));
-    setAgents(initialAgents);
-    setIsOfflineMode(true);
-    if (reason) setErrorMessage(reason);
-
-    // Simulate agent progression
-    for (let i = 0; i < modeAgents.length; i++) {
-      if (abortRef.current) return;
-      setAgents((prev) =>
-        prev.map((a, idx) => idx === i ? { ...a, status: 'running' } : a)
-      );
-      await new Promise((resolve) => setTimeout(resolve, 800 + Math.random() * 700));
-      if (abortRef.current) return;
-      setAgents((prev) =>
-        prev.map((a, idx) => idx === i ? { ...a, status: 'done' } : a)
-      );
-    }
-
-    const mockResult = { ...generateMockAnalysis(sym, analysisMode, language), isMock: true, errorMessage: reason };
-    setResult(mockResult);
-
-    // Add to history
-    const historyItem: HistoryItem = {
-      id: Date.now().toString(),
-      symbol: sym,
-      mode: analysisMode,
-      recommendation: mockResult.recommendation,
-      score: mockResult.score,
-      timestamp: new Date().toISOString(),
-    };
-    setHistory((prev) => [historyItem, ...prev].slice(0, 10));
-  }, [language]);
-
   const runRealAnalysis = useCallback(async (sym: string, analysisMode: AnalysisMode) => {
     const modeAgents = modeConfig[analysisMode].agents;
     const initialAgents: AgentState[] = modeAgents.map((id) => ({
@@ -398,8 +193,8 @@ export function AIAnalysisView() {
       });
 
       if (!res.ok) {
-        // API returned error - show error, allow mock as fallback
-        await runMockAnalysis(sym, analysisMode, 'AI服务暂时不可用，显示模拟分析结果');
+        // API returned error - set error state, no mock fallback
+        setErrorMessage('AI服务暂时不可用，请稍后重试');
         return;
       }
 
@@ -446,13 +241,13 @@ export function AIAnalysisView() {
         return;
       }
     } catch {
-      // API unreachable - show error, allow mock as fallback
-      await runMockAnalysis(sym, analysisMode, 'AI服务连接失败，显示模拟分析结果');
+      // API unreachable - set error state, no mock fallback
+      setErrorMessage('AI服务连接失败，请检查网络后重试');
       return;
     }
 
     if (!taskId) {
-      await runMockAnalysis(sym, analysisMode, '分析任务创建失败，显示模拟分析结果');
+      setErrorMessage('分析任务创建失败，请稍后重试');
       return;
     }
 
@@ -559,9 +354,9 @@ export function AIAnalysisView() {
         }
 
         if (taskStatus === 'failed' || taskStatus === 'error') {
-          // Task failed - show error info with mock data
-          const failReason = pollData?.data?.error || 'AI分析失败';
-          await runMockAnalysis(sym, analysisMode, failReason);
+          // Task failed - set error state, no mock fallback
+          const failReason = pollData?.data?.error || 'AI分析失败，请稍后重试';
+          setErrorMessage(failReason);
           return;
         }
       } catch {
@@ -569,9 +364,9 @@ export function AIAnalysisView() {
       }
     }
 
-    // Timeout - show error
-    await runMockAnalysis(sym, analysisMode, 'AI分析超时，请尝试快速分析模式');
-  }, [runMockAnalysis]);
+    // Timeout - set error state, no mock fallback
+    setErrorMessage('AI分析超时，请尝试快速分析模式');
+  }, []);
 
   const handleStartAnalysis = useCallback(async () => {
     if (!symbol.trim()) return;
@@ -586,6 +381,10 @@ export function AIAnalysisView() {
 
     setAnalyzing(false);
   }, [symbol, mode, runRealAnalysis]);
+
+  const handleRetry = useCallback(() => {
+    handleStartAnalysis();
+  }, [handleStartAnalysis]);
 
   const selectSymbol = (sym: string) => {
     setSymbol(sym);
@@ -682,23 +481,41 @@ export function AIAnalysisView() {
         </CardContent>
       </Card>
 
-      {/* Mock Data Warning Banner */}
+      {/* Error / Warning Banner */}
       {(result?.isMock || errorMessage) && (
-        <Card className="bg-yellow-600/5 border-yellow-600/20 rounded-xl">
+        <Card className={`${!result && errorMessage ? 'bg-red-600/5 border-red-600/20' : 'bg-yellow-600/5 border-yellow-600/20'} rounded-xl`}>
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
-              <WifiOff className="w-4 h-4 text-yellow-500 shrink-0" />
+              {!result && errorMessage ? (
+                <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-yellow-500 shrink-0" />
+              )}
               <div className="flex-1">
-                <p className="text-sm text-yellow-400 font-medium">
-                  {result?.isMock ? '当前显示模拟分析数据' : 'AI分析异常'}
+                <p className={`text-sm font-medium ${!result && errorMessage ? 'text-red-400' : 'text-yellow-400'}`}>
+                  {!result && errorMessage ? 'AI分析失败' : result?.isMock ? '当前显示模拟分析数据' : 'AI分析异常'}
                 </p>
                 {errorMessage && (
-                  <p className="text-xs text-yellow-500/80 mt-0.5">{errorMessage}</p>
+                  <p className={`text-xs mt-0.5 ${!result ? 'text-red-500/80' : 'text-yellow-500/80'}`}>{errorMessage}</p>
                 )}
               </div>
-              <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[10px]">
-                演示数据
-              </Badge>
+              {!result && errorMessage && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRetry}
+                  disabled={analyzing}
+                  className="h-7 gap-1.5 text-xs border-red-600/30 text-red-400 hover:bg-red-600/10 hover:text-red-300"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  重试
+                </Button>
+              )}
+              {result?.isMock && (
+                <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[10px]">
+                  演示数据
+                </Badge>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -722,10 +539,32 @@ export function AIAnalysisView() {
       )}
 
       {/* Analysis Results Area */}
-      {(analyzing || result) && (
+      {(analyzing || result || errorMessage) && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Left: Results */}
           <div className="lg:col-span-2 space-y-4">
+            {/* Error State Card */}
+            {!result && errorMessage && !analyzing && (
+              <Card className="bg-[#111118] border-red-600/20 rounded-xl">
+                <CardContent className="p-8 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-red-600/10 border border-red-600/20 flex items-center justify-center mx-auto mb-4">
+                    <AlertTriangle className="w-8 h-8 text-red-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">AI分析失败</h3>
+                  <p className="text-sm text-zinc-400 mb-1">{errorMessage}</p>
+                  <p className="text-xs text-zinc-500 mb-6">请检查网络连接或稍后重试，也可以尝试切换到快速分析模式</p>
+                  <Button
+                    onClick={handleRetry}
+                    disabled={analyzing}
+                    className="bg-red-600 hover:bg-red-700 text-white gap-2"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    重试
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {result && (
               <>
                 {/* Recommendation Badge */}
@@ -963,7 +802,7 @@ export function AIAnalysisView() {
       )}
 
       {/* Empty State */}
-      {!analyzing && !result && (
+      {!analyzing && !result && !errorMessage && (
         <Card className="bg-[#111118] border-[#1e1e2e] border-dashed rounded-xl">
           <CardContent className="py-16 text-center">
             <Brain className="w-16 h-16 text-zinc-600 mx-auto mb-4" />

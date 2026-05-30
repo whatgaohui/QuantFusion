@@ -95,21 +95,6 @@ function generateSparkline(): { v: number }[] {
   return data;
 }
 
-const mockWatchlist: WatchlistItem[] = [
-  { id: '1', symbol: 'AAPL', name: '苹果', price: 189.45, change: 2.34, changePercent: 1.25, sparkline: generateSparkline() },
-  { id: '2', symbol: 'NVDA', name: '英伟达', price: 615.20, change: 8.45, changePercent: 1.39, sparkline: generateSparkline() },
-  { id: '3', symbol: 'TSLA', name: '特斯拉', price: 245.80, change: -3.67, changePercent: -1.47, sparkline: generateSparkline() },
-  { id: '4', symbol: 'MSFT', name: '微软', price: 388.50, change: 1.89, changePercent: 0.49, sparkline: generateSparkline() },
-  { id: '5', symbol: 'AMZN', name: '亚马逊', price: 178.25, change: -0.45, changePercent: -0.25, sparkline: generateSparkline() },
-  { id: '6', symbol: 'META', name: 'Meta', price: 374.20, change: 5.67, changePercent: 1.54, sparkline: generateSparkline() },
-];
-
-const mockAlerts: AlertItem[] = [
-  { id: '1', symbol: 'AAPL', targetPrice: 195.00, direction: 'above', active: true, createdAt: '2024-01-15', expiryDate: '2024-02-15' },
-  { id: '2', symbol: 'TSLA', targetPrice: 240.00, direction: 'below', active: true, createdAt: '2024-01-14', expiryDate: '2024-02-14' },
-  { id: '3', symbol: 'NVDA', targetPrice: 650.00, direction: 'above', active: true, createdAt: '2024-01-13', expiryDate: '2024-02-13' },
-];
-
 export function WatchlistView() {
   const { t, language } = useLanguage();
   const [watchlist, setWatchlist] = useState<WatchlistItem[] | null>(null);
@@ -207,12 +192,12 @@ export function WatchlistView() {
           }));
           setWatchlist(mapped);
         } else {
-          setWatchlist(mockWatchlist);
-          watchlistItems = mockWatchlist.map(i => ({ symbol: i.symbol, id: i.id, name: i.name }));
+          setWatchlist([]);
+          watchlistItems = [];
         }
       } else {
-        setWatchlist(mockWatchlist);
-        watchlistItems = mockWatchlist.map(i => ({ symbol: i.symbol, id: i.id, name: i.name }));
+        setWatchlist([]);
+        watchlistItems = [];
       }
 
       // Fetch real quotes for watchlist items
@@ -235,16 +220,16 @@ export function WatchlistView() {
           }));
           setAlerts(mapped);
         } else {
-          setAlerts(mockAlerts);
+          setAlerts([]);
         }
       } else {
-        setAlerts(mockAlerts);
+        setAlerts([]);
       }
 
       setLastUpdated(new Date());
     } catch {
-      setWatchlist(mockWatchlist);
-      setAlerts(mockAlerts);
+      setWatchlist([]);
+      setAlerts([]);
     } finally {
       setLoading(false);
     }
@@ -310,13 +295,14 @@ export function WatchlistView() {
         }]);
       }
     } catch {
+      // API failed — add locally with zero price (will be refreshed on next fetch)
       setWatchlist((prev) => [...(prev || []), {
         id: Date.now().toString(),
         symbol,
         name,
-        price: 150 + Math.random() * 100,
-        change: (Math.random() - 0.5) * 5,
-        changePercent: (Math.random() - 0.5) * 3,
+        price: 0,
+        change: 0,
+        changePercent: 0,
         sparkline: generateSparkline(),
       }]);
     }

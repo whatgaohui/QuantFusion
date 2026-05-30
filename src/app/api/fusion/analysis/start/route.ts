@@ -1,11 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMockQuote, getMockIndicators, getMockKline } from '@/lib/mock-api-data';
+import { finnhubFetch, FINNHUB_API_KEY } from '@/lib/data-service/config';
+import {
+  calculateRSI,
+  calculateMACD,
+  calculateBollingerBands,
+  calculateKDJ,
+} from '@/lib/indicators';
 import {
   runMultiAgentAnalysis,
   createTask,
   updateTask,
   type AnalysisMode,
 } from '@/lib/multi-agent-analysis';
+
+function toFinnhubSymbol(symbol: string): string {
+  if (symbol.startsWith('SH')) return symbol.slice(2) + '.SS';
+  if (symbol.startsWith('SZ')) return symbol.slice(2) + '.SZ';
+  if (symbol.startsWith('HK')) return symbol.slice(2).replace(/^0*/, '') + '.HK';
+  return symbol;
+}
+
+const STOCK_NAMES: Record<string, string> = {
+  'AAPL': '苹果', 'NVDA': '英伟达', 'TSLA': '特斯拉', 'MSFT': '微软',
+  'AMZN': '亚马逊', 'META': 'Meta', 'GOOGL': '谷歌', 'AMD': 'AMD',
+  'JPM': '摩根大通', 'V': 'Visa',
+  'SH600519': '贵州茅台', 'SH601318': '中国平安', 'SH600036': '招商银行',
+  'SZ000858': '五粮液', 'SH601398': '工商银行', 'SZ300750': '宁德时代',
+  'SH600276': '恒瑞医药', 'SH600030': '中信证券', 'SZ000333': '美的集团',
+  'SH600900': '长江电力', 'SH601899': '紫金矿业', 'SZ002475': '立讯精密',
+  'HK00700': '腾讯控股', 'HK09988': '阿里巴巴', 'HK03690': '美团',
+  'HK00005': '汇丰控股', 'HK00941': '中国移动', 'HK01299': '友邦保险',
+  'HK01810': '小米集团', 'HK09618': '京东集团', 'HK09888': '百度集团', 'HK02015': '理想汽车',
+};
 
 // Global timeout for the entire analysis pipeline (ms)
 const ANALYSIS_GLOBAL_TIMEOUT: Record<AnalysisMode, number> = {
@@ -32,36 +58,140 @@ export async function POST(request: NextRequest) {
       ? mode
       : 'standard') as AnalysisMode;
 
-    // Gather market data for analysis
+    // Gather market data for analysis from real Finnhub API
     let marketData: Record<string, unknown> = {};
-    let resolvedName = stockName || symbol;
+    let resolvedName = stockName || STOCK_NAMES[symbol] || symbol;
+    let hasQuote = false;
+    let hasIndicators = false;
+    let hasKline = false;
 
-    try {
-      const quoteResult = getMockQuote(symbol);
-      if (quoteResult?.success && quoteResult.data) {
-        marketData = { ...quoteResult.data };
-        if (quoteResult.data.name) resolvedName = quoteResult.data.name;
+    // Only attempt Finnhub calls if an API key is available
+    if (FINNHUB_API_KEY) {
+      // 1. Fetch real quote from Finnhub
+      try {
+        const finnhubSymbol = toFinnhubSymbol(symbol);
+        const quoteData = await finnhubFetch<{
+          c: number; h: number; l: number; o: number; pc: number; dp: number; d: number;
+        }>('quote', { symbol: finnhubSymbol });
+
+        if (quoteData && quoteData.c && quoteData.c !== 0) {
+          marketData = {
+            ...marketData,
+            symbol,
+            name: STOCK_NAMES[symbol] || symbol,
+            currentPrice: quoteData.c,
+            change: quoteData.d || 0,
+            changePercent: quoteData.dp || 0,
+            high: quoteData.h || 0,
+            low: quoteData.l || 0,
+            open: quoteData.o || 0,
+            prevClose: quoteData.pc || 0,
+            market: symbol.startsWith('SH') || symbol.startsWith('SZ') ? 'A' : symbol.startsWith('HK') ? 'HK' : 'US',
+          };
+          if (STOCK_NAMES[symbol]) resolvedName = STOCK_NAMES[symbol];
+          hasQuote = true;
+        }
+      } catch {
+        // Quote fetch failed, continue without
       }
-    } catch {
-      // Quote fetch failed, continue without
+
+      // 2. Fetch real candle data and compute indicators from Finnhub
+      try {
+        const finnhubSymbol = toFinnhubSymbol(symbol);
+        const to = Math.floor(Date.now() / 1000);
+        const from = to - 120 * 86400;
+
+        const candleData = await finnhubFetch<{
+          s: string; c: number[]; o: number[]; h: number[]; l: number[]; v: number[]; t: number[];
+        }>('stock/candle', { symbol: finnhubSymbol, resolution: 'D', from: String(from), to: String(to) });
+
+        if (candleData && candleData.s === 'ok' && candleData.c && candleData.c.length >= 30) {
+          const closes = candleData.c;
+          const highs = candleData.h;
+          const lows = candleData.l;
+
+          // Calculate real indicators from candle data
+          const rsi14 = calculateRSI(closes, 14);
+          const macdResult = calculateMACD(closes);
+          const bbResult = calculateBollingerBands(closes);
+          const kdjResult = calculateKDJ(highs, lows, closes);
+
+          const ma5 = closes.length >= 5 ? closes.slice(-5).reduce((s, v) => s + v, 0) / 5 : 0;
+          const ma10 = closes.length >= 10 ? closes.slice(-10).reduce((s, v) => s + v, 0) / 10 : 0;
+          const ma20 = closes.length >= 20 ? closes.slice(-20).reduce((s, v) => s + v, 0) / 20 : 0;
+          const ma60 = closes.length >= 60 ? closes.slice(-60).reduce((s, v) => s + v, 0) / 60 : 0;
+
+          marketData = {
+            ...marketData,
+            indicators: {
+              ma: {
+                ma5: parseFloat(ma5.toFixed(2)),
+                ma10: parseFloat(ma10.toFixed(2)),
+                ma20: parseFloat(ma20.toFixed(2)),
+                ma60: parseFloat(ma60.toFixed(2)),
+              },
+              rsi: {
+                rsi6: parseFloat(calculateRSI(closes, 6).toFixed(2)),
+                rsi12: parseFloat(calculateRSI(closes, 12).toFixed(2)),
+                rsi14: parseFloat(rsi14.toFixed(2)),
+              },
+              macd: {
+                macd: macdResult.macd,
+                signal: macdResult.signal,
+                histogram: macdResult.histogram,
+              },
+              bollinger: {
+                upper: bbResult.upper,
+                middle: bbResult.middle,
+                lower: bbResult.lower,
+                pricePosition: bbResult.pricePosition,
+              },
+              kdj: {
+                k: kdjResult.k,
+                d: kdjResult.d,
+                j: kdjResult.j,
+              },
+            },
+          };
+          hasIndicators = true;
+
+          // 3. Build kline data from the same candle response
+          const klineBars = candleData.t.map((t, i) => ({
+            time: t * 1000,
+            open: candleData.o[i],
+            high: candleData.h[i],
+            low: candleData.l[i],
+            close: candleData.c[i],
+            volume: candleData.v[i],
+          })).slice(-30);
+
+          marketData = {
+            ...marketData,
+            kline: klineBars,
+          };
+          hasKline = true;
+        }
+      } catch {
+        // Candle/indicator fetch failed, continue without
+      }
     }
 
-    try {
-      const indicatorResult = getMockIndicators(symbol);
-      if (indicatorResult?.success && indicatorResult.data) {
-        marketData = { ...marketData, indicators: indicatorResult.data };
-      }
-    } catch {
-      // Indicators fetch failed, continue without
+    // Determine data source quality
+    let dataSource: 'real' | 'limited' | 'none';
+    if (hasQuote && hasIndicators && hasKline) {
+      dataSource = 'real';
+    } else if (hasQuote || hasIndicators || hasKline) {
+      dataSource = 'limited';
+    } else {
+      dataSource = 'none';
     }
+    marketData = { ...marketData, dataSource };
 
-    try {
-      const klineResult = getMockKline(symbol, 30);
-      if (klineResult?.success && klineResult.data) {
-        marketData = { ...marketData, kline: klineResult.data };
-      }
-    } catch {
-      // Kline fetch failed, continue without
+    if (dataSource === 'none') {
+      marketData = {
+        ...marketData,
+        note: '无法获取实时市场数据，分析结果可能缺乏准确性。请告知用户当前无真实市场数据可用。',
+      };
     }
 
     console.log(`[Analysis] Starting ${analysisMode} analysis for ${symbol} (${resolvedName}), task: ${taskId}`);

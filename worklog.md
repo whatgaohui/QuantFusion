@@ -1102,3 +1102,160 @@ Stage Summary:
 - Auto-scroll to bottom only when appropriate (user near bottom or just sent a message)
 - No more double-scroll-container conflict
 - Lint passes clean
+
+---
+
+**Task ID**: 3
+**Agent**: Subagent
+**Date**: 2025-05-28
+**Status**: ✅ Complete
+
+## Summary
+
+Fixed the analysis start API route to use real Finnhub market data instead of mock data. The AI was previously analyzing fake/mock market data, which produced unreliable analysis results. Now the route fetches real quotes, computes real technical indicators from candle data, and includes a `dataSource` quality field so the AI knows the reliability of the data it's analyzing.
+
+## File Modified
+
+`src/app/api/fusion/analysis/start/route.ts`
+
+## Changes Made
+
+### 1. Import Changes
+- **Removed**: `import { getMockQuote, getMockIndicators, getMockKline } from '@/lib/mock-api-data';`
+- **Added**: `import { finnhubFetch, FINNHUB_API_KEY } from '@/lib/data-service/config';`
+- **Added**: `import { calculateRSI, calculateMACD, calculateBollingerBands, calculateKDJ } from '@/lib/indicators';`
+
+### 2. Added Helper Functions
+- `toFinnhubSymbol(symbol)` — Converts internal symbol format to Finnhub format (SH→.SS, SZ→.SZ, HK→.HK)
+- `STOCK_NAMES` — Local map of ~30 stock symbols to Chinese names (same as used in quote route)
+
+### 3. Replaced Mock Data Calls with Real Finnhub API Calls
+- **Quote**: Replaced `getMockQuote(symbol)` with `finnhubFetch('quote', ...)` — fetches real price, change, high, low, open, prevClose from Finnhub
+- **Indicators + Kline**: Replaced `getMockIndicators(symbol)` and `getMockKline(symbol, 30)` with a single `finnhubFetch('stock/candle', ...)` call that:
+  - Fetches 120 days of candle data (resolution 'D')
+  - Computes real MA (5/10/20/60), RSI (6/12/14), MACD, Bollinger Bands, KDJ from the candle data
+  - Builds kline array from the same candle response (last 30 bars)
+
+### 4. Added `dataSource` Field
+- `'real'` — All three data types (quote + indicators + kline) were successfully fetched
+- `'limited'` — Only partial data available (some calls succeeded, some failed)
+- `'none'` — No real data available (all calls failed or no API key)
+
+### 5. Graceful No-Data Handling
+- If `FINNHUB_API_KEY` is not set, skips all Finnhub calls entirely
+- If all Finnhub calls fail, sets `dataSource: 'none'` and adds a `note` field to marketData instructing the AI to inform the user that no real market data is available
+- Analysis still proceeds regardless — the multi-agent flow (createTask, updateTask, runMultiAgentAnalysis) is untouched
+
+### 6. Stock Name Resolution
+- Uses `STOCK_NAMES[symbol]` map for resolving stock names, with fallback to the `stockName` parameter from the request body, then to the symbol itself
+
+## Design Decisions
+- Single candle fetch serves both indicators AND kline data (avoiding duplicate API calls)
+- Indicator computation mirrors the exact logic in `src/app/api/fusion/market/indicators/route.ts`
+- No mock data fallbacks — if Finnhub is unavailable, `dataSource: 'none'` is set and analysis proceeds with empty market data
+- `FINNHUB_API_KEY` check gates all API calls to avoid unnecessary network requests when unconfigured
+
+## Lint Status
+✅ `bun run lint` passes with no errors
+
+---
+
+**Task ID**: 2
+**Agent**: Main
+**Date**: 2025-05-28
+**Status**: ✅ Complete
+
+## Summary
+
+Removed all mock data generation from the AI Analysis View component. Previously, when the AI API failed, the component silently generated fake analysis using `generateMockAnalysis()` and `runMockAnalysis()`, causing users to see mock data thinking it was real AI analysis. Now, when the API fails, the component shows a clear error state with an error message and a retry button instead of silently substituting fake data.
+
+## Changes Made
+
+### Deleted Code
+1. **`generateMockAnalysis()` function** (~165 lines) — The huge mock data generator that created fake analysis with random scores, RSI values, stock names, and complete markdown reports in Chinese
+2. **`aShareStocks`, `usStocks`, `hkStocks` objects** — Mock stock name mappings only used by `generateMockAnalysis()`
+3. **`runMockAnalysis()` function** — Simulated agent progression via setTimeout and showed mock results by calling `generateMockAnalysis()`
+
+### Modified `runRealAnalysis()` — 5 fallback points changed
+All `await runMockAnalysis(sym, analysisMode, ...)` calls replaced with `setErrorMessage(...); return;`:
+
+1. **API returned error** (`!res.ok`): `setErrorMessage('AI服务暂时不可用，请稍后重试')`
+2. **API unreachable** (catch): `setErrorMessage('AI服务连接失败，请检查网络后重试')`
+3. **No taskId returned**: `setErrorMessage('分析任务创建失败，请稍后重试')`
+4. **Task failed during polling**: `setErrorMessage(failReason)` where failReason comes from the API error
+5. **Polling timeout**: `setErrorMessage('AI分析超时，请尝试快速分析模式')`
+
+### `isOfflineMode` state
+- Kept the state but now only set based on API response `source` field: `setIsOffline(source === 'mock')`
+- Removed all places that set `isOfflineMode` to true based on mock fallback
+
+### UI Changes
+1. **Error/Warning Banner** — Repurposed the mock data warning banner to handle both cases:
+   - When `result?.isMock` (API returned mock-sourced data): Yellow warning with WifiOff icon, "当前显示模拟分析数据" text, "演示数据" badge
+   - When `errorMessage && !result` (complete failure): Red error banner with AlertTriangle icon, "AI分析失败" title, error message text, and "重试" (Retry) button
+
+2. **Error State Card** — Added inside the results area when `!result && errorMessage && !analyzing`:
+   - Red AlertTriangle icon in a rounded container
+   - "AI分析失败" heading
+   - Error message text
+   - Helpful hint: "请检查网络连接或稍后重试，也可以尝试切换到快速分析模式"
+   - "重试" button with RefreshCw icon that re-triggers `handleStartAnalysis()`
+
+3. **Results area condition** — Changed from `{(analyzing || result) && (` to `{(analyzing || result || errorMessage) && (` so the error card appears in the results area
+
+4. **Empty state condition** — Changed from `{!analyzing && !result && (` to `{!analyzing && !result && !errorMessage && (` to hide the empty state when there's an error
+
+5. **New imports** — Added `AlertTriangle` and `RefreshCw` from lucide-react for error UI
+
+6. **`handleRetry()` callback** — New callback that delegates to `handleStartAnalysis()` for retry functionality
+
+## Files Modified
+1. `src/components/dashboard/ai-analysis-view.tsx` — Complete rewrite removing ~210 lines of mock data code and adding error state handling
+
+## Lint Status
+✅ `bun run lint` passes with no errors
+
+---
+
+**Task ID**: 4
+**Agent**: Mock-Data-Fix
+**Date**: 2025-05-28
+**Status**: ✅ Complete
+
+## Summary
+
+Removed all hardcoded mock data fallbacks from 4 frontend view components (Positions, Watchlist, News, Backtest). Previously, when API calls returned empty data or failed, components silently substituted hardcoded mock data, making it impossible for users to tell whether they were seeing real or fake data. Now, empty API responses show honest empty states, and API failures show error banners with retry buttons. Visible "演示模式" banners are shown when using non-real data.
+
+## Files Modified
+
+### 1. `src/components/dashboard/positions-view.tsx`
+- **Removed** `mockActivePositions` (5 items), `mockClosedPositions` (2 items), `mockSummary`, `mockRiskMetrics`
+- **Added** `zeroRiskMetrics` constant (`{ var95: 0, sharpeRatio: 0, maxDrawdown: 0 }`) as honest zero-value fallback
+- `calculateRiskMetrics()`: Returns `zeroRiskMetrics` for empty positions; removed `isZero` check that substituted mock risk metrics
+- `fetchData()`: All 6 mock fallback paths → empty state (`[]`, zero metrics, zero summary)
+- Summary/risk fallbacks: Changed `|| mockSummary.*` → `?? 0`, `|| mockRiskMetrics` → `?? zeroRiskMetrics`
+- Added prominent "演示模式" banner when `isDemoRisk` is true (i18n: `pos.demoBanner`, `pos.demoBannerDesc`)
+- Removed old small hint text below risk metrics in favor of the new prominent banner
+
+### 2. `src/components/dashboard/watchlist-view.tsx`
+- **Removed** `mockWatchlist` (6 items) and `mockAlerts` (3 items)
+- `fetchData()`: All 5 mock fallback paths → empty state (`[]`)
+- `handleAddToWatchlist()` catch: Changed from random fake prices to zero values (will refresh on next cycle)
+
+### 3. `src/components/dashboard/news-view.tsx`
+- **Removed** `mockNews` (6 items, ~75 lines of hardcoded Chinese financial news)
+- `fetchNews()`: All 3 mock fallback paths → `setNews([])`
+- Filter: Changed `(news || mockNews)` → `(news || [])`
+
+### 4. `src/components/dashboard/backtest-view.tsx`
+- Kept `generateMockBacktestResult()` (backtest is inherently a simulation)
+- Replaced small offline badge with prominent warning card using i18n: `back.simulatedWarning`, `back.simulatedWarningDesc`
+
+### 5. `src/lib/i18n.ts`
+- Added 4 new i18n keys (en + zh): `pos.demoBanner`, `pos.demoBannerDesc`, `back.simulatedWarning`, `back.simulatedWarningDesc`
+- Updated `pos.demoRiskHint` to say "risk metrics are zero" instead of "showing demo values"
+
+## Verification
+- ✅ `bun run lint` passes with no errors
+- ✅ Zero remaining references to any removed mock data in all 4 view files
+- ✅ Dev server running on port 3000

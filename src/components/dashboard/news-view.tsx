@@ -40,81 +40,6 @@ interface NewsArticle {
   timestamp: string;
 }
 
-const mockNews: NewsArticle[] = [
-  {
-    id: '1',
-    headline: '标普500再创新高，科技板块领涨',
-    source: '路透社',
-    url: '#',
-    image: '',
-    summary: '受主要科技公司强劲财报提振，基准指数收盘创历史新高，市场情绪全面向好。',
-    category: 'general',
-    sentiment: 'bullish',
-    relatedStocks: ['AAPL', 'NVDA', 'MSFT'],
-    timestamp: '2024-01-15T14:30:00Z',
-  },
-  {
-    id: '2',
-    headline: '英伟达AI芯片需求预测超预期，股价大涨',
-    source: '彭博社',
-    url: '#',
-    image: '',
-    summary: '芯片制造商上调了当前季度收入指引，称其AI训练和推理处理器需求空前旺盛。',
-    category: 'general',
-    sentiment: 'bullish',
-    relatedStocks: ['NVDA', 'AMD'],
-    timestamp: '2024-01-15T12:15:00Z',
-  },
-  {
-    id: '3',
-    headline: '美联储暗示未来可能降息，市场反应积极',
-    source: 'CNBC',
-    url: '#',
-    image: '',
-    summary: '美联储官员表示通胀数据正朝正确方向发展，为可能的降息打开了大门。',
-    category: 'general',
-    sentiment: 'bullish',
-    relatedStocks: [],
-    timestamp: '2024-01-15T10:45:00Z',
-  },
-  {
-    id: '4',
-    headline: '比特币ETF首日交易创纪录资金流入',
-    source: 'CoinDesk',
-    url: '#',
-    image: '',
-    summary: '新获批的现货比特币ETF首日交易量超过46亿美元，创历史上最成功的ETF发行纪录。',
-    category: 'crypto',
-    sentiment: 'bullish',
-    relatedStocks: ['COIN'],
-    timestamp: '2024-01-15T09:00:00Z',
-  },
-  {
-    id: '5',
-    headline: '美元兑主要货币走弱，人民币汇率走强',
-    source: '金融时报',
-    url: '#',
-    image: '',
-    summary: '美元兑欧元和日元大幅下跌，交易员提高了对上半年降息的预期概率。',
-    category: 'forex',
-    sentiment: 'neutral',
-    relatedStocks: [],
-    timestamp: '2024-01-14T16:30:00Z',
-  },
-  {
-    id: '6',
-    headline: '辉瑞宣布430亿美元收购Seagen，医药板块异动',
-    source: '华尔街日报',
-    url: '#',
-    image: '',
-    summary: '制药巨头将收购Seagen以加强其肿瘤药物管线，这是近年来最大的医疗健康交易之一。',
-    category: 'merger',
-    sentiment: 'neutral',
-    relatedStocks: ['PFE', 'SGEN'],
-    timestamp: '2024-01-14T14:00:00Z',
-  },
-];
-
 function getCategoryColor(category: string): string {
   switch (category) {
     case 'crypto': return 'bg-purple-600/15 text-purple-400 border-purple-600/20';
@@ -223,15 +148,15 @@ export function MarketNewsView() {
           }));
           setNews(mapped);
         } else {
-          setNews(mockNews);
+          setNews([]);
         }
       } else {
         setError(t('dash.fetchError'));
-        setNews(mockNews);
+        setNews([]);
       }
     } catch {
       setError(t('dash.fetchError'));
-      setNews(mockNews);
+      setNews([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -243,8 +168,8 @@ export function MarketNewsView() {
   }, [fetchNews]);
 
   const filteredNews = category === 'all'
-    ? (news || mockNews)
-    : (news || mockNews).filter((n) => n.category === category);
+    ? (news || [])
+    : (news || []).filter((n) => n.category === category);
 
   if (loading) {
     return (

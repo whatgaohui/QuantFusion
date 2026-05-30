@@ -92,64 +92,10 @@ interface RiskMetrics {
   maxDrawdown: number;
 }
 
-const mockActivePositions: Position[] = [
-  {
-    id: '1', symbol: 'AAPL', name: '苹果', buyPrice: 182.50, currentPrice: 189.45,
-    quantity: 50, buyDate: '2024-01-10', cycleDays: 7, pnl: 347.50, pnlPercent: 3.81,
-    holdingDays: 4, remainingDays: 3, status: 'ACTIVE',
-    lots: [{ id: 'l1', buyDate: '2024-01-10', qty: 30, price: 181.00, openDate: '2024-01-10', quantity: 30, costPrice: 181.00, realizedPnl: 0 }, { id: 'l2', buyDate: '2024-01-11', qty: 20, price: 184.75, openDate: '2024-01-11', quantity: 20, costPrice: 184.75, realizedPnl: 0 }],
-  },
-  {
-    id: '2', symbol: 'NVDA', name: '英伟达', buyPrice: 598.30, currentPrice: 615.20,
-    quantity: 20, buyDate: '2024-01-12', cycleDays: 7, pnl: 338.00, pnlPercent: 2.82,
-    holdingDays: 2, remainingDays: 5, status: 'ACTIVE',
-    lots: [{ id: 'l3', buyDate: '2024-01-12', qty: 20, price: 598.30, openDate: '2024-01-12', quantity: 20, costPrice: 598.30, realizedPnl: 0 }],
-  },
-  {
-    id: '3', symbol: 'TSLA', name: '特斯拉', buyPrice: 252.10, currentPrice: 245.80,
-    quantity: 30, buyDate: '2024-01-09', cycleDays: 7, pnl: -189.00, pnlPercent: -2.50,
-    holdingDays: 5, remainingDays: 2, status: 'ACTIVE',
-    lots: [{ id: 'l4', buyDate: '2024-01-09', qty: 30, price: 252.10, openDate: '2024-01-09', quantity: 30, costPrice: 252.10, realizedPnl: 0 }],
-  },
-  {
-    id: '4', symbol: 'MSFT', name: '微软', buyPrice: 380.20, currentPrice: 388.50,
-    quantity: 25, buyDate: '2024-01-13', cycleDays: 7, pnl: 207.50, pnlPercent: 2.18,
-    holdingDays: 1, remainingDays: 6, status: 'ACTIVE',
-    lots: [{ id: 'l5', buyDate: '2024-01-13', qty: 25, price: 380.20, openDate: '2024-01-13', quantity: 25, costPrice: 380.20, realizedPnl: 0 }],
-  },
-  {
-    id: '5', symbol: 'AMZN', name: '亚马逊', buyPrice: 175.80, currentPrice: 178.25,
-    quantity: 40, buyDate: '2024-01-08', cycleDays: 7, pnl: 98.00, pnlPercent: 1.39,
-    holdingDays: 6, remainingDays: 1, status: 'ACTIVE',
-    lots: [{ id: 'l6', buyDate: '2024-01-08', qty: 40, price: 175.80, openDate: '2024-01-08', quantity: 40, costPrice: 175.80, realizedPnl: 0 }],
-  },
-];
-
-const mockClosedPositions: Position[] = [
-  {
-    id: '6', symbol: 'META', name: 'Meta', buyPrice: 360.50, currentPrice: 374.20,
-    quantity: 15, buyDate: '2024-01-02', cycleDays: 7, pnl: 205.50, pnlPercent: 3.80,
-    holdingDays: 7, remainingDays: 0, status: 'CLOSED',
-  },
-  {
-    id: '7', symbol: 'GOOGL', name: '谷歌', buyPrice: 145.20, currentPrice: 142.65,
-    quantity: 35, buyDate: '2024-01-01', cycleDays: 7, pnl: -89.25, pnlPercent: -1.76,
-    holdingDays: 7, remainingDays: 0, status: 'CLOSED',
-  },
-];
-
-const mockSummary: PositionSummary = {
-  totalInvested: 87560.00,
-  totalPnl: 810.75,
-  avgHoldingDays: 4.2,
-  activeCount: 5,
-  closedCount: 2,
-};
-
-const mockRiskMetrics: RiskMetrics = {
-  var95: -2450,
-  sharpeRatio: 1.47,
-  maxDrawdown: -8.3,
+const zeroRiskMetrics: RiskMetrics = {
+  var95: 0,
+  sharpeRatio: 0,
+  maxDrawdown: 0,
 };
 
 function formatCurrency(value: number | undefined | null): string {
@@ -158,7 +104,7 @@ function formatCurrency(value: number | undefined | null): string {
 }
 
 function calculateRiskMetrics(positions: Position[]): RiskMetrics {
-  if (positions.length === 0) return mockRiskMetrics;
+  if (positions.length === 0) return zeroRiskMetrics;
 
   const totalValue = positions.reduce((sum, p) => sum + p.currentPrice * p.quantity, 0);
   const returns = positions.map(p => p.pnlPercent / 100);
@@ -187,15 +133,11 @@ function calculateRiskMetrics(positions: Position[]): RiskMetrics {
   }
   const maxDrawdownPercent = totalValue > 0 ? -(maxDrawdown / totalValue) * 100 : 0;
 
-  const result: RiskMetrics = {
+  return {
     var95: parseFloat(var95.toFixed(0)),
     sharpeRatio: parseFloat(sharpeRatio.toFixed(2)),
     maxDrawdown: parseFloat(maxDrawdownPercent.toFixed(1)),
   };
-
-  // If all metrics are effectively zero (insufficient data), return demo defaults
-  const isZero = Math.abs(result.var95) < 1 && Math.abs(result.sharpeRatio) < 0.01 && Math.abs(result.maxDrawdown) < 0.1;
-  return isZero ? mockRiskMetrics : result;
 }
 
 export function PositionsView() {
@@ -281,17 +223,17 @@ export function PositionsView() {
           activePositions = allPositions.filter(p => p.status === 'ACTIVE');
           closedPositionsList = allPositions.filter(p => p.status === 'CLOSED');
 
-          setPositions(activePositions.length > 0 ? activePositions : mockActivePositions);
-          setClosedPositions(closedPositionsList.length > 0 ? closedPositionsList : mockClosedPositions);
+          setPositions(activePositions.length > 0 ? activePositions : []);
+          setClosedPositions(closedPositionsList.length > 0 ? closedPositionsList : []);
         } else {
-          setPositions(mockActivePositions);
-          setClosedPositions(mockClosedPositions);
-          activePositions = mockActivePositions;
+          setPositions([]);
+          setClosedPositions([]);
+          activePositions = [];
         }
       } else {
-        setPositions(mockActivePositions);
-        setClosedPositions(mockClosedPositions);
-        activePositions = mockActivePositions;
+        setPositions([]);
+        setClosedPositions([]);
+        activePositions = [];
       }
 
       // Fetch current prices from fusion API for active positions
@@ -345,16 +287,16 @@ export function PositionsView() {
               });
               const calculatedMetrics = calculateRiskMetrics(updatedPositions);
               setRiskMetrics(calculatedMetrics);
-              setIsDemoRisk(calculatedMetrics === mockRiskMetrics || (Math.abs(calculatedMetrics.var95) < 1 && Math.abs(calculatedMetrics.sharpeRatio) < 0.01 && Math.abs(calculatedMetrics.maxDrawdown) < 0.1));
+              setIsDemoRisk(Math.abs(calculatedMetrics.var95) < 1 && Math.abs(calculatedMetrics.sharpeRatio) < 0.01 && Math.abs(calculatedMetrics.maxDrawdown) < 0.1);
             }
           }
         } catch {
           const fallbackMetrics = calculateRiskMetrics(activePositions);
           setRiskMetrics(fallbackMetrics);
-          setIsDemoRisk(fallbackMetrics === mockRiskMetrics || (Math.abs(fallbackMetrics.var95) < 1 && Math.abs(fallbackMetrics.sharpeRatio) < 0.01 && Math.abs(fallbackMetrics.maxDrawdown) < 0.1));
+          setIsDemoRisk(Math.abs(fallbackMetrics.var95) < 1 && Math.abs(fallbackMetrics.sharpeRatio) < 0.01 && Math.abs(fallbackMetrics.maxDrawdown) < 0.1);
         }
       } else {
-        setRiskMetrics(mockRiskMetrics);
+        setRiskMetrics(zeroRiskMetrics);
         setIsDemoRisk(true);
       }
 
@@ -368,14 +310,14 @@ export function PositionsView() {
           closedCount: data.closedCount ?? closedPositionsList.length,
         });
       } else {
-        setSummary(mockSummary);
+        setSummary({ totalInvested: 0, totalPnl: 0, avgHoldingDays: 0, activeCount: 0, closedCount: 0 });
       }
     } catch {
       setError(t('pos.pricesError'));
-      setPositions(mockActivePositions);
-      setClosedPositions(mockClosedPositions);
-      setSummary(mockSummary);
-      setRiskMetrics(mockRiskMetrics);
+      setPositions([]);
+      setClosedPositions([]);
+      setSummary({ totalInvested: 0, totalPnl: 0, avgHoldingDays: 0, activeCount: 0, closedCount: 0 });
+      setRiskMetrics(zeroRiskMetrics);
       setIsDemoRisk(true);
     } finally {
       setLoading(false);
@@ -424,10 +366,10 @@ export function PositionsView() {
     );
   }
 
-  const totalInvested = summary?.totalInvested || mockSummary.totalInvested;
-  const totalPnl = summary?.totalPnl || mockSummary.totalPnl;
-  const avgDays = summary?.avgHoldingDays || mockSummary.avgHoldingDays;
-  const currentRisk = riskMetrics || mockRiskMetrics;
+  const totalInvested = summary?.totalInvested ?? 0;
+  const totalPnl = summary?.totalPnl ?? 0;
+  const avgDays = summary?.avgHoldingDays ?? 0;
+  const currentRisk = riskMetrics ?? zeroRiskMetrics;
 
   return (
     <div className="space-y-6">
@@ -444,6 +386,19 @@ export function PositionsView() {
           >
             {t('common.retry')}
           </Button>
+        </div>
+      )}
+
+      {/* Demo Mode Banner — shown when risk metrics are zero/insufficient */}
+      {isDemoRisk && (
+        <div className="flex items-center gap-3 p-3 bg-yellow-600/10 border border-yellow-600/30 rounded-lg">
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-yellow-600/20 flex items-center justify-center">
+            <AlertTriangle className="w-4 h-4 text-yellow-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-yellow-400">{t('pos.demoBanner')}</p>
+            <p className="text-[10px] text-yellow-500/80 mt-0.5">{t('pos.demoBannerDesc')}</p>
+          </div>
         </div>
       )}
 
@@ -530,9 +485,6 @@ export function PositionsView() {
           </CardContent>
         </Card>
       </div>
-      {isDemoRisk && (
-        <p className="text-[10px] text-yellow-500/70 text-center">{t('pos.demoRiskHint')}</p>
-      )}
 
       {/* Active Positions */}
       <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">

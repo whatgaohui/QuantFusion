@@ -354,7 +354,9 @@ const translations: Record<Language, Record<string, string>> = {
     'pos.annualized': 'Annualized',
     'pos.portfolioLevel': 'Portfolio level',
     'pos.demo': 'Demo',
-    'pos.demoRiskHint': 'Insufficient data — showing demo values',
+    'pos.demoRiskHint': 'Insufficient data — risk metrics are zero',
+    'pos.demoBanner': 'Demo Mode — Zero Risk Metrics',
+    'pos.demoBannerDesc': 'Portfolio data is insufficient to calculate meaningful risk metrics. Add more positions for real calculations.',
 
     // Backtest View
     'back.config': 'Backtest Configuration',
@@ -385,6 +387,8 @@ const translations: Record<Language, Record<string, string>> = {
     'back.tradePnl': 'P&L',
     'back.symbol': 'Symbol',
     'back.offlineMode': 'Offline Mode — Simulated Results',
+    'back.simulatedWarning': '⚠️ Backtest results are simulated data for reference only',
+    'back.simulatedWarningDesc': 'Cannot connect to backtest service. The following results are generated locally by simulation and do not represent real historical performance.',
     'back.realtimeMode': 'AI Backtest',
     'back.entryDate': 'Entry Date',
     'back.exitDate': 'Exit Date',
@@ -842,7 +846,9 @@ const translations: Record<Language, Record<string, string>> = {
     'pos.annualized': '年化',
     'pos.portfolioLevel': '组合级别',
     'pos.demo': '演示',
-    'pos.demoRiskHint': '数据不足 — 显示演示数值',
+    'pos.demoRiskHint': '数据不足 — 风险指标为零',
+    'pos.demoBanner': '演示模式 — 风险指标为零',
+    'pos.demoBannerDesc': '组合数据不足以计算有意义的风险指标，添加更多持仓后将显示真实计算结果。',
 
     // Backtest View
     'back.config': '回测配置',
@@ -873,6 +879,8 @@ const translations: Record<Language, Record<string, string>> = {
     'back.tradePnl': '盈亏',
     'back.symbol': '代码',
     'back.offlineMode': '离线模式 — 模拟结果',
+    'back.simulatedWarning': '⚠️ 回测结果为模拟数据，仅供参考',
+    'back.simulatedWarningDesc': '无法连接到回测服务，以下结果由本地模拟生成，不代表真实历史表现。',
     'back.realtimeMode': 'AI 回测',
     'back.entryDate': '入场日期',
     'back.exitDate': '出场日期',
