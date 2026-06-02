@@ -16,9 +16,11 @@ import {
   Activity,
   Layers,
   Timer,
-  Wifi,
   WifiOff,
   Zap,
+  PlusCircle,
+  Percent,
+  PieChart,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,7 +51,9 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLanguage } from '@/lib/i18n';
+import { AddPositionDialog } from '@/components/dashboard/add-position-dialog';
 import { toast } from 'sonner';
 
 interface Position {
@@ -69,6 +73,14 @@ interface Position {
   lots?: { buyDate: string; qty: number; price: number }[];
   /** Whether the current price comes from real-time Finnhub data */
   isLivePrice?: boolean;
+  /** Asset type classification */
+  assetType?: 'stock' | 'etf' | 'bond' | 'fund';
+  /** Target allocation weight (0-100%) */
+  targetWeight?: number;
+  /** ETF category (for ETF positions) */
+  category?: string;
+  /** ETF expense ratio (for ETF positions) */
+  expenseRatio?: number;
 }
 
 interface PositionSummary {
@@ -88,49 +100,76 @@ interface RiskData {
   mock?: boolean;
 }
 
+/** Badge style mapping for asset types */
+const ASSET_TYPE_BADGE_STYLES: Record<string, string> = {
+  stock: 'bg-zinc-600/15 text-zinc-300 border-zinc-600/20',
+  etf: 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20',
+  bond: 'bg-yellow-600/15 text-yellow-400 border-yellow-600/20',
+  fund: 'bg-purple-600/15 text-purple-400 border-purple-600/20',
+};
+
+/** ETF category badge styles */
+const CATEGORY_BADGE_STYLES: Record<string, string> = {
+  broad_market: 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20',
+  sector: 'bg-purple-600/15 text-purple-400 border-purple-600/20',
+  bond: 'bg-yellow-600/15 text-yellow-400 border-yellow-600/20',
+  commodity: 'bg-amber-600/15 text-amber-400 border-amber-600/20',
+  international: 'bg-blue-600/15 text-blue-400 border-blue-600/20',
+  thematic: 'bg-pink-600/15 text-pink-400 border-pink-600/20',
+};
+
 const mockActivePositions: Position[] = [
   {
     id: '1', symbol: 'AAPL', name: 'Apple Inc.', buyPrice: 182.50, currentPrice: 189.45,
     quantity: 50, buyDate: '2024-01-10', cycleDays: 7, pnl: 347.50, pnlPercent: 3.81,
-    holdingDays: 4, remainingDays: 3, status: 'ACTIVE',
+    holdingDays: 4, remainingDays: 3, status: 'ACTIVE', assetType: 'stock',
     lots: [{ buyDate: '2024-01-10', qty: 30, price: 181.00 }, { buyDate: '2024-01-11', qty: 20, price: 184.75 }],
   },
   {
     id: '2', symbol: 'NVDA', name: 'NVIDIA Corp.', buyPrice: 598.30, currentPrice: 615.20,
     quantity: 20, buyDate: '2024-01-12', cycleDays: 7, pnl: 338.00, pnlPercent: 2.82,
-    holdingDays: 2, remainingDays: 5, status: 'ACTIVE',
+    holdingDays: 2, remainingDays: 5, status: 'ACTIVE', assetType: 'stock',
     lots: [{ buyDate: '2024-01-12', qty: 20, price: 598.30 }],
   },
   {
     id: '3', symbol: 'TSLA', name: 'Tesla Inc.', buyPrice: 252.10, currentPrice: 245.80,
     quantity: 30, buyDate: '2024-01-09', cycleDays: 7, pnl: -189.00, pnlPercent: -2.50,
-    holdingDays: 5, remainingDays: 2, status: 'ACTIVE',
+    holdingDays: 5, remainingDays: 2, status: 'ACTIVE', assetType: 'stock',
     lots: [{ buyDate: '2024-01-09', qty: 30, price: 252.10 }],
   },
   {
-    id: '4', symbol: 'MSFT', name: 'Microsoft Corp.', buyPrice: 380.20, currentPrice: 388.50,
-    quantity: 25, buyDate: '2024-01-13', cycleDays: 7, pnl: 207.50, pnlPercent: 2.18,
-    holdingDays: 1, remainingDays: 6, status: 'ACTIVE',
-    lots: [{ buyDate: '2024-01-13', qty: 25, price: 380.20 }],
+    id: '4', symbol: 'SPY', name: 'SPDR S&P 500 ETF', buyPrice: 475.20, currentPrice: 488.50,
+    quantity: 25, buyDate: '2024-01-13', cycleDays: 7, pnl: 332.50, pnlPercent: 2.80,
+    holdingDays: 1, remainingDays: 6, status: 'ACTIVE', assetType: 'etf',
+    targetWeight: 20, category: 'broad_market', expenseRatio: 0.09,
+    lots: [{ buyDate: '2024-01-13', qty: 25, price: 475.20 }],
   },
   {
-    id: '5', symbol: 'AMZN', name: 'Amazon.com', buyPrice: 175.80, currentPrice: 178.25,
-    quantity: 40, buyDate: '2024-01-08', cycleDays: 7, pnl: 98.00, pnlPercent: 1.39,
-    holdingDays: 6, remainingDays: 1, status: 'ACTIVE',
-    lots: [{ buyDate: '2024-01-08', qty: 40, price: 175.80 }],
+    id: '5', symbol: 'QQQ', name: 'Invesco QQQ Trust', buyPrice: 398.80, currentPrice: 412.25,
+    quantity: 30, buyDate: '2024-01-08', cycleDays: 7, pnl: 403.50, pnlPercent: 3.37,
+    holdingDays: 6, remainingDays: 1, status: 'ACTIVE', assetType: 'etf',
+    targetWeight: 15, category: 'broad_market', expenseRatio: 0.20,
+    lots: [{ buyDate: '2024-01-08', qty: 30, price: 398.80 }],
+  },
+  {
+    id: '6', symbol: 'BND', name: 'Vanguard Total Bond Market ETF', buyPrice: 72.30, currentPrice: 71.85,
+    quantity: 100, buyDate: '2024-01-07', cycleDays: 7, pnl: -45.00, pnlPercent: -0.62,
+    holdingDays: 7, remainingDays: 0, status: 'ACTIVE', assetType: 'bond',
+    targetWeight: 15, category: 'bond', expenseRatio: 0.03,
+    lots: [{ buyDate: '2024-01-07', qty: 100, price: 72.30 }],
   },
 ];
 
 const mockClosedPositions: Position[] = [
   {
-    id: '6', symbol: 'META', name: 'Meta Platforms', buyPrice: 360.50, currentPrice: 374.20,
+    id: '7', symbol: 'META', name: 'Meta Platforms', buyPrice: 360.50, currentPrice: 374.20,
     quantity: 15, buyDate: '2024-01-02', cycleDays: 7, pnl: 205.50, pnlPercent: 3.80,
-    holdingDays: 7, remainingDays: 0, status: 'CLOSED',
+    holdingDays: 7, remainingDays: 0, status: 'CLOSED', assetType: 'stock',
   },
   {
-    id: '7', symbol: 'GOOGL', name: 'Alphabet Inc.', buyPrice: 145.20, currentPrice: 142.65,
+    id: '8', symbol: 'GOOGL', name: 'Alphabet Inc.', buyPrice: 145.20, currentPrice: 142.65,
     quantity: 35, buyDate: '2024-01-01', cycleDays: 7, pnl: -89.25, pnlPercent: -1.76,
-    holdingDays: 7, remainingDays: 0, status: 'CLOSED',
+    holdingDays: 7, remainingDays: 0, status: 'CLOSED', assetType: 'stock',
   },
 ];
 
@@ -138,7 +177,7 @@ const mockSummary: PositionSummary = {
   totalInvested: 87560.00,
   totalPnl: 810.75,
   avgHoldingDays: 4.2,
-  activeCount: 5,
+  activeCount: 6,
   closedCount: 2,
 };
 
@@ -169,7 +208,37 @@ export function PositionsView() {
   const [positionsIsMock, setPositionsIsMock] = useState(true);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [expandedLotId, setExpandedLotId] = useState<string | null>(null);
+  const [assetFilter, setAssetFilter] = useState<string>('all');
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
   const priceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  /** Filter positions by asset type */
+  const filteredPositions = positions?.filter((p) => {
+    if (assetFilter === 'all') return true;
+    return (p.assetType || 'stock') === assetFilter;
+  }) || [];
+
+  /** Count positions by asset type */
+  const assetTypeCounts = positions?.reduce((acc, p) => {
+    const type = p.assetType || 'stock';
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>) || {};
+
+  /** Calculate ETF-specific metrics */
+  const etfPositions = positions?.filter((p) => p.assetType === 'etf') || [];
+  const totalPortfolioValue = positions?.reduce((sum, p) => sum + p.currentPrice * p.quantity, 0) || 0;
+  const etfValue = etfPositions.reduce((sum, p) => sum + p.currentPrice * p.quantity, 0);
+  const etfWeight = totalPortfolioValue > 0 ? (etfValue / totalPortfolioValue) * 100 : 0;
+
+  // Weighted average expense ratio for ETF positions
+  const etfPositionsFromApi = etfPositions.filter((p) => p.expenseRatio != null && p.expenseRatio > 0);
+  const etfTotalValue = etfPositionsFromApi.reduce((sum, p) => sum + p.currentPrice * p.quantity, 0);
+  const avgExpenseRatio = etfTotalValue > 0
+    ? etfPositionsFromApi.reduce((sum, p) => sum + (p.expenseRatio || 0) * p.currentPrice * p.quantity, 0) / etfTotalValue
+    : 0;
+
+  const hasEtfPositions = etfPositions.length > 0;
 
   /** Fetch real-time prices from Finnhub for all active positions */
   const fetchRealtimePrices = useCallback(async (currentPositions: Position[]) => {
@@ -245,6 +314,58 @@ export function PositionsView() {
     }
   }, []);
 
+  /** Fetch ETF profiles for ETF positions to get expense ratio data */
+  const fetchEtfProfiles = useCallback(async (currentPositions: Position[]) => {
+    const etfSymbols = currentPositions
+      .filter((p) => p.assetType === 'etf' && p.expenseRatio == null)
+      .map((p) => p.symbol);
+
+    if (etfSymbols.length === 0) return;
+
+    try {
+      const profilePromises = etfSymbols.map(async (symbol) => {
+        try {
+          const res = await fetch(`/api/etf/profile/${encodeURIComponent(symbol)}`);
+          if (res.ok) {
+            const data = await res.json();
+            return {
+              symbol,
+              expenseRatio: data.expenseRatio,
+              category: data.category,
+              trackingIndex: data.trackingIndex,
+            };
+          }
+        } catch {
+          // ignore
+        }
+        return null;
+      });
+
+      const profiles = await Promise.all(profilePromises);
+      const profileMap = new Map(
+        profiles.filter((p): p is NonNullable<typeof p> => p != null).map((p) => [p.symbol, p])
+      );
+
+      if (profileMap.size > 0) {
+        setPositions((prev) =>
+          prev?.map((pos) => {
+            const profile = profileMap.get(pos.symbol);
+            if (profile && pos.assetType === 'etf') {
+              return {
+                ...pos,
+                expenseRatio: profile.expenseRatio ?? pos.expenseRatio,
+                category: profile.category ?? pos.category,
+              };
+            }
+            return pos;
+          }) || null
+        );
+      }
+    } catch {
+      // silently handle
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -291,6 +412,8 @@ export function PositionsView() {
 
       // Fetch real-time prices immediately after loading positions
       await fetchRealtimePrices(activePositions);
+      // Fetch ETF profiles for expense ratio data
+      await fetchEtfProfiles(activePositions);
     } catch {
       setPositions(mockActivePositions);
       setClosedPositions(mockClosedPositions);
@@ -299,7 +422,7 @@ export function PositionsView() {
     } finally {
       setLoading(false);
     }
-  }, [fetchRealtimePrices]);
+  }, [fetchRealtimePrices, fetchEtfProfiles]);
 
   /** Periodic price refresh (every 30 seconds) */
   useEffect(() => {
@@ -350,6 +473,11 @@ export function PositionsView() {
     }
   };
 
+  /** Handle position added from dialog */
+  const handlePositionAdded = useCallback(() => {
+    fetchData();
+  }, [fetchData]);
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -376,7 +504,7 @@ export function PositionsView() {
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className={`grid grid-cols-1 ${hasEtfPositions ? 'sm:grid-cols-5' : 'sm:grid-cols-3'} gap-4`}>
         <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
@@ -418,6 +546,38 @@ export function PositionsView() {
             <p className="text-2xl font-bold text-white">{avgDays.toFixed(1)} {t('pos.days')}</p>
           </CardContent>
         </Card>
+
+        {hasEtfPositions && (
+          <>
+            <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-zinc-400">{t('pos.etfWeight')}</span>
+                  <div className="w-8 h-8 rounded-lg bg-emerald-600/10 flex items-center justify-center">
+                    <PieChart className="w-4 h-4 text-emerald-400" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-emerald-400">{etfWeight.toFixed(1)}%</p>
+                <p className="text-[10px] text-zinc-600">{etfPositions.length} ETF{etfPositions.length !== 1 ? 's' : ''}</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-zinc-400">{t('pos.avgExpenseRatio')}</span>
+                  <div className="w-8 h-8 rounded-lg bg-purple-600/10 flex items-center justify-center">
+                    <Percent className="w-4 h-4 text-purple-400" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-purple-400">
+                  {avgExpenseRatio > 0 ? `${avgExpenseRatio.toFixed(3)}%` : '--'}
+                </p>
+                <p className="text-[10px] text-zinc-600">{t('etf.weightedAvg')}</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Risk Metrics */}
@@ -503,7 +663,7 @@ export function PositionsView() {
             <div className="flex items-center gap-2">
               <CardTitle className="text-base font-semibold text-white">{t('pos.activePositions')}</CardTitle>
               <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[10px]">
-                {positions?.length || 0}
+                {filteredPositions.length}
               </Badge>
               {positionsIsMock && (
                 <Badge className="bg-yellow-600/15 text-yellow-400 border-yellow-600/20 text-[9px] border">DEMO</Badge>
@@ -530,6 +690,49 @@ export function PositionsView() {
               </Button>
             </div>
           </div>
+
+          {/* Asset Type Filter Tabs */}
+          <div className="mt-3">
+            <Tabs value={assetFilter} onValueChange={setAssetFilter}>
+              <TabsList className="bg-[#0a0a0f] border border-[#1e1e2e] h-8 p-0.5">
+                <TabsTrigger
+                  value="all"
+                  className="text-[11px] px-2.5 py-1 data-[state=active]:bg-emerald-600/15 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-600/30"
+                >
+                  {t('pos.filterAll')}
+                  <span className="ml-1 text-[9px] opacity-60">{positions?.length || 0}</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="stock"
+                  className="text-[11px] px-2.5 py-1 data-[state=active]:bg-zinc-600/15 data-[state=active]:text-zinc-300 data-[state=active]:border-zinc-600/30"
+                >
+                  {t('etf.assetTypeStock')}
+                  <span className="ml-1 text-[9px] opacity-60">{assetTypeCounts['stock'] || 0}</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="etf"
+                  className="text-[11px] px-2.5 py-1 data-[state=active]:bg-emerald-600/15 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-600/30"
+                >
+                  {t('etf.assetTypeEtf')}
+                  <span className="ml-1 text-[9px] opacity-60">{assetTypeCounts['etf'] || 0}</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="bond"
+                  className="text-[11px] px-2.5 py-1 data-[state=active]:bg-yellow-600/15 data-[state=active]:text-yellow-400 data-[state=active]:border-yellow-600/30"
+                >
+                  {t('etf.assetTypeBond')}
+                  <span className="ml-1 text-[9px] opacity-60">{assetTypeCounts['bond'] || 0}</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="fund"
+                  className="text-[11px] px-2.5 py-1 data-[state=active]:bg-purple-600/15 data-[state=active]:text-purple-400 data-[state=active]:border-purple-600/30"
+                >
+                  {t('etf.assetTypeFund')}
+                  <span className="ml-1 text-[9px] opacity-60">{assetTypeCounts['fund'] || 0}</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </CardHeader>
         <CardContent>
           {!positions || positions.length === 0 ? (
@@ -537,6 +740,18 @@ export function PositionsView() {
               <Briefcase className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
               <p className="text-zinc-400 text-sm">{t('pos.noActivePositions')}</p>
               <p className="text-zinc-500 text-xs mt-1">{t('pos.openFromScanner')}</p>
+              <Button
+                className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                onClick={() => setAddDialogOpen(true)}
+              >
+                <PlusCircle className="w-4 h-4" />
+                {t('pos.addPosition')}
+              </Button>
+            </div>
+          ) : filteredPositions.length === 0 ? (
+            <div className="text-center py-12">
+              <Briefcase className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
+              <p className="text-zinc-400 text-sm">{t('pos.noPositionsForFilter')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -544,6 +759,7 @@ export function PositionsView() {
                 <TableHeader>
                   <TableRow className="border-[#1e1e2e] hover:bg-transparent">
                     <TableHead className="text-zinc-400 text-xs">Symbol</TableHead>
+                    <TableHead className="text-zinc-400 text-xs">{t('etf.assetType')}</TableHead>
                     <TableHead className="text-zinc-400 text-xs">{t('pos.buyPrice')}</TableHead>
                     <TableHead className="text-zinc-400 text-xs">{t('pos.current')}</TableHead>
                     <TableHead className="text-zinc-400 text-xs">{t('pos.pnlPercent')}</TableHead>
@@ -552,108 +768,151 @@ export function PositionsView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {positions.map((pos) => (
-                    <TableRow key={pos.id} className="border-[#1e1e2e] hover:bg-[#1a1a2e]/50">
-                      <TableCell>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-white">{pos.symbol}</p>
-                            {pos.lots && pos.lots.length > 1 && (
-                              <button onClick={() => setExpandedLotId(expandedLotId === pos.id ? null : pos.id)}>
-                                <Layers className={`w-3 h-3 text-zinc-500 hover:text-emerald-400 transition-colors ${expandedLotId === pos.id ? 'text-emerald-400' : ''}`} />
-                              </button>
+                  {filteredPositions.map((pos) => {
+                    const assetType = pos.assetType || 'stock';
+                    const badgeStyle = ASSET_TYPE_BADGE_STYLES[assetType] || ASSET_TYPE_BADGE_STYLES.stock;
+                    const isExpanded = expandedLotId === pos.id;
+                    const isEtf = assetType === 'etf';
+
+                    return (
+                      <TableRow key={pos.id} className="border-[#1e1e2e] hover:bg-[#1a1a2e]/50">
+                        <TableCell>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-white">{pos.symbol}</p>
+                              {pos.lots && pos.lots.length > 1 && (
+                                <button onClick={() => setExpandedLotId(isExpanded ? null : pos.id)}>
+                                  <Layers className={`w-3 h-3 text-zinc-500 hover:text-emerald-400 transition-colors ${isExpanded ? 'text-emerald-400' : ''}`} />
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-xs text-zinc-500">{pos.name}</p>
+                            {/* ETF expandable details */}
+                            {isEtf && (pos.category || pos.expenseRatio != null || pos.targetWeight != null) && (
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                {pos.category && (
+                                  <Badge className={`text-[8px] border ${CATEGORY_BADGE_STYLES[pos.category] || 'bg-zinc-600/15 text-zinc-400 border-zinc-600/20'}`}>
+                                    {t(`etf.cat_${pos.category}` as 'etf.cat_broad_market') || pos.category}
+                                  </Badge>
+                                )}
+                                {pos.expenseRatio != null && pos.expenseRatio > 0 && (
+                                  <span className="text-[9px] text-zinc-500">
+                                    {t('etf.expenseRatio')}: <span className="text-zinc-300">{pos.expenseRatio.toFixed(3)}%</span>
+                                  </span>
+                                )}
+                                {pos.targetWeight != null && pos.targetWeight > 0 && (
+                                  <span className="text-[9px] text-zinc-500">
+                                    {t('etf.targetWeight')}: <span className="text-zinc-300">{pos.targetWeight}%</span>
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
-                          <p className="text-xs text-zinc-500">{pos.name}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-zinc-300">${pos.buyPrice.toFixed(2)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm text-white font-medium">${pos.currentPrice.toFixed(2)}</span>
-                          {pos.isLivePrice === true ? (
-                            <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[8px] px-1 py-0 flex items-center gap-0.5">
-                              <Zap className="w-2.5 h-2.5" />
-                              {t('pos.realtime')}
-                            </Badge>
-                          ) : pos.isLivePrice === false && pos.currentPrice > 0 ? (
-                            <Badge className="bg-zinc-600/15 text-zinc-400 border-zinc-600/20 text-[8px] px-1 py-0 flex items-center gap-0.5">
-                              <WifiOff className="w-2.5 h-2.5" />
-                              {t('pos.stale')}
-                            </Badge>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {pos.pnlPercent >= 0 ? (
-                            <TrendingUp className="w-3 h-3 text-emerald-400" />
-                          ) : (
-                            <TrendingDown className="w-3 h-3 text-red-400" />
-                          )}
-                          <span className={`text-sm font-medium ${pos.pnlPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {pos.pnlPercent >= 0 ? '+' : ''}{pos.pnlPercent.toFixed(2)}%
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1">
-                              <Timer className="w-3 h-3 text-zinc-500" />
-                              <span className="text-xs text-zinc-400">{pos.remainingDays}d {t('pos.left')}</span>
-                            </div>
-                            <span className="text-[10px] text-zinc-600">{pos.cycleDays}d {t('pos.cycle')}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`text-[9px] border ${badgeStyle}`}>
+                            {t(`etf.assetType${assetType.charAt(0).toUpperCase() + assetType.slice(1)}` as 'etf.assetTypeStock')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-zinc-300">${pos.buyPrice.toFixed(2)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm text-white font-medium">${pos.currentPrice.toFixed(2)}</span>
+                            {pos.isLivePrice === true ? (
+                              <Badge className="bg-emerald-600/15 text-emerald-400 border-emerald-600/20 text-[8px] px-1 py-0 flex items-center gap-0.5">
+                                <Zap className="w-2.5 h-2.5" />
+                                {t('pos.realtime')}
+                              </Badge>
+                            ) : pos.isLivePrice === false && pos.currentPrice > 0 ? (
+                              <Badge className="bg-zinc-600/15 text-zinc-400 border-zinc-600/20 text-[8px] px-1 py-0 flex items-center gap-0.5">
+                                <WifiOff className="w-2.5 h-2.5" />
+                                {t('pos.stale')}
+                              </Badge>
+                            ) : null}
                           </div>
-                          <Progress
-                            value={((pos.cycleDays - pos.remainingDays) / pos.cycleDays) * 100}
-                            className="h-1.5 bg-[#1e1e2e]"
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={closingId === pos.id}
-                              className="h-7 px-2 text-red-400 hover:text-red-300 hover:bg-red-600/10"
-                            >
-                              {closingId === pos.id ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <XCircle className="w-3.5 h-3.5" />
-                              )}
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent className="bg-[#111118] border-[#1e1e2e]">
-                            <AlertDialogHeader>
-                              <AlertDialogTitle className="text-white">{t('pos.closePosition')}</AlertDialogTitle>
-                              <AlertDialogDescription className="text-zinc-400">
-                                {t('pos.closePositionConfirm').replace('{symbol}', pos.symbol).replace('{quantity}', pos.quantity.toString()).replace('{price}', pos.currentPrice.toFixed(2))}
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel className="bg-[#1a1a2e] border-[#2e2e3e] text-zinc-300 hover:bg-[#2e2e3e]">
-                                {t('pos.cancel')}
-                              </AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleClosePosition(pos.id)}
-                                className="bg-red-600 hover:bg-red-700 text-white"
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            {pos.pnlPercent >= 0 ? (
+                              <TrendingUp className="w-3 h-3 text-emerald-400" />
+                            ) : (
+                              <TrendingDown className="w-3 h-3 text-red-400" />
+                            )}
+                            <span className={`text-sm font-medium ${pos.pnlPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {pos.pnlPercent >= 0 ? '+' : ''}{pos.pnlPercent.toFixed(2)}%
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1">
+                                <Timer className="w-3 h-3 text-zinc-500" />
+                                <span className="text-xs text-zinc-400">{pos.remainingDays}d {t('pos.left')}</span>
+                              </div>
+                              <span className="text-[10px] text-zinc-600">{pos.cycleDays}d {t('pos.cycle')}</span>
+                            </div>
+                            <Progress
+                              value={((pos.cycleDays - pos.remainingDays) / pos.cycleDays) * 100}
+                              className="h-1.5 bg-[#1e1e2e]"
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={closingId === pos.id}
+                                className="h-7 px-2 text-red-400 hover:text-red-300 hover:bg-red-600/10"
                               >
-                                {t('pos.closePosition')}
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                                {closingId === pos.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <XCircle className="w-3.5 h-3.5" />
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="bg-[#111118] border-[#1e1e2e]">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="text-white">{t('pos.closePosition')}</AlertDialogTitle>
+                                <AlertDialogDescription className="text-zinc-400">
+                                  {t('pos.closePositionConfirm').replace('{symbol}', pos.symbol).replace('{quantity}', pos.quantity.toString()).replace('{price}', pos.currentPrice.toFixed(2))}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel className="bg-[#1a1a2e] border-[#2e2e3e] text-zinc-300 hover:bg-[#2e2e3e]">
+                                  {t('pos.cancel')}
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleClosePosition(pos.id)}
+                                  className="bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                  {t('pos.closePosition')}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
           )}
+
+          {/* Add Position Button */}
+          <div className="mt-4 flex justify-end">
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+              onClick={() => setAddDialogOpen(true)}
+            >
+              <PlusCircle className="w-4 h-4" />
+              {t('pos.addPosition')}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -688,6 +947,7 @@ export function PositionsView() {
                     <TableHeader>
                       <TableRow className="border-[#1e1e2e] hover:bg-transparent">
                         <TableHead className="text-zinc-400 text-xs">Symbol</TableHead>
+                        <TableHead className="text-zinc-400 text-xs">{t('etf.assetType')}</TableHead>
                         <TableHead className="text-zinc-400 text-xs">{t('pos.buyPrice')}</TableHead>
                         <TableHead className="text-zinc-400 text-xs">{t('pos.sellPrice')}</TableHead>
                         <TableHead className="text-zinc-400 text-xs">{t('pos.pnl')}</TableHead>
@@ -696,29 +956,38 @@ export function PositionsView() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {closedPositions.map((pos) => (
-                        <TableRow key={pos.id} className="border-[#1e1e2e] hover:bg-[#1a1a2e]/50">
-                          <TableCell>
-                            <div>
-                              <p className="text-sm font-semibold text-zinc-300">{pos.symbol}</p>
-                              <p className="text-xs text-zinc-600">{pos.name}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm text-zinc-400">${pos.buyPrice.toFixed(2)}</TableCell>
-                          <TableCell className="text-sm text-zinc-300">${pos.currentPrice.toFixed(2)}</TableCell>
-                          <TableCell>
-                            <span className={`text-sm font-medium ${pos.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {pos.pnl >= 0 ? '+' : ''}{formatCurrency(pos.pnl)}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-sm text-zinc-400">{pos.holdingDays}d</TableCell>
-                          <TableCell>
-                            <Badge className="bg-zinc-600/15 text-zinc-400 border-zinc-600/20 text-[10px]">
-                              {t('common.closed')}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {closedPositions.map((pos) => {
+                        const assetType = pos.assetType || 'stock';
+                        const badgeStyle = ASSET_TYPE_BADGE_STYLES[assetType] || ASSET_TYPE_BADGE_STYLES.stock;
+                        return (
+                          <TableRow key={pos.id} className="border-[#1e1e2e] hover:bg-[#1a1a2e]/50">
+                            <TableCell>
+                              <div>
+                                <p className="text-sm font-semibold text-zinc-300">{pos.symbol}</p>
+                                <p className="text-xs text-zinc-600">{pos.name}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={`text-[9px] border ${badgeStyle}`}>
+                                {t(`etf.assetType${assetType.charAt(0).toUpperCase() + assetType.slice(1)}` as 'etf.assetTypeStock')}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-zinc-400">${pos.buyPrice.toFixed(2)}</TableCell>
+                            <TableCell className="text-sm text-zinc-300">${pos.currentPrice.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <span className={`text-sm font-medium ${pos.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {pos.pnl >= 0 ? '+' : ''}{formatCurrency(pos.pnl)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-sm text-zinc-400">{pos.holdingDays}d</TableCell>
+                            <TableCell>
+                              <Badge className="bg-zinc-600/15 text-zinc-400 border-zinc-600/20 text-[10px]">
+                                {t('common.closed')}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -731,6 +1000,13 @@ export function PositionsView() {
           </CollapsibleContent>
         </Card>
       </Collapsible>
+
+      {/* Add Position Dialog */}
+      <AddPositionDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        onPositionAdded={handlePositionAdded}
+      />
     </div>
   );
 }
@@ -759,6 +1035,13 @@ function mapDbPosition(p: Record<string, unknown>): Position {
       }))
     : undefined;
 
+  // Map asset type
+  const rawAssetType = typeof p.assetType === 'string' ? p.assetType : 'stock';
+  const assetType = (['stock', 'etf', 'bond', 'fund'].includes(rawAssetType) ? rawAssetType : 'stock') as Position['assetType'];
+
+  // Map target weight
+  const targetWeight = typeof p.targetWeight === 'number' && p.targetWeight > 0 ? p.targetWeight : undefined;
+
   return {
     id: (p.id as string) || '',
     symbol: (p.symbol as string) || '',
@@ -775,5 +1058,7 @@ function mapDbPosition(p: Record<string, unknown>): Position {
     status: (p.status as string) === 'closed' ? 'CLOSED' : 'ACTIVE',
     lots,
     isLivePrice: false,
+    assetType,
+    targetWeight,
   };
 }

@@ -7,6 +7,7 @@ import {
   MessageSquare,
   Radar,
   Briefcase,
+  PieChart,
   Eye,
   Target,
   Newspaper,
@@ -27,7 +28,7 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/lib/i18n';
 
-export type NavItem = 'dashboard' | 'aiAnalysis' | 'agentChat' | 'scanner' | 'positions' | 'watchlist' | 'strategies' | 'news' | 'backtest' | 'settings';
+export type NavItem = 'dashboard' | 'aiAnalysis' | 'agentChat' | 'scanner' | 'positions' | 'etfPortfolio' | 'watchlist' | 'strategies' | 'news' | 'backtest' | 'settings';
 
 interface NavConfig {
   id: NavItem;
@@ -42,6 +43,7 @@ const navItems: NavConfig[] = [
   { id: 'agentChat', labelKey: 'sidebar.agentChat', icon: MessageSquare, accent: true },
   { id: 'scanner', labelKey: 'sidebar.scanner', icon: Radar },
   { id: 'positions', labelKey: 'sidebar.positions', icon: Briefcase },
+  { id: 'etfPortfolio', labelKey: 'sidebar.etfPortfolio', icon: PieChart },
   { id: 'watchlist', labelKey: 'sidebar.watchlist', icon: Eye },
   { id: 'strategies', labelKey: 'sidebar.strategies', icon: Target },
   { id: 'news', labelKey: 'sidebar.news', icon: Newspaper },

@@ -1,3 +1,48 @@
+# Work Log — Task 9: Update Positions View to Support ETFs
+
+## Summary
+Updated the positions view to support ETFs alongside stocks. Added asset type badges, filter tabs, ETF-specific metrics, and integrated the AddPositionDialog component.
+
+## Files Modified
+
+### `/src/components/dashboard/positions-view.tsx`
+- **Position interface**: Added `assetType?: 'stock' | 'etf' | 'bond' | 'fund'`, `targetWeight?: number`, `category?: string`, `expenseRatio?: number` fields
+- **Asset Type badge column**: Added "Asset Type" column to both active and closed positions tables with color-coded badges:
+  - stock = zinc badge
+  - etf = emerald badge
+  - bond = yellow badge
+  - fund = purple badge
+- **ETF expandable details**: For ETF positions, shows category badge, expense ratio, and target weight inline under the symbol
+- **Filter tabs**: Added Tabs component with "All", "Stocks", "ETFs", "Bonds", "Funds" filter tabs, each showing count of matching positions
+- **ETF-specific summary cards**: When ETF positions exist, grid expands to 5 columns showing:
+  - "ETF Weight" card (PieChart icon, emerald accent, % of portfolio in ETFs)
+  - "Avg Expense Ratio" card (Percent icon, purple accent, weighted average expense ratio)
+- **AddPositionDialog integration**: Replaced any inline add position logic with the `AddPositionDialog` component. Added "Add Position" button both in empty state and at the bottom of the positions table
+- **fetchEtfProfiles**: Added function to fetch ETF profile data (expense ratio, category) from `/api/etf/profile/[symbol]` for ETF positions that don't have that data yet
+- **mapDbPosition**: Updated to map `assetType` (validated against valid types), `targetWeight`, and default to 'stock' when not specified
+- **Mock data**: Updated mock data to include ETF and bond positions (SPY, QQQ, BND) with appropriate assetType, category, expenseRatio, and targetWeight fields
+
+### `/src/app/api/portfolio/positions/route.ts`
+- **POST handler**: Updated to extract `assetType` and `targetWeight` from request body
+- Added `assetType` validation against valid types (`stock`, `etf`, `bond`, `fund`), defaulting to `stock`
+- Added `targetWeight` to `db.position.create()` data, persisted as `Float?` (null when not provided or 0)
+
+### `/src/lib/i18n.ts`
+- Added 4 new translation keys for both English and Chinese:
+  - `pos.filterAll` — All / 全部
+  - `pos.noPositionsForFilter` — No positions matching this filter / 没有匹配此筛选的持仓
+  - `pos.etfWeight` — ETF Weight / ETF权重
+  - `pos.avgExpenseRatio` — Avg Expense Ratio / 平均费率
+
+## Verification
+- `bun run lint` passed with no errors
+- All existing translations and component patterns preserved
+- Dark theme styling consistent (bg-[#0a0a0f], bg-[#111118], border-[#1e1e2e], emerald accents)
+- Responsive layout maintained with sm:grid-cols-3/5 breakpoints
+- i18n support for both English and Chinese
+
+---
+
 # QuantFusion — Iterative Fix Session Summary
 
 ## Session Overview
@@ -255,3 +300,217 @@ Fixed the watchlist "add stock" feature which was broken for users trying to add
 - Search API correctly reads Finnhub key from database (tested via curl)
 - Watchlist POST/DELETE API working correctly
 - "Add directly" button available for stocks not in search results
+
+---
+Task ID: fix-page-load
+Agent: Main
+Task: Diagnose and fix page loading issue
+
+Work Log:
+- Discovered dev server process was being killed by sandbox environment after ~60 seconds
+- Found build error: `generateMarketBrief` doesn't exist in `@/lib/ai-service` (in `/src/app/api/fusion/ai/brief/route.ts`)
+- Fixed the broken route by replacing with a simple response (no frontend code references this endpoint)
+- Successfully built production bundle (bun run build)
+- Restarted dev server using the official `.zscripts/dev.sh` script which properly manages process lifecycle
+- Verified page loads correctly via Agent Browser: dashboard, sidebar, navigation all working
+
+Stage Summary:
+- Page loading issue fixed
+- Build error fixed (ai/brief route)
+- Dev server running stably on port 3000
+- All dashboard features verified working (portfolio overview, market indices, watchlist, positions, etc.)
+
+---
+
+# Work Log — Task 6: ETF API Routes
+
+## Summary
+Created 6 ETF-related API routes for the QuantFusion trading platform. All routes follow existing project patterns: using `import { db } from '@/lib/db'` for database access, `import { getFinnhubApiKey } from '@/lib/finnhub-config'` for Finnhub API key, and `DEFAULT_USER_ID` from `@/lib/auth-utils` for user handling.
+
+## Files Created
+
+### 1. `/src/app/api/etf/search/route.ts` — GET
+Search for ETFs by name, symbol, or category.
+- First searches the `ETFProfile` database with `contains` filter on symbol, name, category, and trackingIndex
+- Then uses Finnhub API (if key available) for additional results, filtering for ETF-like results (type/description contains "etf", "trust", or "index")
+- Deduplicates by symbol (uppercase comparison)
+- Returns array of `{ symbol, name, category, expenseRatio, trackingIndex }`
+
+### 2. `/src/app/api/etf/profile/[symbol]/route.ts` — GET
+Get detailed ETF profile for a specific symbol.
+- First checks the `ETFProfile` database
+- If found, returns full profile with parsed JSON fields (topHoldings, sectorWeights, regionWeights)
+- If not found, creates a basic profile from Finnhub `stock/profile2` API data and saves to DB
+- Uses Finnhub quote data to estimate AUM when available
+- Returns 404 if not found in DB and Finnhub key is unavailable
+
+### 3. `/src/app/api/etf/portfolio/analysis/route.ts` — GET
+Analyze the user's ETF portfolio (positions where `assetType = 'etf'`).
+- Gets all open ETF positions for DEFAULT_USER_ID
+- Calculates allocation by sector (from profile sectorWeights, falling back to "Unknown")
+- Calculates allocation by region (from profile regionWeights, falling back to "Unknown")
+- Calculates allocation by category (from profile category, falling back to "Unknown")
+- Calculates portfolio-level weighted metrics: expense ratio, dividend yield, beta
+  - Normalizes by coverage when not all positions have metric data
+- Detects concentration risks (any single ETF > 30% of portfolio value)
+- Returns comprehensive analysis object
+
+### 4. `/src/app/api/etf/portfolio/rebalance/route.ts` — GET
+Generate rebalancing suggestions for the user's ETF portfolio.
+- Gets current ETF positions with values and current weights
+- If user has target weights set (position.targetWeight), uses those
+- If no target weights exist, generates default MPT-based allocation:
+  - Predefined targets for common ETFs (SPY 20%, QQQ 15%, BND 15%, etc.)
+  - Remaining weight distributed equally among unrecognized symbols
+  - Normalizes to ensure total = 100%
+- Generates buy/sell/hold suggestions with 1% rebalance threshold
+- Sorts: sell first (reduce overweight), then buy, then hold
+- Returns `{ suggestions: [{ symbol, action, currentWeight, targetWeight, weightDiff, estimatedAmount }], totalRebalanceAmount }`
+
+### 5. `/src/app/api/etf/popular/route.ts` — GET
+Return a list of 20 popular ETFs with their full profiles.
+- Seeds the database with predefined popular ETFs if none exist
+- For existing DB, upserts any missing popular ETFs
+- Popular ETFs: SPY, QQQ, VTI, VOO, IVV, IWM, EFA, AGG, BND, VWO, GLD, SLV, XLF, XLK, VGT, IBB, XLE, XLY, VNQ, TLT
+- Each has comprehensive data including expenseRatio, returns, volatility, beta, topHoldings, sectorWeights, regionWeights
+- Returns array of parsed ETFProfile objects sorted by AUM descending
+
+### 6. `/src/app/api/etf/compare/route.ts` — GET
+Compare multiple ETFs side by side.
+- Accepts `symbols` query param (comma-separated, max 10)
+- Fetches profiles from database first
+- For symbols not in DB, creates basic profiles from Finnhub data (parallel requests)
+- Returns both full comparison data per ETF and a `metricComparison` summary object
+  - metricComparison has arrays of { symbol, value } for each metric: expenseRatio, dividendYield, returns1y/3y/5y, beta, sharpe1y, volatility1y, aum
+- Includes `missingSymbols` array for any symbols that couldn't be resolved
+
+## Technical Decisions
+- All routes use `await getFinnhubApiKey()` (not `process.env`) consistent with project patterns
+- All routes use `DEFAULT_USER_ID` for user handling consistent with existing portfolio routes
+- JSON fields (topHoldings, sectorWeights, regionWeights) are stored as strings in SQLite/Prisma and parsed on read
+- Portfolio analysis normalizes weighted metrics by coverage to avoid underestimation when some positions lack data
+- Rebalancing uses a 1% threshold to avoid noise from trivial weight differences
+- Popular ETFs seeded with realistic financial data (expense ratios, returns, sector weights, etc.)
+
+## Verification
+- `bun run lint` passed with no errors
+- `bun run db:push` confirmed database is in sync with schema
+- All 6 route files created successfully
+
+---
+
+# Work Log — Task 7: ETF Portfolio View Component
+
+## Summary
+Created the ETF Portfolio View component and updated all related navigation, i18n translations, and the Add Position Dialog to support ETF-specific features.
+
+## Files Created
+
+### `/src/components/dashboard/etf-portfolio-view.tsx`
+Comprehensive ETF Portfolio management view with 5 major sections:
+
+**A. Portfolio Overview Cards** (top row, 4 cards)
+- Total ETF Portfolio Value (with DollarSign icon, emerald accent)
+- Weighted Expense Ratio (with Percent icon, purple accent, weighted average label)
+- Weighted Dividend Yield (with TrendingUp icon, yellow accent)
+- Portfolio Beta (with BarChart3 icon, blue accent, volatility indicator)
+- Concentration risk warnings shown below cards when any ETF exceeds 20% threshold
+
+**B. ETF Holdings Table**
+- Columns: Symbol, Category (color-coded badge), Price, Shares, Value, Weight %, P&L, Target Weight
+- Category badges: broad_market=emerald, sector=purple, bond=yellow, commodity=amber, international=blue, thematic=pink
+- Clicking a row expands to show: expense ratio, tracking index, dividend yield, avg cost, top holdings
+- Add ETF button opens the AddPositionDialog
+- Empty state with call-to-action
+
+**C. Asset Allocation Visualization** (3 pie charts side by side)
+- By Category (broad_market, sector, bond, commodity, international, thematic)
+- By Sector (Technology, Healthcare, Finance, Energy, etc.)
+- By Region (US, International, Emerging)
+- Each with donut chart + legend, custom recharts tooltips, responsive layout
+
+**D. Rebalancing Suggestions Panel**
+- Bar chart comparing current (solid emerald) vs target (outlined emerald) weights
+- Suggestions list with color-coded actions: green=underweight(buy), red=overweight(sell), gray=on target
+- Current → target weight transition display with weight diff
+- Estimated total rebalance amount
+- Refresh button
+
+**E. Popular ETFs Quick Add** (collapsible)
+- Search bar with debounced ETF search via /api/etf/search
+- Search results dropdown showing symbol, name, category badge, expense ratio
+- Grid of popular ETF cards with: symbol, name, category badge, expense ratio, 1Y return
+- Click to add (opens AddPositionDialog with symbol pre-filled)
+- Lazy-loads popular ETFs from /api/etf/popular when expanded
+
+Mock data provided for all sections when API is unavailable.
+
+## Files Modified
+
+### `/src/components/dashboard/sidebar.tsx`
+- Added `PieChart` import from lucide-react
+- Added `'etfPortfolio'` to `NavItem` type union
+- Added `{ id: 'etfPortfolio', labelKey: 'sidebar.etfPortfolio', icon: PieChart }` to navItems array (between positions and watchlist)
+
+### `/src/app/page.tsx`
+- Added `import { ETFPortfolioView } from '@/components/dashboard/etf-portfolio-view'`
+- Added `case 'etfPortfolio': return <ETFPortfolioView />;` in ViewRenderer switch
+- Added `etfPortfolio: 'sidebar.etfPortfolio'` to viewTitleKeys mapping
+
+### `/src/lib/i18n.ts`
+Added 35+ translation keys for both English (`en`) and Chinese (`zh`):
+- `sidebar.etfPortfolio` — ETF Portfolio / ETF组合
+- `etf.title`, `etf.portfolioValue`, `etf.expenseRatio`, `etf.dividendYield`, `etf.beta`
+- `etf.weightedAvg`, `etf.holdings`, `etf.category`, `etf.weight`
+- `etf.targetWeight`, `etf.currentWeight`, `etf.rebalancing`, `etf.rebalance`
+- `etf.overweight`, `etf.underweight`, `etf.onTarget`
+- `etf.popularEtfs`, `etf.addEtf`, `etf.searchEtf`, `etf.noEtfHoldings`
+- `etf.allocation`, `etf.byCategory`, `etf.bySector`, `etf.byRegion`
+- `etf.buy`, `etf.sell`, `etf.suggestion`, `etf.estimatedAmount`
+- `etf.cat_broad_market`, `etf.cat_sector`, `etf.cat_bond`, `etf.cat_commodity`, `etf.cat_international`, `etf.cat_thematic`
+- `etf.assetType`, `etf.assetTypeStock`, `etf.assetTypeEtf`, `etf.assetTypeBond`, `etf.assetTypeFund`
+
+### `/src/components/dashboard/add-position-dialog.tsx`
+- Added **Asset Type Selector** (Stock / ETF / Bond / Fund) as 4-button grid at top of form
+- When ETF is selected:
+  - Shows ETF search input with debounced search via `/api/etf/search`
+  - Search results display symbol, name, category badge, expense ratio, tracking index
+  - Selected ETF shows in a highlighted info card with category badge and metrics
+  - Symbol field becomes read-only when ETF is selected from search
+- Added **Target Weight** input field (visible for ETF, Bond, Fund asset types)
+- Target weight shown in computed values card
+- `assetType` and `targetWeight` sent to API in POST body
+- Form reset now clears ETF-specific state
+
+## Verification
+- `bun run lint` passed with no errors
+- All 5 files created/modified successfully
+- Dark theme styling consistent with existing components (bg-[#0a0a0f], bg-[#111118], border-[#1e1e2e], emerald accents)
+- Responsive layout (mobile-first with sm:, md:, lg: breakpoints)
+- i18n support for both English and Chinese
+
+---
+Task ID: etf-portfolio-transformation
+Agent: Main + Subagents
+Task: ETF Portfolio Transformation - add comprehensive ETF support to QuantFusion
+
+Work Log:
+- Updated Prisma schema: added ETFProfile model (20 fields including sector/region weights, top holdings, risk metrics) and added assetType + targetWeight fields to Position model
+- Pushed schema to database with `bun run db:push`
+- Created 6 ETF API routes: /api/etf/search, /api/etf/profile/[symbol], /api/etf/portfolio/analysis, /api/etf/portfolio/rebalance, /api/etf/popular, /api/etf/compare
+- Built comprehensive ETF Portfolio View component with: overview cards, holdings table, allocation charts (category/sector/region), rebalancing suggestions, popular ETFs quick-add
+- Updated sidebar navigation to include ETF Portfolio item
+- Updated main page ViewRenderer to support etfPortfolio view
+- Added 35+ i18n translation keys for both English and Chinese
+- Updated Add Position Dialog to support asset type selection (Stock/ETF/Bond/Fund), ETF search, and target weight input
+- Updated Positions View to support ETF positions with filter tabs, asset type badges, and ETF-specific summary cards
+- Fixed critical runtime bug in etf-portfolio-view.tsx where API response shape didn't match component interface
+- Verified all features work via Agent Browser: dashboard loads, ETF portfolio view renders, positions view shows tabs and badges
+- Lint passes with zero errors
+
+Stage Summary:
+- Full ETF portfolio management system added to QuantFusion
+- Supports ETF search, profiles, portfolio analysis, rebalancing suggestions, and comparison
+- 20 popular ETFs seeded in database with comprehensive financial data
+- Positions view now supports both stocks and ETFs with filtering
+- All features verified working in browser

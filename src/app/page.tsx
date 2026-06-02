@@ -7,6 +7,7 @@ import { AIAnalysisView } from '@/components/dashboard/ai-analysis-view';
 import { AgentChatView } from '@/components/dashboard/agent-chat-view';
 import { SignalScannerView } from '@/components/dashboard/signal-scanner-view';
 import { PositionsView } from '@/components/dashboard/positions-view';
+import { ETFPortfolioView } from '@/components/dashboard/etf-portfolio-view';
 import { WatchlistView } from '@/components/dashboard/watchlist-view';
 import { StrategyCenterView } from '@/components/dashboard/strategy-center-view';
 import { MarketNewsView } from '@/components/dashboard/news-view';
@@ -48,6 +49,8 @@ function ViewRenderer({
       return <SignalScannerView />;
     case 'positions':
       return <PositionsView />;
+    case 'etfPortfolio':
+      return <ETFPortfolioView />;
     case 'watchlist':
       return <WatchlistView onNavigate={(v, extra) => onNavigate(v, extra)} />;
     case 'strategies':
@@ -73,6 +76,7 @@ const viewTitleKeys: Record<NavItem, string> = {
   agentChat: 'sidebar.agentChat',
   scanner: 'sidebar.scanner',
   positions: 'sidebar.positions',
+  etfPortfolio: 'sidebar.etfPortfolio',
   watchlist: 'sidebar.watchlist',
   strategies: 'sidebar.strategies',
   news: 'sidebar.news',

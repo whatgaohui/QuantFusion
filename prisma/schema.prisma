@@ -94,6 +94,7 @@ model Position {
   market       String    // A / HK / US
   side         String    // long / short
   status       String    // open / closed
+  assetType    String    @default("stock") // stock / etf / bond / fund
   avgCost      Float     @default(0)
   quantity     Int       @default(0)
   currentPrice Float     @default(0)
@@ -101,6 +102,7 @@ model Position {
   realizedPnl  Float     @default(0)
   stopLoss     Float?
   takeProfit   Float?
+  targetWeight Float?    // Target allocation weight (0-100%)
   openedAt     DateTime  @default(now())
   closedAt     DateTime?
   notes        String?
@@ -112,6 +114,7 @@ model Position {
   @@index([symbol])
   @@index([status])
   @@index([userId, status])
+  @@index([assetType])
 }
 
 model PositionLot {
@@ -389,6 +392,38 @@ model AgentMemory {
   @@index([analysisDate])
   @@index([symbol, analysisDate])
   @@index([wasCorrect])
+}
+
+// ============================================================
+// ETF Profiles (ETF组合改造)
+// ============================================================
+
+model ETFProfile {
+  id              String   @id @default(cuid())
+  symbol          String   @unique
+  name            String
+  market          String   @default("US") // A / HK / US
+  category        String?  // broad_market / sector / bond / commodity / international / thematic / leveraged / inverse
+  expenseRatio    Float?   // Annual expense ratio (%)
+  trackingIndex   String?  // Index being tracked (e.g., "S&P 500")
+  aum             Float?   // Assets under management in millions
+  dividendYield   Float?   // Annual dividend yield (%)
+  peRatio         Float?   // Portfolio P/E ratio
+  pbRatio         Float?   // Portfolio P/B ratio
+  beta            Float?   // Beta vs benchmark
+  sharpe1y        Float?   // 1-year Sharpe ratio
+  volatility1y    Float?   // 1-year annualized volatility (%)
+  returns1y       Float?   // 1-year total return (%)
+  returns3y       Float?   // 3-year annualized return (%)
+  returns5y       Float?   // 5-year annualized return (%)
+  topHoldings     String?  // JSON: top 10 holdings [{symbol, name, weight}]
+  sectorWeights   String?  // JSON: sector allocation [{sector, weight}]
+  regionWeights   String?  // JSON: region allocation [{region, weight}]
+  updatedAt       DateTime @updatedAt
+
+  @@index([symbol])
+  @@index([category])
+  @@index([market])
 }
 
 model SystemConfig {

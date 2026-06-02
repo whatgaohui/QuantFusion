@@ -32,7 +32,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { symbol, market, side, avgCost, quantity, stopLoss, takeProfit, notes } = body;
+    const { symbol, market, side, avgCost, quantity, stopLoss, takeProfit, assetType, targetWeight, notes } = body;
 
     if (!symbol || avgCost === undefined || quantity === undefined) {
       return NextResponse.json(
@@ -53,6 +53,10 @@ export async function POST(request: NextRequest) {
     const avgCostNum = parseFloat(avgCost);
     const quantityNum = parseInt(quantity, 10);
 
+    // Validate assetType
+    const validAssetTypes = ['stock', 'etf', 'bond', 'fund'];
+    const resolvedAssetType = assetType && validAssetTypes.includes(assetType) ? assetType : 'stock';
+
     const position = await db.position.create({
       data: {
         userId: DEFAULT_USER_ID,
@@ -60,11 +64,13 @@ export async function POST(request: NextRequest) {
         market: market || 'US',
         side: side || 'long',
         status: 'open',
+        assetType: resolvedAssetType,
         avgCost: avgCostNum,
         quantity: quantityNum,
         currentPrice: avgCostNum,
         stopLoss: stopLoss !== undefined ? parseFloat(stopLoss) : null,
         takeProfit: takeProfit !== undefined ? parseFloat(takeProfit) : null,
+        targetWeight: targetWeight !== undefined && targetWeight > 0 ? parseFloat(targetWeight) : null,
         openedAt: new Date(),
         notes: notes || null,
       },
