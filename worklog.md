@@ -514,3 +514,24 @@ Stage Summary:
 - 20 popular ETFs seeded in database with comprehensive financial data
 - Positions view now supports both stocks and ETFs with filtering
 - All features verified working in browser
+
+---
+Task ID: fix-page-load-v2
+Agent: Main
+Task: Fix page loading issue (dev server stuck/crashed)
+
+Work Log:
+- Investigated page loading failure - dev server was stuck with high CPU usage
+- Killed stuck Next.js processes (PID 779, 795, 829, 906)
+- Restarted dev server successfully - page returns HTTP 200 with full HTML content
+- Verified page renders correctly via Agent Browser: dashboard, sidebar, navigation all working
+- Verified ETF Portfolio view works correctly: overview cards, holdings table, allocation charts, rebalancing panel, popular ETFs, add ETF dialog
+- Fixed Beta card label internationalization: replaced hardcoded English strings with i18n keys (etf.betaLow, etf.betaHigh, etf.betaMarket)
+- Added Chinese translations: '< 1.0 低波动', '> 1.0 高波动', '= 1.0 市场'
+- Lint passes with zero errors
+
+Stage Summary:
+- Page loading issue resolved (dev server was stuck, restarted successfully)
+- ETF Portfolio view fully functional
+- Minor i18n fix applied for Beta card labels
+- Dev server running stably on port 3000

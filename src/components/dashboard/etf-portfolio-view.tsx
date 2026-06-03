@@ -382,7 +382,7 @@ export function ETFPortfolioView() {
             </div>
             <p className="text-2xl font-bold text-white">{data.portfolioBeta.toFixed(2)}</p>
             <p className="text-[10px] text-zinc-500 mt-0.5">
-              {data.portfolioBeta < 1 ? '< 1.0 Lower Volatility' : data.portfolioBeta > 1 ? '> 1.0 Higher Volatility' : '= 1.0 Market'}
+              {data.portfolioBeta < 1 ? t('etf.betaLow') : data.portfolioBeta > 1 ? t('etf.betaHigh') : t('etf.betaMarket')}
             </p>
           </CardContent>
         </Card>
