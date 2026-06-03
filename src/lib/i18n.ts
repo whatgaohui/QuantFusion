@@ -715,6 +715,13 @@ const translations: Record<Language, Record<string, string>> = {
     'etf.assetTypeEtf': 'ETF',
     'etf.assetTypeBond': 'Bond',
     'etf.assetTypeFund': 'Fund',
+    'etf.cat_leveraged': 'Leveraged',
+    'etf.cat_inverse': 'Inverse',
+    'etf.cat_cn_broad_market': 'CN Broad Market',
+    'etf.cat_cn_cross_border': 'CN Cross-border',
+    'etf.marketCN': 'A-Share',
+    'etf.marketUS': 'US',
+    'etf.marketHK': 'HK',
   },
   zh: {
     // Sidebar
@@ -1422,6 +1429,13 @@ const translations: Record<Language, Record<string, string>> = {
     'etf.assetTypeEtf': 'ETF',
     'etf.assetTypeBond': '债券',
     'etf.assetTypeFund': '基金',
+    'etf.cat_leveraged': '杠杆',
+    'etf.cat_inverse': '反向',
+    'etf.cat_cn_broad_market': '宽基',
+    'etf.cat_cn_cross_border': '跨境',
+    'etf.marketCN': 'A股',
+    'etf.marketUS': '美股',
+    'etf.marketHK': '港股',
   },
 };
 

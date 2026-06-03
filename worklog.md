@@ -555,3 +555,67 @@ Stage Summary:
 - Initial page load compiles only DashboardView, other views compile on-demand
 - All navigation and views verified working via Agent Browser
 - Server running stably with official startup script
+
+---
+Task ID: 2
+Agent: Subagent
+Task: Add A-share ETF support to QuantFusion
+
+Work Log:
+- Added 25 Chinese A-share ETFs to POPULAR_ETFS array in /api/etf/popular/route.ts with comprehensive data (topHoldings, sectorWeights, regionWeights, returns, beta, etc.)
+  - 7 broad_market ETFs: 510050, 510300, 510500, 159919, 512100, 588000, 159915
+  - 5 international ETFs: 513500, 513100, 513030, 513060, 513080
+  - 11 sector ETFs: 512480, 512660, 512170, 512800, 515030, 515790, 159869, 512200, 515050, 512010
+  - 2 bond ETFs: 511010, 511260
+  - 1 commodity ETF: 518880
+- Added CN_ETF_DB constant with 50+ A-share ETFs to /api/etf/search/route.ts for local search fallback
+  - Added isChineseEtfPattern() helper to detect 6-digit Chinese ETF code queries
+  - CN_ETF_DB searched before DB and Finnhub for all queries (symbol, name, category, trackingIndex matching)
+  - Finnhub search skipped for 6-digit queries (Finnhub doesn't support Chinese ETFs)
+- Updated /api/etf/profile/[symbol]/route.ts with CN_ETF_DB local database for profile lookup
+  - Added isChineseEtfSymbol() helper to detect 6-digit Chinese ETF codes
+  - When a 6-digit symbol is requested, looks up CN_ETF_DB first
+  - If found, upserts to ETFProfile database and returns full profile with parsed JSON fields
+  - If 6-digit symbol not found in CN_ETF_DB or DB, returns 404 (skips Finnhub since it doesn't support A-share ETFs)
+- Added 7 i18n translation keys to both en and zh sections in /src/lib/i18n.ts:
+  - etf.cat_leveraged: Leveraged / 杠杆
+  - etf.cat_inverse: Inverse / 反向
+  - etf.cat_cn_broad_market: CN Broad Market / 宽基
+  - etf.cat_cn_cross_border: CN Cross-border / 跨境
+  - etf.marketCN: A-Share / A股
+  - etf.marketUS: US / 美股
+  - etf.marketHK: HK / 港股
+- Ran `bun run lint` — passed with zero errors
+- Ran `bun run db:push` — database already in sync
+
+Stage Summary:
+- A-share ETFs (513500, 510300, etc.) are now searchable via /api/etf/search using local CN_ETF_DB
+- A-share ETF profiles are viewable via /api/etf/profile/[symbol] using local CN_ETF_DB with automatic DB upsert
+- 25 A-share ETFs seeded in the popular ETFs list across 5 categories (broad_market, international, sector, bond, commodity)
+- 50+ A-share ETFs available in search database covering all major A-share ETF code ranges
+- All A-share ETFs use market: 'A' field
+- Finnhub API calls skipped for Chinese ETF code patterns (no wasted API calls)
+- i18n keys added for new categories and market labels
+
+---
+Task ID: 2
+Agent: Main + Subagent
+Task: Add A-share ETF support - search for 513500, 513300 etc.
+
+Work Log:
+- Added 25+ Chinese A-share ETFs to POPULAR_ETFS in /api/etf/popular/route.ts
+- Added 55+ Chinese A-share ETFs to CN_ETF_DB in /api/etf/search/route.ts as local search fallback
+- Updated /api/etf/search/route.ts to search CN_ETF_DB first (by symbol, name, category, trackingIndex)
+- Added isChineseEtfPattern() to detect 6-digit number queries and skip Finnhub for them
+- Updated /api/etf/profile/[symbol]/route.ts to support A-share ETF profile lookup and upsert to database
+- Added 513300 (华夏沪深300ETF) to all three data sources
+- Added 7 new i18n keys for A-share categories (leveraged, inverse, cn_broad_market, cn_cross_border, marketCN, marketUS, marketHK)
+- Lint passes with zero errors
+- Verified via curl: search for 513500, 513300, and 沪深300 all return correct results
+- Verified via Agent Browser: ETF search UI shows Chinese A-share ETFs correctly
+
+Stage Summary:
+- A-share ETF search fully functional: 513500, 513300, etc. all searchable
+- Chinese name search also works (e.g., "沪深300" finds matching ETFs)
+- 55+ A-share ETFs in local search database covering broad_market, international, sector, bond, commodity
+- Profile lookup and database persistence working for A-share ETFs
