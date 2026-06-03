@@ -1,22 +1,78 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Sidebar, type NavItem } from '@/components/dashboard/sidebar';
-import { DashboardView } from '@/components/dashboard/dashboard-view';
-import { AIAnalysisView } from '@/components/dashboard/ai-analysis-view';
-import { AgentChatView } from '@/components/dashboard/agent-chat-view';
-import { SignalScannerView } from '@/components/dashboard/signal-scanner-view';
-import { PositionsView } from '@/components/dashboard/positions-view';
-import { ETFPortfolioView } from '@/components/dashboard/etf-portfolio-view';
-import { WatchlistView } from '@/components/dashboard/watchlist-view';
-import { StrategyCenterView } from '@/components/dashboard/strategy-center-view';
-import { MarketNewsView } from '@/components/dashboard/news-view';
-import { BacktestView } from '@/components/dashboard/backtest-view';
-import { SettingsView } from '@/components/dashboard/settings-view';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useLanguage } from '@/lib/i18n';
+
+// ─── Dynamic imports: only compile when the view is actually rendered ───
+// This prevents Turbopack from compiling all 11 views + their heavy deps
+// (recharts, etc.) on first page load, which was causing the server to hang.
+
+// Loading fallback for dynamic imports
+function ViewLoading() {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="flex items-center gap-3 text-zinc-400">
+        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <span className="text-sm">Loading...</span>
+      </div>
+    </div>
+  );
+}
+
+const DashboardView = dynamic(
+  () => import('@/components/dashboard/dashboard-view').then(m => ({ default: m.DashboardView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
+const AIAnalysisView = dynamic(
+  () => import('@/components/dashboard/ai-analysis-view').then(m => ({ default: m.AIAnalysisView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
+const AgentChatView = dynamic(
+  () => import('@/components/dashboard/agent-chat-view').then(m => ({ default: m.AgentChatView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
+const SignalScannerView = dynamic(
+  () => import('@/components/dashboard/signal-scanner-view').then(m => ({ default: m.SignalScannerView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
+const PositionsView = dynamic(
+  () => import('@/components/dashboard/positions-view').then(m => ({ default: m.PositionsView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
+const ETFPortfolioView = dynamic(
+  () => import('@/components/dashboard/etf-portfolio-view').then(m => ({ default: m.ETFPortfolioView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
+const WatchlistView = dynamic(
+  () => import('@/components/dashboard/watchlist-view').then(m => ({ default: m.WatchlistView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
+const StrategyCenterView = dynamic(
+  () => import('@/components/dashboard/strategy-center-view').then(m => ({ default: m.StrategyCenterView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
+const MarketNewsView = dynamic(
+  () => import('@/components/dashboard/news-view').then(m => ({ default: m.MarketNewsView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
+const BacktestView = dynamic(
+  () => import('@/components/dashboard/backtest-view').then(m => ({ default: m.BacktestView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
+const SettingsView = dynamic(
+  () => import('@/components/dashboard/settings-view').then(m => ({ default: m.SettingsView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface BacktestNavState {
   strategy?: string;

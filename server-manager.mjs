@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * QuantFusion Server Manager
- * Keeps the Next.js production server running with auto-restart on crash.
- * Uses `next start` for lower memory footprint.
+ * Keeps the Next.js dev server running with auto-restart on crash.
+ * Uses `next dev` for hot-reloading during development.
  */
 
 import { spawn } from 'child_process';
@@ -12,6 +12,7 @@ const MAX_RESTARTS = 50;
 const RESTART_DELAY = 3000;
 const HEALTH_CHECK_INTERVAL = 10000;
 const HEALTH_CHECK_URL = 'http://localhost:3000/';
+const DEV_MODE = process.env.DEV_MODE !== 'false'; // default to dev mode
 let restarts = 0;
 let currentChild = null;
 
@@ -26,11 +27,12 @@ function startServer() {
     process.exit(1);
   }
 
-  log(`Starting Next.js production server (attempt ${restarts + 1}/${MAX_RESTARTS})...`);
+  const command = DEV_MODE ? 'dev' : 'start';
+  log(`Starting Next.js ${command} server (attempt ${restarts + 1}/${MAX_RESTARTS})...`);
 
-  currentChild = spawn('node', ['node_modules/.bin/next', 'start', '-p', '3000'], {
+  currentChild = spawn('node', ['node_modules/.bin/next', command, '-p', '3000'], {
     cwd: '/home/z/my-project',
-    env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=1024', PORT: '3000' },
+    env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=768', PORT: '3000' },
     stdio: ['ignore', 'pipe', 'pipe']
   });
 

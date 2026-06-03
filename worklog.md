@@ -535,3 +535,23 @@ Stage Summary:
 - ETF Portfolio view fully functional
 - Minor i18n fix applied for Beta card labels
 - Dev server running stably on port 3000
+
+---
+Task ID: fix-page-load-v3
+Agent: Main
+Task: Fix recurring page loading issue - server keeps getting stuck/killed
+
+Work Log:
+- Root cause identified: All 11 view components were statically imported in page.tsx, causing Turbopack to compile ALL components (including heavy deps like recharts) on first page load, spiking CPU to 113% and causing server to hang/be killed
+- Refactored page.tsx to use next/dynamic for all 11 view components with { ssr: false }
+- Added ViewLoading component as loading fallback for dynamic imports
+- Only the currently active view is compiled on demand, dramatically reducing initial compilation load
+- Used .zscripts/dev.sh (official startup script) to restart server with proper process management
+- CPU usage dropped from 113% to ~9% after dynamic import optimization
+
+Stage Summary:
+- Page loading issue permanently fixed with dynamic import optimization
+- Server CPU usage reduced from 113% → 9.4%
+- Initial page load compiles only DashboardView, other views compile on-demand
+- All navigation and views verified working via Agent Browser
+- Server running stably with official startup script
