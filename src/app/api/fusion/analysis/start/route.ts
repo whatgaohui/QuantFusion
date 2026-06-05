@@ -90,90 +90,90 @@ async function getMarketData(symbol: string) {
  * 构建包含历史记忆上下文的系统提示
  */
 function buildSystemPrompt(mode: AnalysisMode, historyContext?: string): string {
-  const basePrompt = `You are an expert quantitative stock analyst for the QuantFusion platform. You provide comprehensive, data-driven stock analysis.
+  const basePrompt = `你是一位专业的量化股票分析师，提供全面、数据驱动的股票分析。请使用中文进行分析和输出。
 
-Your analysis must be structured and include:
-1. A clear recommendation (BUY, HOLD, or SELL)
-2. A composite score (0-100)
-3. Technical analysis summary
-4. Fundamental analysis summary
-5. Sentiment analysis summary
-6. Risk assessment with risk level (LOW, MEDIUM, HIGH) and risk score (0-100)`;
+你的分析必须结构化，包含以下内容：
+1. 明确的投资建议（BUY买入、HOLD持有、SELL卖出）
+2. 综合评分（0-100）
+3. 技术面分析摘要
+4. 基本面分析摘要
+5. 市场情绪分析摘要
+6. 风险评估，包含风险等级（LOW低、MEDIUM中、HIGH高）和风险评分（0-100）`;
 
   // 注入历史记忆上下文
   const memoryPrompt = historyContext
-    ? `\n\n## Historical Analysis Memory (Important - Review Before Making Recommendations)\n${historyContext}\n\nWhen making your recommendation, consider:
-- Past accuracy for this stock and learn from previous mistakes
-- If past BUY recommendations were often wrong, be more conservative
-- If past SELL recommendations were often wrong, consider upside potential more carefully
-- Reference past key signals that proved correct or incorrect\n`
+    ? `\n\n## 历史分析记忆（重要 - 做出建议前请先回顾）\n${historyContext}\n\n在给出建议时，请注意：
+- 回顾该股票过去的预测准确率，从过去的错误中学习
+- 如果过去的买入建议经常出错，请更加保守
+- 如果过去的卖出建议经常出错，请更多考虑上行潜力
+- 参考过去被证明正确或错误的关键信号\n`
     : '';
 
   const modePrompts: Record<AnalysisMode, string> = {
     quick: `${basePrompt}${memoryPrompt}
 
-This is a QUICK analysis. Focus primarily on technical indicators and provide a concise summary.
-Provide your response in the following JSON format:
+这是快速分析模式。主要聚焦技术指标，提供简洁的摘要。
+请以以下JSON格式返回分析结果：
 {
-  "symbol": "SYMBOL",
+  "symbol": "股票代码",
   "recommendation": "BUY|HOLD|SELL",
   "score": 0-100,
-  "technicalSummary": "...",
-  "fundamentalSummary": "...",
-  "sentimentSummary": "...",
+  "technicalSummary": "技术面分析摘要，中文",
+  "fundamentalSummary": "基本面分析摘要，中文",
+  "sentimentSummary": "情绪面分析摘要，中文",
   "riskLevel": "LOW|MEDIUM|HIGH",
   "riskScore": 0-100,
-  "report": "Markdown formatted report"
+  "report": "Markdown格式的中文分析报告"
 }`,
 
     standard: `${basePrompt}${memoryPrompt}
 
-This is a STANDARD analysis. Provide thorough analysis covering technical, fundamental, and sentiment aspects.
-Provide your response in the following JSON format:
+这是标准分析模式。请提供涵盖技术面、基本面和情绪面的全面分析。
+请以以下JSON格式返回分析结果：
 {
-  "symbol": "SYMBOL",
+  "symbol": "股票代码",
   "recommendation": "BUY|HOLD|SELL",
   "score": 0-100,
-  "technicalSummary": "...",
-  "fundamentalSummary": "...",
-  "sentimentSummary": "...",
+  "technicalSummary": "技术面分析摘要，中文",
+  "fundamentalSummary": "基本面分析摘要，中文",
+  "sentimentSummary": "情绪面分析摘要，中文",
   "riskLevel": "LOW|MEDIUM|HIGH",
   "riskScore": 0-100,
-  "report": "Markdown formatted report with sections"
+  "report": "Markdown格式的中文分析报告，包含多个章节"
 }`,
 
     full: `${basePrompt}${memoryPrompt}
 
-This is a FULL analysis. Provide comprehensive analysis including all aspects with detailed reasoning.
-Provide your response in the following JSON format:
+这是完整分析模式。请提供包含所有方面的全面分析，附详细推理过程。
+请以以下JSON格式返回分析结果：
 {
-  "symbol": "SYMBOL",
+  "symbol": "股票代码",
   "recommendation": "BUY|HOLD|SELL",
   "score": 0-100,
-  "technicalSummary": "...",
-  "fundamentalSummary": "...",
-  "sentimentSummary": "...",
+  "technicalSummary": "技术面分析摘要，中文",
+  "fundamentalSummary": "基本面分析摘要，中文",
+  "sentimentSummary": "情绪面分析摘要，中文",
   "riskLevel": "LOW|MEDIUM|HIGH",
   "riskScore": 0-100,
-  "report": "Detailed markdown formatted report with all sections"
+  "report": "详细的Markdown格式中文分析报告，包含所有章节"
 }`,
 
     debate: `${basePrompt}${memoryPrompt}
 
-This is a DEBATE mode analysis. In addition to standard analysis, provide both bull and bear cases with strong arguments for each side.
-Provide your response in the following JSON format:
+这是辩论分析模式。除标准分析外，请提供看多和看空双方的强力论据。
+请以以下JSON格式返回分析结果：
 {
-  "symbol": "SYMBOL",
+  "symbol": "股票代码",
   "recommendation": "BUY|HOLD|SELL",
   "score": 0-100,
-  "technicalSummary": "...",
-  "fundamentalSummary": "...",
-  "sentimentSummary": "...",
+  "technicalSummary": "技术面分析摘要，中文",
+  "fundamentalSummary": "基本面分析摘要，中文",
+  "sentimentSummary": "情绪面分析摘要，中文",
   "riskLevel": "LOW|MEDIUM|HIGH",
   "riskScore": 0-100,
-  "bullCase": "Strong arguments for buying...",
-  "bearCase": "Strong arguments for selling...",
-  "report": "Detailed markdown formatted report including debate analysis"
+  "bullCase": "看多论据，中文",
+  "bearCase": "看空论据，中文",
+  "report": "详细的Markdown格式中文分析报告，包含辩论分析"
 }`,
   };
 
@@ -190,20 +190,20 @@ function generateMockAnalysis(symbol: string, mode: AnalysisMode) {
     symbol,
     recommendation,
     score,
-    technicalSummary: `${symbol} is currently showing ${recommendation === 'BUY' ? 'bullish' : recommendation === 'SELL' ? 'bearish' : 'neutral'} technical signals. Key moving averages suggest ${recommendation === 'BUY' ? 'an uptrend' : recommendation === 'SELL' ? 'a downtrend' : 'sideways movement'}. RSI and MACD indicators support the current assessment. Support and resistance levels should be monitored closely.`,
-    fundamentalSummary: `${symbol} fundamentals present a ${score >= 65 ? 'favorable' : 'mixed'} picture. Revenue growth and profitability metrics are ${score >= 70 ? 'strong' : 'moderate'}. Valuation metrics suggest the stock is ${score >= 70 ? 'fairly valued to slightly undervalued' : 'fairly valued to slightly overvalued'}. Key fundamental drivers should be tracked going forward.`,
-    sentimentSummary: `Market sentiment for ${symbol} is currently ${score >= 65 ? 'positive' : score >= 45 ? 'neutral' : 'cautious'}. Analyst consensus leans ${recommendation === 'BUY' ? 'bullish' : recommendation === 'SELL' ? 'bearish' : 'neutral'}. Recent news flow has been ${score >= 60 ? 'favorable' : 'mixed'}. Social sentiment indicators reflect ${score >= 65 ? 'optimism' : 'caution'} among retail investors.`,
+    technicalSummary: `${symbol}目前呈现${recommendation === 'BUY' ? '看多' : recommendation === 'SELL' ? '看空' : '中性'}技术信号。关键均线暗示${recommendation === 'BUY' ? '上升趋势' : recommendation === 'SELL' ? '下降趋势' : '横盘整理'}。RSI和MACD指标支持当前判断。支撑位和阻力位需要密切关注。`,
+    fundamentalSummary: `${symbol}的基本面呈现${score >= 65 ? '有利' : '参差'}的图景。营收增长和盈利能力指标${score >= 70 ? '强劲' : '中等'}。估值指标表明该股票${score >= 70 ? '估值合理至略微低估' : '估值合理至略微高估'}。需持续跟踪核心基本面驱动因素。`,
+    sentimentSummary: `${symbol}的市场情绪目前${score >= 65 ? '偏正面' : score >= 45 ? '中性' : '偏谨慎'}。分析师共识倾向于${recommendation === 'BUY' ? '看多' : recommendation === 'SELL' ? '看空' : '中性'}。近期新闻流${score >= 60 ? '较为积极' : '喜忧参半'}。散户投资者情绪指标反映${score >= 65 ? '乐观' : '谨慎'}态度。`,
     riskLevel: score >= 70 ? 'LOW' : score >= 50 ? 'MEDIUM' : 'HIGH',
     riskScore: Math.floor(100 - score + (Math.random() * 10 - 5)),
-    report: `# ${symbol} Analysis Report\n\n## Executive Summary\n${symbol} presents a **${recommendation}** recommendation with a composite score of ${score}/100.\n\n## Technical Analysis\n- **Trend**: ${recommendation === 'BUY' ? 'Bullish' : recommendation === 'SELL' ? 'Bearish' : 'Neutral'}\n- **Momentum**: ${score >= 65 ? 'Positive' : 'Mixed'}\n- **Key Levels**: Monitor support and resistance\n\n## Fundamental Analysis\n- **Growth**: ${score >= 70 ? 'Strong' : 'Moderate'}\n- **Valuation**: ${score >= 65 ? 'Attractive' : 'Fair'}\n\n## Conclusion\nBased on the current analysis, ${symbol} warrants a **${recommendation}** rating with a ${score}/100 score.`,
+    report: `# ${symbol} 分析报告\n\n## 概要\n${symbol}给出**${recommendation === 'BUY' ? '买入' : recommendation === 'SELL' ? '卖出' : '持有'}**建议，综合评分 ${score}/100。\n\n## 技术分析\n- **趋势**：${recommendation === 'BUY' ? '看多' : recommendation === 'SELL' ? '看空' : '中性'}\n- **动能**：${score >= 65 ? '正面' : '混合'}\n- **关键位置**：关注支撑位和阻力位\n\n## 基本面分析\n- **成长性**：${score >= 70 ? '强劲' : '中等'}\n- **估值**：${score >= 65 ? '有吸引力' : '合理'}\n\n## 结论\n基于当前分析，${symbol}评级为**${recommendation === 'BUY' ? '买入' : recommendation === 'SELL' ? '卖出' : '持有'}**，评分 ${score}/100。`,
     provider: 'z-ai',
     tokens: Math.floor(1500 + seed * 1500),
     cost: parseFloat((0.01 + seed * 0.03).toFixed(3)),
   };
 
   if (mode === 'debate') {
-    result.bullCase = `${symbol} has several positive catalysts: strong technical momentum, favorable fundamental trends, and positive market sentiment. Growth prospects appear solid with potential upside if key resistance levels are broken.`;
-    result.bearCase = `Risks for ${symbol} include: potential market headwinds, valuation concerns at current levels, and macro uncertainty. Key support levels should be monitored as a breakdown could signal further downside.`;
+    result.bullCase = `${symbol}有几个积极催化剂：强劲的技术动量、有利的基本面趋势和正面的市场情绪。若关键阻力位突破，增长前景看好，存在上行空间。`;
+    result.bearCase = `${symbol}面临的风险包括：潜在的市场逆风、当前价位的估值担忧以及宏观不确定性。需密切关注关键支撑位，跌破可能预示进一步下行。`;
   }
 
   return result;
@@ -238,32 +238,32 @@ function buildHistoryContextPrompt(context: {
   // 准确率概览
   if (context.accuracyStats) {
     const stats = context.accuracyStats;
-    parts.push(`### Past Accuracy for this stock:`);
-    parts.push(`- Total verified analyses: ${stats.totalAnalyses}`);
-    parts.push(`- Overall accuracy: ${stats.accuracyRate}%`);
-    parts.push(`- BUY accuracy: ${stats.buyAccuracy}%`);
-    parts.push(`- SELL accuracy: ${stats.sellAccuracy}%`);
-    parts.push(`- Recent trend: ${stats.recentTrend}`);
+    parts.push(`### 该股票的历史预测准确率：`);
+    parts.push(`- 已验证的分析总数：${stats.totalAnalyses}`);
+    parts.push(`- 整体准确率：${stats.accuracyRate}%`);
+    parts.push(`- 买入建议准确率：${stats.buyAccuracy}%`);
+    parts.push(`- 卖出建议准确率：${stats.sellAccuracy}%`);
+    parts.push(`- 近期趋势：${stats.recentTrend}`);
     parts.push('');
   }
 
   // 近期分析记录
   if (context.recentAnalyses.length > 0) {
-    parts.push(`### Recent analysis history:`);
+    parts.push(`### 近期分析历史：`);
     for (const analysis of context.recentAnalyses) {
       const result = analysis.wasCorrect === null
-        ? 'pending verification'
+        ? '待验证'
         : analysis.wasCorrect
-          ? `CORRECT (actual return: ${analysis.actualReturn}%)`
-          : `INCORRECT (actual return: ${analysis.actualReturn}%)`;
-      parts.push(`- ${analysis.date}: ${analysis.recommendation} (score: ${analysis.score}, entry: $${analysis.entryPrice.toFixed(2)}) → ${result}`);
+          ? `正确（实际收益：${analysis.actualReturn}%）`
+          : `错误（实际收益：${analysis.actualReturn}%）`;
+      parts.push(`- ${analysis.date}：${analysis.recommendation}（评分：${analysis.score}，入场价：$${analysis.entryPrice.toFixed(2)}）→ ${result}`);
     }
     parts.push('');
   }
 
   // 反思洞察
   if (context.reflectionInsights.length > 0) {
-    parts.push(`### Key insights from past performance:`);
+    parts.push(`### 从历史表现中获得的关键洞察：`);
     for (const insight of context.reflectionInsights) {
       parts.push(`- ${insight}`);
     }
@@ -325,15 +325,15 @@ export async function POST(request: NextRequest) {
     // Try to use AI service (routes through user's configured provider) for analysis
     try {
       const systemPrompt = buildSystemPrompt(mode, historyPrompt);
-      const userPrompt = `Analyze the stock ${symbolUpper}.
+      const userPrompt = `请分析股票 ${symbolUpper}。
 
-Current Market Data:
+当前市场数据：
 ${JSON.stringify(marketData.quote, null, 2)}
 
-Company Profile:
+公司概况：
 ${JSON.stringify(marketData.companyProfile, null, 2)}
 
-${historyPrompt ? `Historical Context (learn from past analyses):\n${historyPrompt}\n` : ''}Please provide a comprehensive analysis of ${symbolUpper} in ${mode} mode. Return valid JSON only.`;
+${historyPrompt ? `历史分析上下文（从过去的分析中学习）：\n${historyPrompt}\n` : ''}请以${mode === 'quick' ? '快速' : mode === 'standard' ? '标准' : mode === 'full' ? '完整' : '辩论'}模式对 ${symbolUpper} 进行全面分析，仅返回有效的JSON。`;
 
       const messages: ChatMessage[] = [
         { role: 'system', content: systemPrompt },
@@ -411,8 +411,8 @@ ${historyPrompt ? `Historical Context (learn from past analyses):\n${historyProm
             recommendation: 'HOLD',
             score: 50,
             technicalSummary: content.slice(0, 500),
-            fundamentalSummary: 'See full report for details.',
-            sentimentSummary: 'See full report for details.',
+            fundamentalSummary: '详见完整报告。',
+            sentimentSummary: '详见完整报告。',
             riskLevel: 'MEDIUM',
             riskScore: 50,
             report: content,

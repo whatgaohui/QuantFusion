@@ -48,10 +48,10 @@ function generateFallbackSentiment(symbol: string, name?: string) {
     name: name || symbol.toUpperCase(),
     score,
     label,
-    factors: ['Fallback analysis - AI unavailable', 'Using deterministic signals'],
+    factors: ['AI服务暂不可用，使用降级分析', '基于确定性信号计算'],
     riskLevel,
-    shortTermOutlook: score > 55 ? 'Positive momentum expected' : score < 40 ? 'Downward pressure likely' : 'Sideways consolidation',
-    summary: `Sentiment analysis for ${name || symbol} is based on deterministic fallback. AI analysis was unavailable.`,
+    shortTermOutlook: score > 55 ? '短期动能偏正面' : score < 40 ? '短期下行压力较大' : '短期震荡整理',
+    summary: `${name || symbol}的情绪分析基于降级算法，AI分析服务暂不可用。`,
     newsCount: 0,
     analyzedAt: new Date().toISOString(),
     provider: 'fallback',
@@ -144,34 +144,35 @@ async function analyzeSentiment(symbol: string, name?: string) {
     ? newsItems.map((n, i) => `${i + 1}. "${n.headline}" - ${n.summary || 'No summary'} (${n.source})`).join('\n')
     : 'No recent news available for this symbol.';
 
-  const systemPrompt = `You are an expert financial analyst specializing in stock market sentiment analysis. Analyze the given stock data and provide a sentiment assessment.
+  const systemPrompt = `你是一位专业的金融市场分析师，擅长股票市场情绪分析。请根据给定的股票数据，提供情绪评估。
 
-IMPORTANT: You must respond ONLY with valid JSON in this exact format, no other text:
+重要：你必须仅以有效的JSON格式返回结果，不要包含其他文字：
 {
-  "symbol": "TICKER",
-  "name": "Company Name",
+  "symbol": "股票代码",
+  "name": "公司名称",
   "score": 72,
   "label": "BULLISH",
-  "factors": ["factor 1", "factor 2"],
+  "factors": ["因素1", "因素2"],
   "riskLevel": "LOW",
-  "shortTermOutlook": "Brief outlook text",
-  "summary": "Brief summary of sentiment analysis",
+  "shortTermOutlook": "短期展望描述",
+  "summary": "情绪分析摘要",
   "newsCount": 5
 }
 
-Rules:
-- score: integer 0-100 where 0 = extremely bearish, 50 = neutral, 100 = extremely bullish
-- label: one of STRONG_BUY, BUY, BULLISH, NEUTRAL, BEARISH, SELL, STRONG_SELL
-- riskLevel: one of LOW, MEDIUM, HIGH
-- factors: array of 2-5 key factors influencing sentiment
-- newsCount: number of news articles analyzed`;
+规则：
+- score：0-100的整数，0=极度看空，50=中性，100=极度看多
+- label：STRONG_BUY（强烈买入）、BUY（买入）、BULLISH（看多）、NEUTRAL（中性）、BEARISH（看空）、SELL（卖出）、STRONG_SELL（强烈卖出）之一
+- riskLevel：LOW（低）、MEDIUM（中）、HIGH（高）之一
+- factors：2-5个影响情绪的关键因素数组，请用中文描述
+- summary和shortTermOutlook：请用中文撰写
+- newsCount：分析的新闻文章数量`;
 
-  const userPrompt = `Analyze market sentiment for ${name || symbol} (${symbol}).
+  const userPrompt = `请分析 ${name || symbol}（${symbol}）的市场情绪。
 
-${quoteInfo ? `Market Data: ${quoteInfo}\n` : ''}Recent News:
+${quoteInfo ? `市场数据：${quoteInfo}\n` : ''}近期新闻：
 ${newsSummary}
 
-Provide your sentiment analysis as JSON only.`;
+请仅以JSON格式返回情绪分析结果。`;
 
   // Try AI analysis
   try {
