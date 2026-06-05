@@ -155,15 +155,19 @@ function formatPercent(value: number | undefined | null, decimals = 2): string {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function ETFPortfolioView() {
-  const { t } = useLanguage();
+interface ETFPortfolioViewProps {
+  onNavigate?: (view: string, extra?: Record<string, string>) => void;
+}
+
+export function ETFPortfolioView({ onNavigate }: ETFPortfolioViewProps) {
+  const { t, language } = useLanguage();
   const [analysis, setAnalysis] = useState<PortfolioAnalysis | null>(null);
   const [rebalanceData, setRebalanceData] = useState<{ suggestions: RebalanceSuggestion[]; totalRebalanceAmount: number } | null>(null);
   const [popularETFs, setPopularETFs] = useState<PopularETF[]>([]);
   const [loading, setLoading] = useState(true);
   const [rebalanceLoading, setRebalanceLoading] = useState(false);
   const [popularLoading, setPopularLoading] = useState(false);
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null); // kept for compatibility but not used
   const [popularOpen, setPopularOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Array<{ symbol: string; name: string; category: string; expenseRatio: number; trackingIndex: string }>>([]);
@@ -174,10 +178,23 @@ export function ETFPortfolioView() {
   const [editWeightValue, setEditWeightValue] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // ─── Navigate to Detail ────────────────────────────────────────────────
+
+  const handleViewDetail = (holding: ETFHolding) => {
+    onNavigate?.('etfDetail', {
+      symbol: holding.symbol,
+      name: holding.name,
+      market: holding.market || '',
+    });
+  };
+
   // ─── Delete & Update Handlers ────────────────────────────────────────────
 
   const handleDeleteHolding = async (holding: ETFHolding) => {
-    if (!confirm(`Are you sure you want to remove ${holding.symbol} from your ETF portfolio?`)) return;
+    const msg = language === 'zh'
+      ? `确定要从ETF组合中移除 ${holding.symbol} 吗？`
+      : `Are you sure you want to remove ${holding.symbol} from your ETF portfolio?`;
+    if (!confirm(msg)) return;
     setDeletingId(holding.id);
     try {
       const res = await fetch('/api/portfolio/positions', {
@@ -471,17 +488,16 @@ export function ETFPortfolioView() {
             disabled={rebalanceLoading}
           >
             <BarChart2 className="w-3.5 h-3.5" />
-            {t('etf.rebalance')}
+            {language === 'zh' ? '调仓建议' : t('etf.rebalance')}
             {rebalanceLoading && <Loader2 className="w-3 h-3 animate-spin ml-1" />}
           </Button>
           <Button
-            variant="outline"
             size="sm"
-            className="h-8 px-3 text-xs border-[#1e1e2e] text-zinc-300 hover:text-white hover:border-emerald-600/30 gap-1.5 bg-[#111118]"
+            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
             onClick={() => { fetchAnalysis(); fetchRebalance(); }}
           >
-            <Zap className="w-3.5 h-3.5" />
-            {t('etf.oneClickAdjust')}
+            <RefreshCw className="w-3.5 h-3.5" />
+            {language === 'zh' ? '刷新数据' : 'Refresh Data'}
           </Button>
         </div>
       )}
@@ -556,19 +572,15 @@ export function ETFPortfolioView() {
                       <TableRow
                         key={holding.id}
                         className="border-[#1e1e2e] cursor-pointer hover:bg-[#1a1a2e]/50"
-                        onClick={() => setExpandedRow(isExpanded ? null : holding.id)}
+                        onClick={() => handleViewDetail(holding)}
                       >
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <div>
-                              <p className="text-sm font-semibold text-white">{holding.symbol}</p>
+                              <p className="text-sm font-semibold text-white hover:text-emerald-400 transition-colors">{holding.symbol}</p>
                               <p className="text-xs text-zinc-500 truncate max-w-[120px]">{holding.name}</p>
                             </div>
-                            {isExpanded ? (
-                              <ChevronUp className="w-3 h-3 text-zinc-500" />
-                            ) : (
-                              <ChevronDown className="w-3 h-3 text-zinc-500" />
-                            )}
+                            <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-emerald-400" />
                           </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
@@ -664,141 +676,7 @@ export function ETFPortfolioView() {
                 </TableBody>
               </Table>
 
-              {/* Expanded Details Row */}
-              {expandedRow && data.holdings.find(h => h.id === expandedRow) && (
-                <div className="mt-2 p-4 bg-[#0a0a0f] rounded-lg border border-[#1e1e2e]">
-                  {(() => {
-                    const h = data.holdings.find(h => h.id === expandedRow)!;
-                    const isCNY = h.market === 'A';
-                    return (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                          <div>
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{t('etf.expenseRatio')}</p>
-                            <p className="text-sm font-medium text-white">{formatPercent(h.expenseRatio, 3)}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Tracking Index</p>
-                            <p className="text-sm font-medium text-white">{h.trackingIndex || '—'}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Dividend Yield</p>
-                            <p className="text-sm font-medium text-white">{formatPercent(h.dividendYield)}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Avg Cost</p>
-                            <p className="text-sm font-medium text-white">{isCNY ? `¥${h.avgCost.toFixed(2)}` : `$${h.avgCost.toFixed(2)}`}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{t('etf.targetWeight')}</p>
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium text-white">{formatPercent(h.targetWeight)}</p>
-                              <Popover open={editingWeight === h.id} onOpenChange={(open) => { if (!open) setEditingWeight(null); }}>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 text-zinc-500 hover:text-white"
-                                    onClick={() => {
-                                      setEditingWeight(h.id);
-                                      setEditWeightValue(String(h.targetWeight || ''));
-                                    }}
-                                  >
-                                    <Pencil className="w-3 h-3" />
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-48 bg-[#111118] border-[#1e1e2e]" align="start">
-                                  <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-400">{t('etf.targetWeight')} (%)</Label>
-                                    <Input
-                                      type="number"
-                                      step="0.5"
-                                      value={editWeightValue}
-                                      onChange={(e) => setEditWeightValue(e.target.value)}
-                                      className="bg-[#0a0a0f] border-[#1e1e2e] text-white h-8 text-sm"
-                                    />
-                                    <Button
-                                      size="sm"
-                                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                                      onClick={() => handleUpdateWeight(h.id, parseFloat(editWeightValue) || 0)}
-                                    >
-                                      {t('etf.updateWeight')}
-                                    </Button>
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{t('dash.price')}</p>
-                            <p className="text-sm font-medium text-white">{isCNY ? `¥${h.currentPrice.toFixed(2)}` : `$${h.currentPrice.toFixed(2)}`}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Unrealized P&L</p>
-                            <p className={`text-sm font-medium ${h.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {h.pnl >= 0 ? '+' : ''}{formatCurrency(h.pnl, h.market)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{t('etf.weight')} vs {t('etf.targetWeight')}</p>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-zinc-300">{formatPercent(h.weight)}</span>
-                              <span className="text-xs text-zinc-600">→</span>
-                              <span className="text-sm text-emerald-400">{formatPercent(h.targetWeight)}</span>
-                              <Badge className={`text-[9px] border ml-1 ${
-                                h.weight > h.targetWeight
-                                  ? 'bg-red-600/15 text-red-400 border-red-600/20'
-                                  : h.weight < h.targetWeight
-                                    ? 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20'
-                                    : 'bg-zinc-600/15 text-zinc-400 border-zinc-600/20'
-                              }`}>
-                                {h.weight > h.targetWeight ? t('etf.overweight') : h.weight < h.targetWeight ? t('etf.underweight') : t('etf.onTarget')}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                        {/* Quick Actions */}
-                        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#1e1e2e]">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2 text-xs border-[#1e1e2e] text-zinc-400 hover:text-white hover:border-emerald-600/30 gap-1"
-                            onClick={() => {
-                              setEditingWeight(h.id);
-                              setEditWeightValue(String(h.targetWeight || ''));
-                            }}
-                          >
-                            <Pencil className="w-3 h-3" />
-                            {t('etf.editWeight')}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2 text-xs border-[#1e1e2e] text-zinc-400 hover:text-white hover:border-emerald-600/30 gap-1"
-                            onClick={() => handleDeleteHolding(h)}
-                            disabled={deletingId === h.id}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            Remove
-                          </Button>
-                        </div>
-                        {h.topHoldings && h.topHoldings.length > 0 && (
-                          <div className="pt-2 border-t border-[#1e1e2e]">
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Top Holdings</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {h.topHoldings.slice(0, 10).map((ticker) => (
-                                <Badge key={ticker} className="bg-[#1e1e2e] text-zinc-300 border-[#2e2e3e] text-[10px]">
-                                  {ticker}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
+              {/* Click any row to view ETF detail page */}
             </div>
           )}
         </CardContent>

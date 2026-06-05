@@ -455,7 +455,7 @@ export function WatchlistView({ onNavigate }: WatchlistViewProps) {
     setAlertExpiry('');
   };
 
-  // Debounced search
+  // Debounced search - also supports Chinese fund codes (510880, etc.)
   useEffect(() => {
     if (!searchQuery || searchQuery.length < 1) {
       setSearchResults([]);
@@ -464,13 +464,42 @@ export function WatchlistView({ onNavigate }: WatchlistViewProps) {
     setSearching(true);
     const timeout = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/market/search?q=${encodeURIComponent(searchQuery)}`);
-        if (res.ok) {
-          const data = await res.json();
-          setSearchResults(Array.isArray(data) ? data.slice(0, 10) : []);
-        } else {
-          setSearchResults([]);
+        // Search both general market and ETF/fund databases
+        const [marketRes, etfRes] = await Promise.allSettled([
+          fetch(`/api/market/search?q=${encodeURIComponent(searchQuery)}`),
+          fetch(`/api/etf/search?q=${encodeURIComponent(searchQuery)}`),
+        ]);
+
+        const allResults: SearchResult[] = [];
+        const seenSymbols = new Set<string>();
+
+        // Process market search results
+        if (marketRes.status === 'fulfilled' && marketRes.value.ok) {
+          const data = await marketRes.value.json();
+          if (Array.isArray(data)) {
+            for (const item of data) {
+              if (!seenSymbols.has(item.symbol.toUpperCase())) {
+                seenSymbols.add(item.symbol.toUpperCase());
+                allResults.push({ symbol: item.symbol, description: item.description || item.symbol, type: item.type || 'Stock' });
+              }
+            }
+          }
         }
+
+        // Process ETF/fund search results (these include Chinese fund codes)
+        if (etfRes.status === 'fulfilled' && etfRes.value.ok) {
+          const data = await etfRes.value.json();
+          if (Array.isArray(data)) {
+            for (const item of data) {
+              if (!seenSymbols.has(item.symbol.toUpperCase())) {
+                seenSymbols.add(item.symbol.toUpperCase());
+                allResults.push({ symbol: item.symbol, description: item.name || item.symbol, type: item.category || 'ETF' });
+              }
+            }
+          }
+        }
+
+        setSearchResults(allResults.slice(0, 15));
       } catch {
         setSearchResults([]);
       } finally {
@@ -671,13 +700,14 @@ export function WatchlistView({ onNavigate }: WatchlistViewProps) {
         {(watchlist || []).map((item) => (
           <Card
             key={item.id}
-            className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300 group"
+            className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300 group cursor-pointer"
+            onClick={() => onNavigate?.('etfDetail', { symbol: item.symbol, name: item.name })}
           >
             <CardContent className="p-4">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-white">{item.symbol}</h3>
+                    <h3 className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors">{item.symbol}</h3>
                     {item.changePercent >= 0 ? (
                       <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
                     ) : (
@@ -686,7 +716,7 @@ export function WatchlistView({ onNavigate }: WatchlistViewProps) {
                   </div>
                   <p className="text-xs text-zinc-500 mt-0.5">{item.name}</p>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -699,15 +729,6 @@ export function WatchlistView({ onNavigate }: WatchlistViewProps) {
                     title={t('pos.addPosition')}
                   >
                     <PlusCircle className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onNavigate?.('aiAnalysis', { symbol: item.symbol })}
-                    className="h-6 w-6 p-0 text-zinc-600 hover:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                    title={t('watch.quickAnalyze')}
-                  >
-                    <Brain className="w-3.5 h-3.5" />
                   </Button>
                   <Button
                     variant="ghost"

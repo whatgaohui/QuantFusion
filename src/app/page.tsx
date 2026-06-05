@@ -9,10 +9,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useLanguage } from '@/lib/i18n';
 
 // ─── Dynamic imports: only compile when the view is actually rendered ───
-// This prevents Turbopack from compiling all 11 views + their heavy deps
-// (recharts, etc.) on first page load, which was causing the server to hang.
 
-// Loading fallback for dynamic imports
 function ViewLoading() {
   return (
     <div className="flex items-center justify-center h-64">
@@ -31,19 +28,6 @@ const DashboardView = dynamic(
   () => import('@/components/dashboard/dashboard-view').then(m => ({ default: m.DashboardView })),
   { ssr: false, loading: () => <ViewLoading /> }
 );
-const AIAnalysisView = dynamic(
-  () => import('@/components/dashboard/ai-analysis-view').then(m => ({ default: m.AIAnalysisView })),
-  { ssr: false, loading: () => <ViewLoading /> }
-);
-const AgentChatView = dynamic(
-  () => import('@/components/dashboard/agent-chat-view').then(m => ({ default: m.AgentChatView })),
-  { ssr: false, loading: () => <ViewLoading /> }
-);
-const SignalScannerView = dynamic(
-  () => import('@/components/dashboard/signal-scanner-view').then(m => ({ default: m.SignalScannerView })),
-  { ssr: false, loading: () => <ViewLoading /> }
-);
-// PositionsView removed — functionality merged into ETF Portfolio
 const ETFPortfolioView = dynamic(
   () => import('@/components/dashboard/etf-portfolio-view').then(m => ({ default: m.ETFPortfolioView })),
   { ssr: false, loading: () => <ViewLoading /> }
@@ -52,65 +36,46 @@ const WatchlistView = dynamic(
   () => import('@/components/dashboard/watchlist-view').then(m => ({ default: m.WatchlistView })),
   { ssr: false, loading: () => <ViewLoading /> }
 );
-// StrategyCenterView removed — functionality merged into Backtest
-const MarketNewsView = dynamic(
-  () => import('@/components/dashboard/news-view').then(m => ({ default: m.MarketNewsView })),
-  { ssr: false, loading: () => <ViewLoading /> }
-);
-const BacktestView = dynamic(
-  () => import('@/components/dashboard/backtest-view').then(m => ({ default: m.BacktestView })),
-  { ssr: false, loading: () => <ViewLoading /> }
-);
 const SettingsView = dynamic(
   () => import('@/components/dashboard/settings-view').then(m => ({ default: m.SettingsView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
+const ETFDetailView = dynamic(
+  () => import('@/components/dashboard/etf-detail-view').then(m => ({ default: m.ETFDetailView })),
   { ssr: false, loading: () => <ViewLoading /> }
 );
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface BacktestNavState {
-  strategy?: string;
-  symbol?: string;
-}
-
-interface AIAnalysisNavState {
-  symbol?: string;
+interface ETFDetailNavState {
+  symbol: string;
+  name?: string;
+  market?: 'A' | 'US' | 'HK';
 }
 
 function ViewRenderer({
   activeView,
   onNavigate,
-  backtestNavState,
-  aiAnalysisNavState,
+  etfDetailNavState,
 }: {
   activeView: NavItem;
-  onNavigate: (view: NavItem, extra?: BacktestNavState & AIAnalysisNavState) => void;
-  backtestNavState: BacktestNavState;
-  aiAnalysisNavState: AIAnalysisNavState;
+  onNavigate: (view: NavItem, extra?: ETFDetailNavState) => void;
+  etfDetailNavState: ETFDetailNavState;
 }) {
   switch (activeView) {
     case 'dashboard':
       return <DashboardView onNavigate={(v) => onNavigate(v)} />;
-    case 'aiAnalysis':
-      return <AIAnalysisView initialSymbol={aiAnalysisNavState.symbol} />;
-    case 'agentChat':
-      return <AgentChatView />;
-    case 'scanner':
-      return <SignalScannerView />;
-
     case 'etfPortfolio':
-      return <ETFPortfolioView />;
-    case 'watchlist':
-      return <WatchlistView onNavigate={(v, extra) => onNavigate(v, extra)} />;
-
-    case 'news':
-      return <MarketNewsView onNavigate={(v) => onNavigate(v)} />;
-    case 'backtest':
-      return <BacktestView
-        initialStrategy={backtestNavState.strategy}
-        initialSymbol={backtestNavState.symbol}
-        onNavigate={(v) => onNavigate(v as NavItem)}
+      return <ETFPortfolioView onNavigate={onNavigate} />;
+    case 'etfDetail':
+      return <ETFDetailView
+        symbol={etfDetailNavState.symbol}
+        name={etfDetailNavState.name}
+        market={etfDetailNavState.market}
+        onBack={() => onNavigate('etfPortfolio')}
       />;
+    case 'watchlist':
+      return <WatchlistView onNavigate={onNavigate} />;
     case 'settings':
       return <SettingsView />;
     default:
@@ -121,31 +86,21 @@ function ViewRenderer({
 const viewTitleKeys: Record<NavItem, string> = {
   dashboard: 'sidebar.dashboard',
   etfPortfolio: 'sidebar.etfPortfolio',
+  etfDetail: 'sidebar.etfPortfolio',
   watchlist: 'sidebar.watchlist',
-  scanner: 'sidebar.scanner',
-  aiAnalysis: 'sidebar.aiAnalysis',
-  agentChat: 'sidebar.agentChat',
-  news: 'sidebar.news',
-  backtest: 'sidebar.backtest',
   settings: 'sidebar.settings',
 };
 
 export default function HomePage() {
   const [activeView, setActiveView] = useState<NavItem>('dashboard');
-  const [backtestNavState, setBacktestNavState] = useState<BacktestNavState>({});
-  const [aiAnalysisNavState, setAIAnalysisNavState] = useState<AIAnalysisNavState>({});
+  const [etfDetailNavState, setEtfDetailNavState] = useState<ETFDetailNavState>({ symbol: '' });
   const [mobileOpen, setMobileOpen] = useState(false);
   const { t, language } = useLanguage();
 
-  const handleNavigate = (view: NavItem, extra?: BacktestNavState & AIAnalysisNavState) => {
+  const handleNavigate = (view: NavItem, extra?: ETFDetailNavState) => {
     setActiveView(view);
-    if (extra) {
-      if (view === 'backtest') {
-        setBacktestNavState({ strategy: extra.strategy, symbol: extra.symbol });
-      }
-      if (view === 'aiAnalysis') {
-        setAIAnalysisNavState({ symbol: extra.symbol });
-      }
+    if (extra && view === 'etfDetail') {
+      setEtfDetailNavState({ symbol: extra.symbol || '', name: extra.name, market: extra.market });
     }
   };
 
@@ -194,7 +149,7 @@ export default function HomePage() {
 
         {/* View Content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6">
-          <ViewRenderer activeView={activeView} onNavigate={handleNavigate} backtestNavState={backtestNavState} aiAnalysisNavState={aiAnalysisNavState} />
+          <ViewRenderer activeView={activeView} onNavigate={handleNavigate} etfDetailNavState={etfDetailNavState} />
         </div>
 
         {/* Footer */}

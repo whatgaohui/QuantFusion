@@ -981,3 +981,123 @@ Stage Summary:
 - Delete position button available on each row
 - Sidebar redesigned with ETF-centric grouping (Portfolio/Analysis/Tools)
 - Page verified working on both desktop and mobile viewports
+
+---
+
+# Work Log — Task 2: Create ETF Detail View Component
+
+## Summary
+Created a comprehensive ETF Detail View component at `/src/components/dashboard/etf-detail-view.tsx`, modeled after professional stock detail pages like 东方财富 and 同花顺. The component provides a full-featured ETF/stock detail page with price charts, technical signals, AI analysis, news, and rebalancing capabilities.
+
+## Files Created
+
+### `/src/components/dashboard/etf-detail-view.tsx`
+Comprehensive ETF detail page component with 5 major sections:
+
+**A. Sticky Header Bar**
+- Back button (ArrowLeft) → calls onBack callback
+- Symbol + Name display (resolves Chinese ETF names from CN_ETF_DB)
+- Current Price (large, bold) + Change + Change%
+- Market badge (A-Share / US / HK) with color coding
+- Data source badge (LIVE / SIMULATED / LOADING / UNKNOWN)
+- Refresh button for quote and indicators
+
+**B. Price Chart Section**
+- Time range selector: 1W / 1M / 3M / 6M / 1Y
+- Recharts ComposedChart with Line for close price and Bar for volume
+- Fetches kline data from `/api/fusion/market/kline?symbol=${symbol}&period=D&count=${count}`
+- Also fetches quote from `/api/fusion/market/quote?symbol=${symbol}`
+- Price stats below chart: Open, High, Low, Prev Close, Volume
+- Handles both CNY (¥) and USD ($) formatting based on market
+
+**C. Tab Section (using shadcn/ui Tabs)**
+- **概览 (Overview)** tab:
+  - ETF profile info from `/api/etf/profile/${symbol}`: Category, Expense Ratio, Tracking Index, Dividend Yield, AUM, PE/PB Ratio, Beta, Sharpe, Volatility, 1Y/3Y/5Y Returns
+  - Position info (if held): Shares, Avg Cost, Current Value, Unrealized P&L, Weight, Target Weight (with inline edit)
+  - Top holdings as badges with weight percentages
+  - Sector/Region allocation as mini donut pie charts with legend
+
+- **信号 (Signals)** tab:
+  - Signal Score circular gauge (SVG circle reused from signal-scanner-view.tsx)
+  - BUY/HOLD/SELL badge based on computed signal
+  - Basic indicators: RSI(14), MACD (MACD/Signal/Hist), Bollinger Bands (Upper/Middle/Lower), KDJ (K/D/J), Volume Ratio
+  - Extended indicators tab: SAR, Supertrend, CCI, Williams %R, OBV, MFI, ADX, ATR, Ichimoku
+  - Signal type badge with color coding
+
+- **AI分析 (AI Analysis)** tab:
+  - Mode selector: Quick / Standard / Full / Debate (4-button grid)
+  - Start analysis button → POST to `/api/fusion/analysis/start` with `{symbol, mode}`
+  - Results: Recommendation badge, Score progress bar, Technical/Fundamental/Sentiment/Risk summaries
+  - Bull/Bear cases (debate mode) in side-by-side cards
+  - Detailed report in collapsible section
+  - LLM usage stats (provider, tokens, cost)
+  - AI sentiment from `/api/ai/sentiment?symbol=${symbol}&name=${name}`
+
+- **资讯 (News)** tab:
+  - Fetches from `/api/fusion/market/news?symbol=${symbol}`
+  - List of news articles: headline, source, time, sentiment badge
+  - External link for articles with URLs
+  - Related stocks display
+
+- **调仓 (Rebalance)** tab (only shown if ETF is held in portfolio):
+  - Current vs Target weight comparison with progress bars
+  - Rebalance suggestion from `/api/etf/portfolio/rebalance`
+  - Edit target weight inline with Input + Button
+  - Confirm update via PATCH /api/portfolio/positions
+  - Total rebalance amount warning
+
+**Key Implementation Details:**
+- Component is `'use client'` with useState/useEffect/useCallback
+- Chinese ETF detection: `/^\d{6}$/.test(symbol)` → defaults market to 'A'
+- Name resolution: CN_ETF_DB lookup for Chinese fund codes
+- Format helpers: formatCurrency (CNY/USD), formatPercent, formatNumber, formatVolume
+- Loading skeletons for all data sections
+- Graceful error handling with fallback data
+- Dark theme: bg-[#0a0a0f], bg-[#111118], border-[#1e1e2e], emerald accents
+- Responsive: mobile-first layout
+
+## Files Modified
+
+### `/src/lib/i18n.ts`
+Added 22 translation keys for both English and Chinese:
+- `detail.priceChart` / 价格走势
+- `detail.tabOverview` / 概览
+- `detail.tabSignals` / 信号
+- `detail.tabAI` / AI分析
+- `detail.tabNews` / 资讯
+- `detail.tabRebalance` / 调仓
+- `detail.profileInfo` / ETF档案
+- `detail.trackingIndex` / 跟踪指数
+- `detail.aum` / 管理规模
+- `detail.volatility1y` / 1年波动率
+- `detail.positionInfo` / 持仓信息
+- `detail.shares` / 持有份额
+- `detail.avgCost` / 平均成本
+- `detail.currentValue` / 当前市值
+- `detail.unrealizedPnl` / 未实现盈亏
+- `detail.topHoldings` / 前十大持仓
+- `detail.noProfileData` / 暂无档案数据
+- `detail.relatedNews` / 相关资讯
+- `detail.weightComparison` / 当前权重 vs 目标权重
+- `detail.weightDiff` / 权重偏差
+- `detail.analysisComplete` / 分析完成
+- `detail.analysisFailed` / 分析失败
+
+### `/src/components/dashboard/sidebar.tsx`
+- Added `'etfDetail'` to `NavItem` type union
+
+### `/src/app/page.tsx`
+- Added dynamic import for `ETFDetailView`
+- Added `ETFDetailNavState` interface with `symbol`, `name?`, `market?` fields
+- Added `etfDetailNavState` state in `HomePage` component
+- Added `etfDetail` case in `ViewRenderer` switch — renders `<ETFDetailView>` with nav state props
+- Added `etfDetail` to `viewTitleKeys` mapping (uses same title as etfPortfolio)
+- Updated `handleNavigate` to handle `etfDetail` view with ETF detail state
+- Updated `ViewRenderer` to accept and pass `etfDetailNavState`
+
+## Verification
+- `bun run lint` passed with zero errors/warnings
+- Dev server running without errors
+- All i18n translations complete for both English and Chinese
+- Dark theme styling consistent with existing components
+- Responsive layout (mobile-first with sm:, md:, lg: breakpoints)
