@@ -347,17 +347,7 @@ export function BacktestView({ initialStrategy, initialSymbol, onNavigate }: Bac
               <FlaskConical className="w-5 h-5 text-emerald-400" />
               <CardTitle className="text-base font-semibold text-white">{t('back.config')}</CardTitle>
             </div>
-            {onNavigate && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onNavigate('strategies')}
-                className="text-zinc-400 hover:text-emerald-400 gap-1.5 text-xs"
-              >
-                <Compass className="w-3.5 h-3.5" />
-                {t('back.goToStrategyCenter')}
-              </Button>
-            )}
+
           </div>
         </CardHeader>
         <CardContent className="space-y-6">

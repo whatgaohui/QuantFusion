@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getFinnhubApiKey } from '@/lib/finnhub-config';
+import { CN_ETF_DB } from '@/lib/cn-etf-db';
 
 /**
  * Check if a query string looks like a Chinese ETF/fund code pattern.
@@ -121,6 +122,27 @@ export async function GET(request: NextRequest) {
           trackingIndex: etf.trackingIndex,
         });
         existingSymbols.add(etf.symbol.toUpperCase());
+      }
+    }
+
+    // 2.5. Fallback: search the hardcoded CN_ETF_DB for Chinese fund patterns
+    if (isChineseFundPattern(query)) {
+      const cnEtfDbResults = CN_ETF_DB.filter(etf => 
+        etf.symbol.startsWith(query) || 
+        etf.name.includes(query) ||
+        etf.trackingIndex.includes(query)
+      );
+      for (const etf of cnEtfDbResults) {
+        if (!existingSymbols.has(etf.symbol)) {
+          results.push({
+            symbol: etf.symbol,
+            name: etf.name,
+            category: etf.category,
+            expenseRatio: etf.expenseRatio,
+            trackingIndex: etf.trackingIndex,
+          });
+          existingSymbols.add(etf.symbol);
+        }
       }
     }
 

@@ -6,10 +6,8 @@ import {
   Brain,
   MessageSquare,
   Radar,
-  Briefcase,
   PieChart,
   Eye,
-  Target,
   Newspaper,
   FlaskConical,
   Settings,
@@ -28,26 +26,36 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/lib/i18n';
 
-export type NavItem = 'dashboard' | 'aiAnalysis' | 'agentChat' | 'scanner' | 'positions' | 'etfPortfolio' | 'watchlist' | 'strategies' | 'news' | 'backtest' | 'settings';
+export type NavItem = 'dashboard' | 'etfPortfolio' | 'watchlist' | 'scanner' | 'aiAnalysis' | 'agentChat' | 'news' | 'backtest' | 'settings';
 
 interface NavConfig {
   id: NavItem;
   labelKey: string;
   icon: React.ElementType;
   accent?: boolean;
+  group?: string; // 'portfolio' | 'analysis' | 'tools' | undefined (top-level)
 }
 
+const groupLabelKeys: Record<string, string> = {
+  portfolio: 'sidebar.groupPortfolio',
+  analysis: 'sidebar.groupAnalysis',
+  tools: 'sidebar.groupTools',
+};
+
 const navItems: NavConfig[] = [
+  // Top-level
   { id: 'dashboard', labelKey: 'sidebar.dashboard', icon: LayoutDashboard },
-  { id: 'aiAnalysis', labelKey: 'sidebar.aiAnalysis', icon: Brain, accent: true },
-  { id: 'agentChat', labelKey: 'sidebar.agentChat', icon: MessageSquare, accent: true },
-  { id: 'scanner', labelKey: 'sidebar.scanner', icon: Radar },
-  { id: 'positions', labelKey: 'sidebar.positions', icon: Briefcase },
-  { id: 'etfPortfolio', labelKey: 'sidebar.etfPortfolio', icon: PieChart },
-  { id: 'watchlist', labelKey: 'sidebar.watchlist', icon: Eye },
-  { id: 'strategies', labelKey: 'sidebar.strategies', icon: Target },
-  { id: 'news', labelKey: 'sidebar.news', icon: Newspaper },
-  { id: 'backtest', labelKey: 'sidebar.backtest', icon: FlaskConical },
+  // Portfolio Group
+  { id: 'etfPortfolio', labelKey: 'sidebar.etfPortfolio', icon: PieChart, accent: true, group: 'portfolio' },
+  { id: 'watchlist', labelKey: 'sidebar.watchlist', icon: Eye, group: 'portfolio' },
+  // Analysis Group
+  { id: 'scanner', labelKey: 'sidebar.scanner', icon: Radar, group: 'analysis' },
+  { id: 'aiAnalysis', labelKey: 'sidebar.aiAnalysis', icon: Brain, accent: true, group: 'analysis' },
+  { id: 'agentChat', labelKey: 'sidebar.agentChat', icon: MessageSquare, group: 'analysis' },
+  // Tools Group
+  { id: 'news', labelKey: 'sidebar.news', icon: Newspaper, group: 'tools' },
+  { id: 'backtest', labelKey: 'sidebar.backtest', icon: FlaskConical, group: 'tools' },
+  // Settings (bottom, no group)
   { id: 'settings', labelKey: 'sidebar.settings', icon: Settings },
 ];
 
@@ -59,6 +67,35 @@ interface SidebarProps {
 export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { language, setLanguage, t } = useLanguage();
+
+  // Build grouped structure for rendering
+  type GroupEntry = { type: 'header'; groupKey: string } | { type: 'separator' } | { type: 'item'; config: NavConfig };
+  const layoutEntries: GroupEntry[] = [];
+
+  let lastGroup: string | undefined = undefined;
+  for (const item of navItems) {
+    if (item.id === 'settings') {
+      // Settings gets a separator before it but no group header
+      layoutEntries.push({ type: 'separator' });
+      layoutEntries.push({ type: 'item', config: item });
+      continue;
+    }
+
+    if (item.group && item.group !== lastGroup) {
+      // Add separator between groups
+      if (lastGroup !== undefined) {
+        layoutEntries.push({ type: 'separator' });
+      }
+      layoutEntries.push({ type: 'header', groupKey: item.group });
+      lastGroup = item.group;
+    } else if (!item.group && lastGroup !== undefined) {
+      // Transition from grouped to ungrouped
+      layoutEntries.push({ type: 'separator' });
+      lastGroup = undefined;
+    }
+
+    layoutEntries.push({ type: 'item', config: item });
+  }
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -85,7 +122,29 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto custom-scrollbar">
-          {navItems.map((item) => {
+          {layoutEntries.map((entry, idx) => {
+            if (entry.type === 'separator') {
+              return (
+                <div key={`sep-${idx}`} className="py-1.5 px-2">
+                  <div className="h-px bg-[#1e1e2e]" />
+                </div>
+              );
+            }
+
+            if (entry.type === 'header') {
+              if (collapsed) return null;
+              const label = t(groupLabelKeys[entry.groupKey] || entry.groupKey);
+              return (
+                <div key={`hdr-${entry.groupKey}`} className="px-3 pt-2 pb-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500/70">
+                    {label}
+                  </span>
+                </div>
+              );
+            }
+
+            // Nav item
+            const item = entry.config;
             const Icon = item.icon;
             const isActive = activeItem === item.id;
             const label = t(item.labelKey);
@@ -96,6 +155,7 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
                 className={cn(
                   'w-full flex items-center gap-3 rounded-lg transition-all duration-200 group',
                   collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2',
+                  item.accent && !collapsed ? 'py-2.5' : '',
                   isActive
                     ? item.accent
                       ? 'bg-emerald-600/20 text-emerald-400 shadow-sm shadow-emerald-600/10'
@@ -103,22 +163,36 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
                     : 'text-zinc-400 hover:bg-[#1a1a2e] hover:text-zinc-200'
                 )}
               >
-                <Icon
-                  className={cn(
-                    'w-5 h-5 flex-shrink-0 transition-colors',
-                    isActive ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-300'
-                  )}
-                />
+                <div className={cn(
+                  'flex-shrink-0 flex items-center justify-center rounded-md transition-colors',
+                  item.accent && isActive
+                    ? 'w-7 h-7 bg-emerald-600/25 shadow-sm shadow-emerald-500/20'
+                    : item.accent
+                    ? 'w-7 h-7 bg-emerald-600/10'
+                    : ''
+                )}>
+                  <Icon
+                    className={cn(
+                      'transition-colors',
+                      item.accent ? 'w-5 h-5' : 'w-5 h-5',
+                      isActive ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-300'
+                    )}
+                  />
+                </div>
                 {!collapsed && (
                   <span className={cn(
                     'text-sm font-medium whitespace-nowrap',
-                    isActive ? 'text-emerald-400' : ''
+                    isActive ? 'text-emerald-400' : '',
+                    item.accent ? 'font-semibold' : ''
                   )}>
                     {label}
                   </span>
                 )}
                 {isActive && !collapsed && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-glow" />
+                  <div className={cn(
+                    'ml-auto rounded-full bg-emerald-400 animate-pulse-glow',
+                    item.accent ? 'w-2 h-2' : 'w-1.5 h-1.5'
+                  )} />
                 )}
               </button>
             );

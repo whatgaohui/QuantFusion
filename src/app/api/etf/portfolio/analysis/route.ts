@@ -82,6 +82,45 @@ export async function GET() {
 
     const profileMap = new Map(etfProfiles.map((p) => [p.symbol, p]));
 
+    // 3.5. Auto-upsert missing ETFProfiles from CN_ETF_DB for Chinese fund codes
+    const missingSymbols = symbols.filter((s) => !profileMap.has(s));
+    if (missingSymbols.length > 0) {
+      try {
+        const { CN_ETF_DB } = await import('@/lib/cn-etf-db');
+        for (const sym of missingSymbols) {
+          if (/^\d{6}$/.test(sym)) {
+            const cnEtf = CN_ETF_DB.find((e) => e.symbol === sym);
+            if (cnEtf) {
+              const upserted = await db.eTFProfile.upsert({
+                where: { symbol: cnEtf.symbol },
+                update: {
+                  name: cnEtf.name, market: 'A', category: cnEtf.category,
+                  expenseRatio: cnEtf.expenseRatio, trackingIndex: cnEtf.trackingIndex,
+                  aum: cnEtf.aum, dividendYield: cnEtf.dividendYield,
+                  peRatio: cnEtf.peRatio, pbRatio: cnEtf.pbRatio, beta: cnEtf.beta,
+                  sharpe1y: cnEtf.sharpe1y, volatility1y: cnEtf.volatility1y,
+                  returns1y: cnEtf.returns1y, returns3y: cnEtf.returns3y, returns5y: cnEtf.returns5y,
+                  topHoldings: cnEtf.topHoldings, sectorWeights: cnEtf.sectorWeights, regionWeights: cnEtf.regionWeights,
+                },
+                create: {
+                  symbol: cnEtf.symbol, name: cnEtf.name, market: 'A', category: cnEtf.category,
+                  expenseRatio: cnEtf.expenseRatio, trackingIndex: cnEtf.trackingIndex,
+                  aum: cnEtf.aum, dividendYield: cnEtf.dividendYield,
+                  peRatio: cnEtf.peRatio, pbRatio: cnEtf.pbRatio, beta: cnEtf.beta,
+                  sharpe1y: cnEtf.sharpe1y, volatility1y: cnEtf.volatility1y,
+                  returns1y: cnEtf.returns1y, returns3y: cnEtf.returns3y, returns5y: cnEtf.returns5y,
+                  topHoldings: cnEtf.topHoldings, sectorWeights: cnEtf.sectorWeights, regionWeights: cnEtf.regionWeights,
+                },
+              });
+              profileMap.set(sym, upserted);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Auto-upsert ETFProfile in analysis error:', e);
+      }
+    }
+
     // 4. Calculate weights for each position
     const positionsWithWeight = positionValues.map((p) => ({
       ...p,

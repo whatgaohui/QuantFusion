@@ -43,10 +43,7 @@ const SignalScannerView = dynamic(
   () => import('@/components/dashboard/signal-scanner-view').then(m => ({ default: m.SignalScannerView })),
   { ssr: false, loading: () => <ViewLoading /> }
 );
-const PositionsView = dynamic(
-  () => import('@/components/dashboard/positions-view').then(m => ({ default: m.PositionsView })),
-  { ssr: false, loading: () => <ViewLoading /> }
-);
+// PositionsView removed — functionality merged into ETF Portfolio
 const ETFPortfolioView = dynamic(
   () => import('@/components/dashboard/etf-portfolio-view').then(m => ({ default: m.ETFPortfolioView })),
   { ssr: false, loading: () => <ViewLoading /> }
@@ -55,10 +52,7 @@ const WatchlistView = dynamic(
   () => import('@/components/dashboard/watchlist-view').then(m => ({ default: m.WatchlistView })),
   { ssr: false, loading: () => <ViewLoading /> }
 );
-const StrategyCenterView = dynamic(
-  () => import('@/components/dashboard/strategy-center-view').then(m => ({ default: m.StrategyCenterView })),
-  { ssr: false, loading: () => <ViewLoading /> }
-);
+// StrategyCenterView removed — functionality merged into Backtest
 const MarketNewsView = dynamic(
   () => import('@/components/dashboard/news-view').then(m => ({ default: m.MarketNewsView })),
   { ssr: false, loading: () => <ViewLoading /> }
@@ -103,14 +97,12 @@ function ViewRenderer({
       return <AgentChatView />;
     case 'scanner':
       return <SignalScannerView />;
-    case 'positions':
-      return <PositionsView />;
+
     case 'etfPortfolio':
       return <ETFPortfolioView />;
     case 'watchlist':
       return <WatchlistView onNavigate={(v, extra) => onNavigate(v, extra)} />;
-    case 'strategies':
-      return <StrategyCenterView onNavigate={(v, extra) => onNavigate(v, extra)} />;
+
     case 'news':
       return <MarketNewsView onNavigate={(v) => onNavigate(v)} />;
     case 'backtest':
@@ -128,13 +120,11 @@ function ViewRenderer({
 
 const viewTitleKeys: Record<NavItem, string> = {
   dashboard: 'sidebar.dashboard',
-  aiAnalysis: 'sidebar.aiAnalysis',
-  agentChat: 'sidebar.agentChat',
-  scanner: 'sidebar.scanner',
-  positions: 'sidebar.positions',
   etfPortfolio: 'sidebar.etfPortfolio',
   watchlist: 'sidebar.watchlist',
-  strategies: 'sidebar.strategies',
+  scanner: 'sidebar.scanner',
+  aiAnalysis: 'sidebar.aiAnalysis',
+  agentChat: 'sidebar.agentChat',
   news: 'sidebar.news',
   backtest: 'sidebar.backtest',
   settings: 'sidebar.settings',

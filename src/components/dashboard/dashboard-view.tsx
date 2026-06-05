@@ -977,7 +977,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             <Button
               variant="outline"
               className="w-full border-[#1e1e2e] bg-[#0a0a0f] text-zinc-300 hover:bg-[#1a1a2e] hover:text-white justify-start gap-2 h-9 text-sm"
-              onClick={() => onNavigate?.('strategies')}
+              onClick={() => onNavigate?.('backtest')}
             >
               <Target className="w-4 h-4" />
               {t('dash.viewStrategies')}

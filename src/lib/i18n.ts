@@ -22,6 +22,9 @@ const translations: Record<Language, Record<string, string>> = {
     'sidebar.backtest': 'Backtest',
     'sidebar.settings': 'Settings',
     'sidebar.collapse': 'Collapse',
+    'sidebar.groupPortfolio': 'Portfolio',
+    'sidebar.groupAnalysis': 'Analysis',
+    'sidebar.groupTools': 'Tools',
 
     // Header
     'header.live': 'Live',
@@ -722,6 +725,15 @@ const translations: Record<Language, Record<string, string>> = {
     'etf.marketCN': 'A-Share',
     'etf.marketUS': 'US',
     'etf.marketHK': 'HK',
+    'etf.updateWeight': 'Update Weight',
+    'etf.removeConfirm': 'Are you sure you want to remove this position?',
+    'etf.removed': 'Position removed',
+    'etf.removeFailed': 'Failed to remove position',
+    'etf.weightUpdated': 'Target weight updated',
+    'etf.weightUpdateFailed': 'Failed to update weight',
+    'etf.actions': 'Actions',
+    'etf.editWeight': 'Edit Weight',
+    'etf.oneClickAdjust': 'One-Click Adjust',
   },
   zh: {
     // Sidebar
@@ -736,6 +748,9 @@ const translations: Record<Language, Record<string, string>> = {
     'sidebar.backtest': '回测',
     'sidebar.settings': '设置',
     'sidebar.collapse': '收起',
+    'sidebar.groupPortfolio': '投资组合',
+    'sidebar.groupAnalysis': '智能分析',
+    'sidebar.groupTools': '市场与工具',
 
     // Header
     'header.live': '实时',
@@ -1436,6 +1451,15 @@ const translations: Record<Language, Record<string, string>> = {
     'etf.marketCN': 'A股',
     'etf.marketUS': '美股',
     'etf.marketHK': '港股',
+    'etf.updateWeight': '更新权重',
+    'etf.removeConfirm': '确定要移除该持仓吗？',
+    'etf.removed': '持仓已移除',
+    'etf.removeFailed': '移除持仓失败',
+    'etf.weightUpdated': '目标权重已更新',
+    'etf.weightUpdateFailed': '更新权重失败',
+    'etf.actions': '操作',
+    'etf.editWeight': '调整权重',
+    'etf.oneClickAdjust': '一键调整',
   },
 };
 

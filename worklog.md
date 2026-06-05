@@ -736,3 +736,248 @@ Stage Summary:
 - Fund sync API can fetch latest fund data from EastMoney
 - A-share ETF auto-detection when adding positions
 - Server running stably on port 3000
+
+# Work Log — Task 2: Fix Chinese ETF Search (510880) and Name Display
+
+## Summary
+Fixed three issues with Chinese ETF support:
+1. **ETF 510880 (上证红利ETF) not found in search**: The CN_ETF_DB hardcoded list in the profile route was missing common Chinese ETFs like 510880. Added 10 new ETFs including dividend, sector, and commodity funds.
+2. **Search doesn't check hardcoded CN_ETF_DB as fallback**: The search route only checked the Fund table and ETFProfile table, but not the hardcoded CN_ETF_DB. Added a fallback search step that checks CN_ETF_DB for Chinese fund patterns.
+3. **Name doesn't display when adding Chinese fund to portfolio**: When a Chinese fund was added as a position, the ETFProfile table had no entry for it, so the analysis route returned null. Added auto-upsert of ETFProfile when creating a position with a 6-digit Chinese fund symbol.
+4. **No PATCH endpoint for position updates**: Added a PATCH endpoint to update position fields (targetWeight, quantity, stopLoss, takeProfit, avgCost, notes).
+
+## Files Created
+
+### `/src/lib/cn-etf-db.ts`
+- Extracted CN_ETF_DB into a shared module with TypeScript interface `CnEtfEntry`
+- Contains all original Chinese ETF data plus 10 new entries:
+  - 510880 (交银上证红利ETF) — Dividend/broad_market
+  - 515180 (华夏沪深300红利ETF) — Dividend/broad_market
+  - 512980 (南方中证500ETF) — Broad market
+  - 159949 (嘉实创业板50ETF) — Broad market
+  - 512690 (鹏华中证酒ETF) — Sector
+  - 512400 (华夏有色金属ETF) — Sector
+  - 515790 (华泰柏瑞光伏ETF) — Sector (replaces duplicate from original)
+  - 516160 (华夏新能源ETF) — Sector
+  - 518800 (国泰黄金ETF) — Commodity
+
+## Files Modified
+
+### `/src/app/api/etf/profile/[symbol]/route.ts`
+- Removed inline CN_ETF_DB array (60+ lines)
+- Added `import { CN_ETF_DB } from '@/lib/cn-etf-db'`
+- All existing profile lookup logic preserved
+
+### `/src/app/api/etf/search/route.ts`
+- Removed inline CN_ETF_DB reference comment
+- Added `import { CN_ETF_DB } from '@/lib/cn-etf-db'`
+- Added step 2.5: Fallback search of CN_ETF_DB for Chinese fund patterns (4-6 digit queries)
+  - Searches by symbol prefix, name contains, or trackingIndex contains
+  - Deduplicates against results from Fund table and ETFProfile table
+  - Provides richer data (expenseRatio, trackingIndex) than Fund table entries
+
+### `/src/app/api/portfolio/positions/route.ts`
+- Added auto-upsert of ETFProfile in POST handler for 6-digit Chinese fund symbols
+  - Dynamically imports CN_ETF_DB from shared module
+  - Finds matching ETF entry and upserts to ETFProfile table
+  - Non-critical: errors logged but don't fail position creation
+- Added PATCH endpoint for updating position fields:
+  - `targetWeight` — Target portfolio weight
+  - `quantity` — Share count
+  - `stopLoss` — Stop loss price
+  - `takeProfit` — Take profit price
+  - `avgCost` — Average cost basis
+  - `notes` — Position notes
+
+## Verification
+- `bun run lint` passed with no errors
+- `curl /api/etf/search?q=510880` returns result (from Fund DB, step 1)
+- `curl /api/etf/profile/510880` returns full profile with name "交银上证红利ETF", expenseRatio, trackingIndex, etc.
+- `curl /api/etf/profile/518800` returns full commodity ETF profile
+- `curl /api/etf/profile/515180` returns dividend ETF profile
+- `POST /api/portfolio/positions` with symbol=510880 creates position and auto-upserts ETFProfile
+- `PATCH /api/portfolio/positions` with id and targetWeight updates position successfully
+- Dev server running without errors
+
+
+---
+
+# Work Log — Task 5: Redesign Sidebar to be ETF-centric with Visual Grouping
+
+## Summary
+Redesigned the QuantFusion sidebar from a flat 11-item list to an ETF-centric, visually grouped navigation with section headers, accent styling for primary items, and removal of merged views (positions, strategies). The new NavItem type has 9 items organized into 3 logical groups plus top-level and bottom items.
+
+## Changes Made
+
+### New Sidebar Structure
+```
+📊 Dashboard (top-level)
+
+💼 Portfolio Group
+  ├─ ETF Portfolio — PRIMARY (accent: emerald glow)
+  └─ Watchlist
+
+📡 Analysis Group
+  ├─ Signal Scanner
+  ├─ AI Analysis (accent)
+  └─ Agent Chat
+
+📰 Tools Group
+  ├─ Market News
+  └─ Backtest
+
+⚙️ Settings (bottom, separator above)
+```
+
+### `/src/components/dashboard/sidebar.tsx` — Full rewrite
+- **NavItem type**: Updated from 11 items to 9 items, removed `'positions'` and `'strategies'`
+- **NavConfig interface**: Added `group?: string` field (`'portfolio' | 'analysis' | 'tools' | undefined`)
+- **groupLabelKeys**: Maps group keys to i18n translation keys (`sidebar.groupPortfolio`, `sidebar.groupAnalysis`, `sidebar.groupTools`)
+- **Grouped layout rendering**: Builds `layoutEntries` array with `header`, `separator`, and `item` entries. Group headers shown only when sidebar is expanded (collapsed shows just icons). Separators between groups and before Settings.
+- **ETF Portfolio accent styling**: `accent: true` items get:
+  - Slightly taller padding (`py-2.5` when expanded)
+  - Icon wrapped in a `div` with `bg-emerald-600/25` background and `shadow-emerald-500/20` glow when active
+  - `bg-emerald-600/10` subtle background when inactive
+  - `font-semibold` label styling
+  - Larger active indicator dot (`w-2 h-2` vs `w-1.5 h-1.5`)
+  - More pronounced active state with `shadow-emerald-600/10`
+- **Group headers**: Rendered as uppercase 10px text with `tracking-widest` and `text-zinc-500/70`
+- **Collapsed mode**: Group headers hidden, all items shown as icon-only with tooltips
+- **Settings**: Always at bottom with separator above, no group header
+- **Preserved**: Collapse/expand toggle, language toggle, tooltips, dark theme, hover effects
+
+### `/src/app/page.tsx` — Updated for new NavItem type
+- Removed `PositionsView` dynamic import (replaced with comment)
+- Removed `StrategyCenterView` dynamic import (replaced with comment)
+- Removed `case 'positions'` and `case 'strategies'` from ViewRenderer switch
+- Updated `viewTitleKeys` to match new 9-item NavItem type (removed positions/strategies entries)
+
+### `/src/components/dashboard/dashboard-view.tsx` — Navigation fix
+- Changed `onNavigate?.('strategies')` → `onNavigate?.('backtest')` (View Strategies button now navigates to Backtest)
+
+### `/src/components/dashboard/backtest-view.tsx` — Navigation fix
+- Removed "Go to Strategy Center" button (strategies functionality merged into backtest)
+
+### `/src/lib/i18n.ts` — New translation keys
+Added 3 group label keys for both English and Chinese:
+- `sidebar.groupPortfolio` — Portfolio / 投资组合
+- `sidebar.groupAnalysis` — Analysis / 智能分析
+- `sidebar.groupTools` — Tools / 市场与工具
+
+## Verification
+- `bun run lint` passed with zero errors
+- Dev server running without compilation errors
+- New NavItem type correctly exported from sidebar.tsx
+- All navigation callbacks use valid NavItem values
+- Collapsed sidebar shows icons only (no group headers)
+- Expanded sidebar shows group headers, separators, and accent styling
+
+---
+
+## Task 6 - Enrich ETF Portfolio View with CRUD Operations
+
+**Date**: 2026-06-05
+**Agent**: Main Agent
+
+### Changes Made
+
+#### 1. `src/components/dashboard/etf-portfolio-view.tsx`
+
+**New Imports Added:**
+- `Trash2`, `Pencil`, `BarChart2`, `Zap`, `ExternalLink` from `lucide-react`
+- `Popover`, `PopoverContent`, `PopoverTrigger` from `@/components/ui/popover`
+- `Label` from `@/components/ui/label`
+
+**ETFHolding Interface Updated:**
+- Added `market?: string` field to support A-share CNY formatting
+
+**formatCurrency Function Updated:**
+- Now accepts optional `market` parameter
+- For `market === 'A'`, formats as CNY (¥) using `zh-CN` locale
+- Default still USD ($)
+
+**New State Variables:**
+- `editingWeight: string | null` - Tracks which holding's weight is being edited
+- `editWeightValue: string` - The current value in the weight edit input
+- `deletingId: string | null` - Tracks which holding is currently being deleted (for loading state)
+
+**New Handler Functions:**
+- `handleDeleteHolding(holding: ETFHolding)` - Confirms and deletes a position via `DELETE /api/portfolio/positions`
+- `handleUpdateWeight(holdingId: string, newWeight: number)` - Updates target weight via `PATCH /api/portfolio/positions`
+
+**Table Header - New "Actions" Column:**
+- Added `<TableHead>` for Actions column at the end of the header row
+
+**Table Body - Actions Column per Row:**
+- Each row now has an Actions cell with:
+  - **Edit Target Weight** button (Target icon) → Opens a Popover with number input and submit button
+  - **Delete** button (Trash2 icon) → Confirms and deletes with loading spinner
+- All action buttons use `e.stopPropagation()` to prevent triggering row expand/collapse
+
+**Quick Actions Bar:**
+- Added above the holdings table (visible when holdings exist)
+- **Batch Rebalance** button - Triggers rebalance calculation
+- **One-Click Adjust** button - Refreshes analysis and rebalance data
+
+**Expanded Row Details Enhanced:**
+- Now shows 8 detail fields instead of 4: Expense Ratio, Tracking Index, Dividend Yield, Avg Cost, Target Weight (with inline edit), Current Price, Unrealized P&L, Weight vs Target comparison
+- Added inline edit target weight via Popover (Pencil icon)
+- Added Weight vs Target comparison with Overweight/Underweight/On Target badge
+- Added Quick Actions section with Edit Weight and Remove buttons
+- Top Holdings section moved to bottom with border separator
+- A-share positions show ¥ CNY formatting for price, avg cost, and unrealized P&L
+
+**API Data Mapping:**
+- Added `market` field extraction from `p.profile.market` in the holdings mapping
+
+#### 2. `src/lib/i18n.ts`
+
+**New English i18n Keys:**
+- `etf.updateWeight`: 'Update Weight'
+- `etf.removeConfirm`: 'Are you sure you want to remove this position?'
+- `etf.removed`: 'Position removed'
+- `etf.removeFailed`: 'Failed to remove position'
+- `etf.weightUpdated`: 'Target weight updated'
+- `etf.weightUpdateFailed`: 'Failed to update weight'
+- `etf.actions`: 'Actions'
+- `etf.editWeight`: 'Edit Weight'
+- `etf.oneClickAdjust`: 'One-Click Adjust'
+
+**New Chinese i18n Keys:**
+- `etf.updateWeight`: '更新权重'
+- `etf.removeConfirm`: '确定要移除该持仓吗？'
+- `etf.removed`: '持仓已移除'
+- `etf.removeFailed`: '移除持仓失败'
+- `etf.weightUpdated`: '目标权重已更新'
+- `etf.weightUpdateFailed`: '更新权重失败'
+- `etf.actions`: '操作'
+- `etf.editWeight`: '调整权重'
+- `etf.oneClickAdjust`: '一键调整'
+
+### Verification
+- `bun run lint` passes with no errors
+- Dev server returns 200 OK on `/`
+- No TypeScript compilation errors
+
+---
+Task ID: 9
+Agent: Main Agent
+Task: Final verification, add 159338 to CN_ETF_DB, fix auto-upsert in analysis route
+
+Work Log:
+- Verified ETF Portfolio page loads correctly with all features
+- Confirmed search for "510880" returns results in Add ETF dialog
+- Found 159338 was missing from CN_ETF_DB - added it as "华夏中证1000ETF"
+- Added auto-upsert logic in /api/etf/portfolio/analysis route to fix missing ETFProfiles for existing positions
+- Tested Edit Target Weight popover - works correctly (changed 510880 target weight to 15%)
+- Verified all ETF names now display correctly: 510880(交银上证红利ETF), 159338(华夏中证1000ETF), 588000(华夏科创50ETF), 513500(博时标普500ETF), 513300(华夏沪深300ETF)
+- Verified mobile view is responsive
+- Reset viewport to desktop after mobile test
+
+Stage Summary:
+- All ETF name display issues fixed
+- Search for 510880 now works in both Popular ETFs section and Add ETF dialog
+- Edit Target Weight works correctly via PATCH /api/portfolio/positions
+- Delete position button available on each row
+- Sidebar redesigned with ETF-centric grouping (Portfolio/Analysis/Tools)
+- Page verified working on both desktop and mobile viewports

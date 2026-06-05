@@ -93,11 +93,116 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Auto-upsert ETFProfile for Chinese fund codes so name displays in analysis
+    if (/^\d{6}$/.test(symbol.toUpperCase())) {
+      try {
+        const { CN_ETF_DB } = await import('@/lib/cn-etf-db');
+        const cnEtf = CN_ETF_DB.find(e => e.symbol === symbol.toUpperCase());
+        if (cnEtf) {
+          await db.eTFProfile.upsert({
+            where: { symbol: cnEtf.symbol },
+            update: {
+              name: cnEtf.name,
+              market: 'A',
+              category: cnEtf.category,
+              expenseRatio: cnEtf.expenseRatio,
+              trackingIndex: cnEtf.trackingIndex,
+              aum: cnEtf.aum,
+              dividendYield: cnEtf.dividendYield,
+              peRatio: cnEtf.peRatio,
+              pbRatio: cnEtf.pbRatio,
+              beta: cnEtf.beta,
+              sharpe1y: cnEtf.sharpe1y,
+              volatility1y: cnEtf.volatility1y,
+              returns1y: cnEtf.returns1y,
+              returns3y: cnEtf.returns3y,
+              returns5y: cnEtf.returns5y,
+              topHoldings: cnEtf.topHoldings,
+              sectorWeights: cnEtf.sectorWeights,
+              regionWeights: cnEtf.regionWeights,
+            },
+            create: {
+              symbol: cnEtf.symbol,
+              name: cnEtf.name,
+              market: 'A',
+              category: cnEtf.category,
+              expenseRatio: cnEtf.expenseRatio,
+              trackingIndex: cnEtf.trackingIndex,
+              aum: cnEtf.aum,
+              dividendYield: cnEtf.dividendYield,
+              peRatio: cnEtf.peRatio,
+              pbRatio: cnEtf.pbRatio,
+              beta: cnEtf.beta,
+              sharpe1y: cnEtf.sharpe1y,
+              volatility1y: cnEtf.volatility1y,
+              returns1y: cnEtf.returns1y,
+              returns3y: cnEtf.returns3y,
+              returns5y: cnEtf.returns5y,
+              topHoldings: cnEtf.topHoldings,
+              sectorWeights: cnEtf.sectorWeights,
+              regionWeights: cnEtf.regionWeights,
+            },
+          });
+        }
+      } catch (e) {
+        console.error('Auto-upsert ETFProfile error:', e);
+        // Non-critical, don't fail the position creation
+      }
+    }
+
     return NextResponse.json(position, { status: 201 });
   } catch (error) {
     console.error('Create position error:', error);
     return NextResponse.json(
       { error: 'Failed to create position' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PATCH /api/portfolio/positions
+ * Update a position (e.g., target weight, quantity, stop loss, take profit)
+ * Body: { id, targetWeight?, quantity?, stopLoss?, takeProfit?, avgCost?, notes? }
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, targetWeight, quantity, stopLoss, takeProfit, avgCost, notes } = body;
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Position id is required' },
+        { status: 400 }
+      );
+    }
+
+    const position = await db.position.findUnique({ where: { id } });
+    if (!position) {
+      return NextResponse.json(
+        { error: 'Position not found' },
+        { status: 404 }
+      );
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (targetWeight !== undefined) updateData.targetWeight = targetWeight;
+    if (quantity !== undefined) updateData.quantity = parseInt(quantity, 10);
+    if (stopLoss !== undefined) updateData.stopLoss = parseFloat(stopLoss);
+    if (takeProfit !== undefined) updateData.takeProfit = parseFloat(takeProfit);
+    if (avgCost !== undefined) updateData.avgCost = parseFloat(avgCost);
+    if (notes !== undefined) updateData.notes = notes;
+
+    const updated = await db.position.update({
+      where: { id },
+      data: updateData,
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error('Update position error:', error);
+    return NextResponse.json(
+      { error: 'Failed to update position' },
       { status: 500 }
     );
   }

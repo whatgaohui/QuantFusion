@@ -22,6 +22,11 @@ import {
   MinusCircle,
   Layers,
   X,
+  Trash2,
+  Pencil,
+  BarChart2,
+  Zap,
+  ExternalLink,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -54,6 +59,8 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/lib/i18n';
 import { toast } from 'sonner';
 import { AddPositionDialog } from './add-position-dialog';
@@ -65,6 +72,7 @@ interface ETFHolding {
   symbol: string;
   name: string;
   category: string;
+  market?: string;
   currentPrice: number;
   shares: number;
   value: number;
@@ -132,8 +140,11 @@ const CATEGORY_BADGE_STYLES: Record<string, string> = {
 
 const ALLOCATION_PIE_COLORS = ['#10b981', '#8b5cf6', '#eab308', '#f59e0b', '#3b82f6', '#ec4899', '#ef4444', '#22c55e', '#0FEDBE'];
 
-function formatCurrency(value: number | undefined | null): string {
-  if (value == null || isNaN(value)) return '$0.00';
+function formatCurrency(value: number | undefined | null, market?: string): string {
+  if (value == null || isNaN(value)) return market === 'A' ? '¥0.00' : '$0.00';
+  if (market === 'A') {
+    return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(value);
+  }
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
 
@@ -159,6 +170,54 @@ export function ETFPortfolioView() {
   const [searching, setSearching] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addSymbol, setAddSymbol] = useState('');
+  const [editingWeight, setEditingWeight] = useState<string | null>(null);
+  const [editWeightValue, setEditWeightValue] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // ─── Delete & Update Handlers ────────────────────────────────────────────
+
+  const handleDeleteHolding = async (holding: ETFHolding) => {
+    if (!confirm(`Are you sure you want to remove ${holding.symbol} from your ETF portfolio?`)) return;
+    setDeletingId(holding.id);
+    try {
+      const res = await fetch('/api/portfolio/positions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: holding.id, closePrice: holding.currentPrice }),
+      });
+      if (res.ok) {
+        toast.success(`Removed ${holding.symbol}`);
+        fetchAnalysis();
+        fetchRebalance();
+      } else {
+        toast.error('Failed to remove position');
+      }
+    } catch {
+      toast.error('Failed to remove position');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleUpdateWeight = async (holdingId: string, newWeight: number) => {
+    try {
+      const res = await fetch('/api/portfolio/positions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: holdingId, targetWeight: newWeight }),
+      });
+      if (res.ok) {
+        toast.success('Target weight updated');
+        setEditingWeight(null);
+        fetchAnalysis();
+        fetchRebalance();
+      } else {
+        toast.error('Failed to update weight');
+      }
+    } catch {
+      toast.error('Failed to update weight');
+    }
+  };
 
   // ─── Data Fetching ───────────────────────────────────────────────────────
 
@@ -176,6 +235,7 @@ export function ETFPortfolioView() {
           symbol: String(p.symbol || ''),
           name: (p.profile as Record<string, unknown>)?.name ? String((p.profile as Record<string, unknown>).name) : String(p.symbol || ''),
           category: (p.profile as Record<string, unknown>)?.category ? String((p.profile as Record<string, unknown>).category) : 'broad_market',
+          market: (p.profile as Record<string, unknown>)?.market ? String((p.profile as Record<string, unknown>).market) : undefined,
           currentPrice: typeof p.currentPrice === 'number' ? p.currentPrice : 0,
           shares: typeof p.quantity === 'number' ? p.quantity : 0,
           value: typeof p.value === 'number' ? p.value : 0,
@@ -400,6 +460,32 @@ export function ETFPortfolioView() {
         </div>
       )}
 
+      {/* ─── Quick Actions Bar ─────────────────────────────────────────── */}
+      {data.holdings.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs border-[#1e1e2e] text-zinc-300 hover:text-white hover:border-emerald-600/30 gap-1.5 bg-[#111118]"
+            onClick={() => fetchRebalance()}
+            disabled={rebalanceLoading}
+          >
+            <BarChart2 className="w-3.5 h-3.5" />
+            {t('etf.rebalance')}
+            {rebalanceLoading && <Loader2 className="w-3 h-3 animate-spin ml-1" />}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs border-[#1e1e2e] text-zinc-300 hover:text-white hover:border-emerald-600/30 gap-1.5 bg-[#111118]"
+            onClick={() => { fetchAnalysis(); fetchRebalance(); }}
+          >
+            <Zap className="w-3.5 h-3.5" />
+            {t('etf.oneClickAdjust')}
+          </Button>
+        </div>
+      )}
+
       {/* ─── B. ETF Holdings Table ──────────────────────────────────────── */}
       <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
         <CardHeader className="pb-3">
@@ -458,6 +544,7 @@ export function ETFPortfolioView() {
                     <TableHead className="text-zinc-400 text-xs text-right">{t('etf.weight')}</TableHead>
                     <TableHead className="text-zinc-400 text-xs text-right">P&L</TableHead>
                     <TableHead className="text-zinc-400 text-xs text-right hidden lg:table-cell">{t('etf.targetWeight')}</TableHead>
+                    <TableHead className="text-zinc-400 text-xs text-right">{t('etf.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -489,9 +576,9 @@ export function ETFPortfolioView() {
                             {t(`etf.cat_${holding.category}`) || holding.category}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm text-white text-right">${holding.currentPrice.toFixed(2)}</TableCell>
+                        <TableCell className="text-sm text-white text-right">{holding.market === 'A' ? `¥${holding.currentPrice.toFixed(2)}` : `$${holding.currentPrice.toFixed(2)}`}</TableCell>
                         <TableCell className="text-sm text-zinc-300 text-right hidden sm:table-cell">{holding.shares}</TableCell>
-                        <TableCell className="text-sm text-white text-right">{formatCurrency(holding.value)}</TableCell>
+                        <TableCell className="text-sm text-white text-right">{formatCurrency(holding.value, holding.market)}</TableCell>
                         <TableCell className="text-right">
                           <span className="text-sm font-medium text-zinc-300">{formatPercent(holding.weight)}</span>
                         </TableCell>
@@ -514,6 +601,63 @@ export function ETFPortfolioView() {
                             <span className="text-xs text-zinc-600">—</span>
                           )}
                         </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                            {/* Edit Target Weight */}
+                            <Popover open={editingWeight === holding.id} onOpenChange={(open) => { if (!open) setEditingWeight(null); }}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-zinc-500 hover:text-white"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingWeight(holding.id);
+                                    setEditWeightValue(String(holding.targetWeight || ''));
+                                  }}
+                                >
+                                  <Target className="w-3.5 h-3.5" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48 bg-[#111118] border-[#1e1e2e]" align="end">
+                                <div className="space-y-2">
+                                  <Label className="text-xs text-zinc-400">{t('etf.targetWeight')} (%)</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.5"
+                                    value={editWeightValue}
+                                    onChange={(e) => setEditWeightValue(e.target.value)}
+                                    className="bg-[#0a0a0f] border-[#1e1e2e] text-white h-8 text-sm"
+                                  />
+                                  <Button
+                                    size="sm"
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    onClick={() => handleUpdateWeight(holding.id, parseFloat(editWeightValue) || 0)}
+                                  >
+                                    {t('etf.updateWeight')}
+                                  </Button>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                            {/* Delete */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-zinc-500 hover:text-red-400"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteHolding(holding);
+                              }}
+                              disabled={deletingId === holding.id}
+                            >
+                              {deletingId === holding.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -525,26 +669,121 @@ export function ETFPortfolioView() {
                 <div className="mt-2 p-4 bg-[#0a0a0f] rounded-lg border border-[#1e1e2e]">
                   {(() => {
                     const h = data.holdings.find(h => h.id === expandedRow)!;
+                    const isCNY = h.market === 'A';
                     return (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div>
-                          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{t('etf.expenseRatio')}</p>
-                          <p className="text-sm font-medium text-white">{formatPercent(h.expenseRatio, 3)}</p>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{t('etf.expenseRatio')}</p>
+                            <p className="text-sm font-medium text-white">{formatPercent(h.expenseRatio, 3)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Tracking Index</p>
+                            <p className="text-sm font-medium text-white">{h.trackingIndex || '—'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Dividend Yield</p>
+                            <p className="text-sm font-medium text-white">{formatPercent(h.dividendYield)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Avg Cost</p>
+                            <p className="text-sm font-medium text-white">{isCNY ? `¥${h.avgCost.toFixed(2)}` : `$${h.avgCost.toFixed(2)}`}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{t('etf.targetWeight')}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-white">{formatPercent(h.targetWeight)}</p>
+                              <Popover open={editingWeight === h.id} onOpenChange={(open) => { if (!open) setEditingWeight(null); }}>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 text-zinc-500 hover:text-white"
+                                    onClick={() => {
+                                      setEditingWeight(h.id);
+                                      setEditWeightValue(String(h.targetWeight || ''));
+                                    }}
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-48 bg-[#111118] border-[#1e1e2e]" align="start">
+                                  <div className="space-y-2">
+                                    <Label className="text-xs text-zinc-400">{t('etf.targetWeight')} (%)</Label>
+                                    <Input
+                                      type="number"
+                                      step="0.5"
+                                      value={editWeightValue}
+                                      onChange={(e) => setEditWeightValue(e.target.value)}
+                                      className="bg-[#0a0a0f] border-[#1e1e2e] text-white h-8 text-sm"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                      onClick={() => handleUpdateWeight(h.id, parseFloat(editWeightValue) || 0)}
+                                    >
+                                      {t('etf.updateWeight')}
+                                    </Button>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{t('dash.price')}</p>
+                            <p className="text-sm font-medium text-white">{isCNY ? `¥${h.currentPrice.toFixed(2)}` : `$${h.currentPrice.toFixed(2)}`}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Unrealized P&L</p>
+                            <p className={`text-sm font-medium ${h.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {h.pnl >= 0 ? '+' : ''}{formatCurrency(h.pnl, h.market)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">{t('etf.weight')} vs {t('etf.targetWeight')}</p>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-zinc-300">{formatPercent(h.weight)}</span>
+                              <span className="text-xs text-zinc-600">→</span>
+                              <span className="text-sm text-emerald-400">{formatPercent(h.targetWeight)}</span>
+                              <Badge className={`text-[9px] border ml-1 ${
+                                h.weight > h.targetWeight
+                                  ? 'bg-red-600/15 text-red-400 border-red-600/20'
+                                  : h.weight < h.targetWeight
+                                    ? 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20'
+                                    : 'bg-zinc-600/15 text-zinc-400 border-zinc-600/20'
+                              }`}>
+                                {h.weight > h.targetWeight ? t('etf.overweight') : h.weight < h.targetWeight ? t('etf.underweight') : t('etf.onTarget')}
+                              </Badge>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Tracking Index</p>
-                          <p className="text-sm font-medium text-white">{h.trackingIndex || '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Dividend Yield</p>
-                          <p className="text-sm font-medium text-white">{formatPercent(h.dividendYield)}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Avg Cost</p>
-                          <p className="text-sm font-medium text-white">${h.avgCost.toFixed(2)}</p>
+                        {/* Quick Actions */}
+                        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#1e1e2e]">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs border-[#1e1e2e] text-zinc-400 hover:text-white hover:border-emerald-600/30 gap-1"
+                            onClick={() => {
+                              setEditingWeight(h.id);
+                              setEditWeightValue(String(h.targetWeight || ''));
+                            }}
+                          >
+                            <Pencil className="w-3 h-3" />
+                            {t('etf.editWeight')}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs border-[#1e1e2e] text-zinc-400 hover:text-white hover:border-emerald-600/30 gap-1"
+                            onClick={() => handleDeleteHolding(h)}
+                            disabled={deletingId === h.id}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            Remove
+                          </Button>
                         </div>
                         {h.topHoldings && h.topHoldings.length > 0 && (
-                          <div className="sm:col-span-2 lg:col-span-4">
+                          <div className="pt-2 border-t border-[#1e1e2e]">
                             <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Top Holdings</p>
                             <div className="flex flex-wrap gap-1.5">
                               {h.topHoldings.slice(0, 10).map((ticker) => (
