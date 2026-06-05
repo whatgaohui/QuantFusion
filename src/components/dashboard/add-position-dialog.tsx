@@ -143,6 +143,10 @@ export function AddPositionDialog({
     setSymbol(etf.symbol);
     setEtfSearchQuery('');
     setEtfSearchResults([]);
+    // Auto-detect market: 6-digit codes starting with 0-5 are A-share funds
+    if (/^\d{6}$/.test(etf.symbol)) {
+      setMarket('A');
+    }
   };
 
   // Computed values

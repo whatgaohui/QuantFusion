@@ -449,3 +449,29 @@ model DataSourceHealth {
   @@index([market])
   @@index([status])
 }
+
+// ============================================================
+// Fund (Chinese funds including ETF, LOF, etc.)
+// ============================================================
+
+model Fund {
+  id         String   @id @default(cuid())
+  code       String   @unique // Fund code, e.g. "513500"
+  name       String            // Fund name, e.g. "博时标普500ETF"
+  pinyin     String?           // Pinyin abbreviation for search, e.g. "bsbp500etf"
+  fundType   String?           // Fund type: ETF, LOF, QDII, etc.
+  market     String?           // Market: A / HK / US
+  isOnMarket Boolean  @default(true) // Whether the fund is currently on market
+  isEtf      Boolean  @default(false) // Whether it's an ETF
+  exchange   String?           // Exchange: SH / SZ
+  nav        Float?            // Net asset value
+  accNav     Float?            // Accumulated net asset value
+  navDate    String?           // NAV date (YYYY-MM-DD)
+  updatedAt  DateTime @updatedAt
+
+  @@index([code])
+  @@index([fundType])
+  @@index([isEtf])
+  @@index([isOnMarket])
+  @@index([pinyin])
+}

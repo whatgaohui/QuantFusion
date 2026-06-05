@@ -619,3 +619,120 @@ Stage Summary:
 - Chinese name search also works (e.g., "沪深300" finds matching ETFs)
 - 55+ A-share ETFs in local search database covering broad_market, international, sector, bond, commodity
 - Profile lookup and database persistence working for A-share ETFs
+
+---
+
+# Work Log — Task 2: Refactor ETF Search API to Use Fund Database Table
+
+## Summary
+Refactored the ETF search route (`/api/etf/search/route.ts`) to replace the hardcoded `CN_ETF_DB` array (~80 Chinese ETFs) with database-driven search using the new `Fund` model. Also added the `Fund` model to the Prisma schema since it didn't exist yet.
+
+## Problem
+The ETF search route contained a hardcoded array of ~80 Chinese ETFs (`CN_ETF_DB`) which was:
+- Limited to only ~80 funds out of thousands available in the market
+- Required code changes to add new funds
+- Couldn't support pinyin-based search
+- Duplicated data that should be in a database
+
+## Files Modified
+
+### `/prisma/schema.prisma`
+- Added `Fund` model with fields: `code` (unique), `name`, `pinyin`, `fundType`, `market`, `isOnMarket`, `isEtf`, `exchange`, `nav`, `accNav`, `navDate`, `updatedAt`
+- Added indexes on `code`, `fundType`, `isEtf`, `isOnMarket`, `pinyin` for efficient search queries
+
+### `/src/app/api/etf/search/route.ts`
+- **Removed** the entire hardcoded `CN_ETF_DB` array (~80 entries, ~80 lines of inline data)
+- **Removed** the `isChineseEtfPattern` function, replaced with `isChineseFundPattern` (same logic, renamed for clarity)
+- **Added** `mapFundTypeToCategory()` helper to convert Fund table's `fundType` field to category strings consistent with ETFProfile conventions (e.g., "ETF" → "broad_market", "QDII" → "international", "债券型" → "bond")
+- **Refactored search flow**:
+  1. **Fund DB search** (Chinese funds/ETFs): Queries the `Fund` table with three OR conditions:
+     - `code.startsWith(query)` — prefix code match (e.g., "513" → all 513xxx funds)
+     - `name.contains(query)` — name contains (e.g., "标普" → funds with 标普 in name)
+     - `pinyin.startsWith(queryLower)` — pinyin prefix (e.g., "bp500" → 标普500ETF)
+  2. **ETFProfile DB search** (US/international ETFs): Same as before, searches cached ETF profiles
+  3. **Finnhub API search** (US ETFs): Same as before, skipped for 6-digit Chinese fund codes
+- **Result ordering**: Fund results are ordered by `isOnMarket DESC, isEtf DESC` so on-market ETFs appear first
+- **Mapping**: `code` → `symbol`, `fundType` → `category` (via helper), `null` for `expenseRatio` and `trackingIndex`
+- **Limit**: Results capped at 20 total
+- **Deduplication**: Symbol-based dedup across all three sources
+
+## Technical Decisions
+- Used `startsWith` for code and pinyin searches (more precise than `contains` for these fields) and `contains` for name search (more flexible)
+- Fund results ordered with on-market + ETF funds first for better relevance
+- `mapFundTypeToCategory()` handles both English and Chinese fund type strings for robustness
+- Kept the Finnhub integration unchanged for US ETF search
+- Kept the ETFProfile DB search for cached US/international ETFs
+
+## Verification
+- `bun run lint` passed with zero errors
+- `bun run db:push` confirmed database schema is in sync
+- Dev server running without errors
+
+
+---
+
+# Work Log — Task 3: Fund Sync API and Database Population
+
+## Summary
+Created the Fund Sync API and Fund Search API, then populated the Fund database with 26,964 Chinese fund records from EastMoney's public API. The existing ETF search at `/api/etf/search` now returns results for Chinese fund codes like 513500 (标普500ETF博时).
+
+## Files Created
+
+### `/src/app/api/fund/sync/route.ts` — POST & GET
+- **POST**: Fetches fund data from EastMoney's `fundcode_search.js` API (or falls back to a comprehensive 200+ entry hardcoded dataset), parses the JS array format, and upserts into the Fund table
+- **GET**: Returns current sync status (total count, ETF count, on-market count)
+- EastMoney parsing: Extracts `var r = [[code, pinyin_abbr, name, fund_type, pinyin_full],...]`
+- `isEtf` detection: Checks fundType contains "ETF", name contains "ETF", or code matches on-market ETF patterns (51xxxx, 588xxx, 159xxx)
+- `isOnMarket` detection: Checks fundType/name for ETF/LOF, and code matches on-market patterns (ETF codes + 161-168xxx LOF + 501xxx LOF)
+- `exchange` determination: Code starts with 5/6 → SH, 0/1/2/3 → SZ
+- Fallback dataset: 200+ entries covering 510xxx, 512xxx, 513xxx, 159xxx, 511xxx, 515xxx, 518xxx, 588xxx ETFs, LOF funds, and major open-end funds
+- Batch processing (50 per batch) to avoid SQLite limitations
+
+### `/src/app/api/fund/search/route.ts` — GET
+- Accepts `q` query parameter
+- Searches by: code prefix match, name contains, pinyin prefix, pinyin contains
+- Returns results with: code, name, fundType, isEtf, isOnMarket, exchange, nav, accNav
+- Ordered by on-market first, then ETFs first
+- Limited to 30 results
+
+## Database Population Results
+- Successfully synced **26,964** fund records from EastMoney API
+- **3,779** identified as ETFs
+- **4,566** identified as on-market funds (ETFs + LOFs)
+- Search by code prefix works: `q=513` → returns 513xxx funds
+- Search by Chinese name works: `q=标普` → returns 标普500 related funds
+- Search by pinyin works: `q=biaopu` → returns 标普 related funds
+- ETF search integration works: `/api/etf/search?q=513500` → returns 513500 (标普500ETF博时)
+
+## Key Technical Decisions
+- EastMoney API returned Chinese fund types like "指数型-股票" instead of "ETF", so detection logic was enhanced to also check fund names for "ETF" and code patterns for on-market ETF codes
+- Pinyin search supports both `startsWith` and `contains` for better discoverability
+- Upsert strategy allows re-running sync to update existing records without duplicates
+
+## Verification
+- `bun run lint` passed with no errors
+- Dev server running without errors
+- All API endpoints returning correct results
+
+---
+Task ID: fund-db-and-etf-search-fix
+Agent: Main
+Task: Fix page loading, populate Fund database, and fix ETF search to use Fund DB
+
+Work Log:
+- Fixed page loading issue: Dev server processes were being killed by sandbox environment
+- Solution: Use official `.zscripts/dev.sh` startup script which properly manages process lifecycle
+- Added `ssr: false` to all dynamic imports in page.tsx to reduce server-side memory usage
+- Refactored ETF search API (`/api/etf/search/route.ts`) to use Fund database table instead of hardcoded CN_ETF_DB array
+- Created fund sync API (`/api/fund/sync/route.ts`) that fetches 26,964 fund records from EastMoney API
+- Created fund search API (`/api/fund/search/route.ts`) for searching funds by code/name/pinyin
+- Populated Fund database with 26,964 records including 3,779 ETFs and 4,566 on-market funds
+- Fixed Add Position Dialog: auto-detect A-share market when selecting Chinese ETF (6-digit codes)
+- Verified ETF search works for user-requested codes: 513500 (标普500ETF博时), 513300 (纳斯达克ETF华夏)
+
+Stage Summary:
+- Page loading fixed using official dev.sh startup script
+- ETF search now queries 26,964 fund records from local database (was hardcoded 80 ETFs before)
+- Fund sync API can fetch latest fund data from EastMoney
+- A-share ETF auto-detection when adding positions
+- Server running stably on port 3000
