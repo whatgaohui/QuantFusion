@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   DollarSign,
   Percent,
@@ -177,6 +177,7 @@ export function ETFPortfolioView({ onNavigate }: ETFPortfolioViewProps) {
   const [editingWeight, setEditingWeight] = useState<string | null>(null);
   const [editWeightValue, setEditWeightValue] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const rebalanceRef = useRef<HTMLDivElement>(null);
 
   // ─── Navigate to Detail ────────────────────────────────────────────────
 
@@ -303,13 +304,19 @@ export function ETFPortfolioView({ onNavigate }: ETFPortfolioViewProps) {
     }
   }, []);
 
-  const fetchRebalance = useCallback(async () => {
+  const fetchRebalance = useCallback(async (scrollToPanel = false) => {
     setRebalanceLoading(true);
     try {
       const res = await fetch('/api/etf/portfolio/rebalance');
       if (res.ok) {
         const data = await res.json();
         setRebalanceData(data);
+        // Scroll to rebalance panel after data loads
+        if (scrollToPanel && data.suggestions?.length > 0) {
+          setTimeout(() => {
+            rebalanceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 100);
+        }
       } else {
         setRebalanceData({ suggestions: [], totalRebalanceAmount: 0 });
       }
@@ -484,7 +491,7 @@ export function ETFPortfolioView({ onNavigate }: ETFPortfolioViewProps) {
             variant="outline"
             size="sm"
             className="h-8 px-3 text-xs border-[#1e1e2e] text-zinc-300 hover:text-white hover:border-emerald-600/30 gap-1.5 bg-[#111118]"
-            onClick={() => fetchRebalance()}
+            onClick={() => fetchRebalance(true)}
             disabled={rebalanceLoading}
           >
             <BarChart2 className="w-3.5 h-3.5" />
@@ -758,6 +765,7 @@ export function ETFPortfolioView({ onNavigate }: ETFPortfolioViewProps) {
       </div>
 
       {/* ─── D. Rebalancing Suggestions Panel ───────────────────────────── */}
+      <div ref={rebalanceRef}>
       <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -886,6 +894,7 @@ export function ETFPortfolioView({ onNavigate }: ETFPortfolioViewProps) {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* ─── E. Popular ETFs Quick Add ──────────────────────────────────── */}
       <Collapsible open={popularOpen} onOpenChange={(open) => { setPopularOpen(open); if (open && popularETFs.length === 0) fetchPopular(); }}>
