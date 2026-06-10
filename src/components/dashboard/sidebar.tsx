@@ -73,7 +73,7 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto custom-scrollbar">
-          {navItems.map((item, idx) => {
+          {navItems.map((item) => {
             // Add separator before Settings
             if (item.id === 'settings') {
               return (
@@ -115,13 +115,13 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
           <button
             onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}
             className={cn(
-              'flex items-center gap-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-[#1a1a2e] transition-colors',
+              'flex items-center gap-3 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-[#1a1a2e] transition-colors',
               collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2 w-full'
             )}
           >
-            <Globe className="w-4 h-4 flex-shrink-0" />
+            <Globe className="w-5 h-5 flex-shrink-0" />
             {!collapsed && (
-              <span className="text-xs font-medium">
+              <span className="text-sm font-medium leading-5">
                 {language === 'en' ? '中文' : 'English'}
               </span>
             )}
@@ -132,14 +132,17 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
         <div className="p-2">
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-[#1a1a2e] transition-colors"
+            className={cn(
+              'flex items-center gap-3 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-[#1a1a2e] transition-colors',
+              collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2 w-full'
+            )}
           >
             {collapsed ? (
-              <ChevronsRight className="w-4 h-4" />
+              <ChevronsRight className="w-5 h-5 flex-shrink-0" />
             ) : (
               <>
-                <ChevronsLeft className="w-4 h-4" />
-                <span className="text-xs font-medium">{t('sidebar.collapse')}</span>
+                <ChevronsLeft className="w-5 h-5 flex-shrink-0" />
+                <span className="text-sm font-medium leading-5">{t('sidebar.collapse')}</span>
               </>
             )}
           </button>
@@ -172,8 +175,7 @@ function SidebarButton({
       onClick={() => onItemChange(item.id)}
       className={cn(
         'w-full flex items-center gap-3 rounded-lg transition-all duration-200 group',
-        collapsed ? 'justify-center px-2 py-2' : 'px-3 py-2',
-        item.accent && !collapsed ? 'py-2.5' : '',
+        collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5',
         isActive
           ? item.accent
             ? 'bg-emerald-600/20 text-emerald-400 shadow-sm shadow-emerald-600/10'
@@ -181,24 +183,32 @@ function SidebarButton({
           : 'text-zinc-400 hover:bg-[#1a1a2e] hover:text-zinc-200'
       )}
     >
-      <div className={cn(
-        'flex-shrink-0 flex items-center justify-center rounded-md transition-colors',
-        item.accent && isActive
-          ? 'w-7 h-7 bg-emerald-600/25 shadow-sm shadow-emerald-500/20'
-          : item.accent
-          ? 'w-7 h-7 bg-emerald-600/10'
-          : ''
-      )}>
+      {/* Icon container — 20×20 icon inside 28×28 wrapper for accent items, 20×20 icon directly for others */}
+      {item.accent ? (
+        <div className={cn(
+          'flex-shrink-0 flex items-center justify-center rounded-md transition-colors w-7 h-7',
+          isActive
+            ? 'bg-emerald-600/25 shadow-sm shadow-emerald-500/20'
+            : 'bg-emerald-600/10'
+        )}>
+          <Icon
+            className={cn(
+              'transition-colors w-4 h-4',
+              isActive ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-300'
+            )}
+          />
+        </div>
+      ) : (
         <Icon
           className={cn(
-            'transition-colors w-5 h-5',
+            'transition-colors flex-shrink-0 w-5 h-5',
             isActive ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-300'
           )}
         />
-      </div>
+      )}
       {!collapsed && (
         <span className={cn(
-          'text-sm font-medium whitespace-nowrap',
+          'text-sm font-medium whitespace-nowrap leading-7',
           isActive ? 'text-emerald-400' : '',
           item.accent ? 'font-semibold' : ''
         )}>
