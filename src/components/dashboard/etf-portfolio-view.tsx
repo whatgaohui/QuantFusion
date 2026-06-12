@@ -130,12 +130,12 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 const CATEGORY_BADGE_STYLES: Record<string, string> = {
-  broad_market: 'bg-emerald-600/15 text-emerald-400 border-emerald-600/20',
-  sector: 'bg-purple-600/15 text-purple-400 border-purple-600/20',
-  bond: 'bg-yellow-600/15 text-yellow-400 border-yellow-600/20',
-  commodity: 'bg-amber-600/15 text-amber-400 border-amber-600/20',
-  international: 'bg-blue-600/15 text-blue-400 border-blue-600/20',
-  thematic: 'bg-pink-600/15 text-pink-400 border-pink-600/20',
+  broad_market: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+  sector: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+  bond: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+  commodity: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+  international: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+  thematic: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
 };
 
 const ALLOCATION_PIE_COLORS = ['#10b981', '#8b5cf6', '#eab308', '#f59e0b', '#3b82f6', '#ec4899', '#ef4444', '#22c55e', '#0FEDBE'];
@@ -418,7 +418,7 @@ export function ETFPortfolioView({ onNavigate }: ETFPortfolioViewProps) {
     <div className="space-y-6">
       {/* ─── A. Portfolio Overview Cards ──────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300">
+        <Card className="bg-gradient-to-br from-[#111118] to-[#0d0d14] border-[#1e1e2e] rounded-xl glow-hover card-hover-glow animate-shimmer transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-zinc-400 font-medium">{t('etf.portfolioValue')}</span>
@@ -426,11 +426,11 @@ export function ETFPortfolioView({ onNavigate }: ETFPortfolioViewProps) {
                 <DollarSign className="w-4 h-4 text-emerald-400" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-white">{formatCurrency(data.totalValue)}</p>
+            <p className="text-2xl font-bold text-white count-up-value">{formatCurrency(data.totalValue)}</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300">
+        <Card className="bg-gradient-to-br from-[#111118] to-[#13131f] border-[#1e1e2e] rounded-xl glow-hover card-hover-glow transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-zinc-400 font-medium">{t('etf.expenseRatio')}</span>
@@ -443,7 +443,7 @@ export function ETFPortfolioView({ onNavigate }: ETFPortfolioViewProps) {
           </CardContent>
         </Card>
 
-        <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300">
+        <Card className="bg-gradient-to-br from-[#111118] to-[#131316] border-[#1e1e2e] rounded-xl glow-hover card-hover-glow transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-zinc-400 font-medium">{t('etf.dividendYield')}</span>
@@ -456,7 +456,7 @@ export function ETFPortfolioView({ onNavigate }: ETFPortfolioViewProps) {
           </CardContent>
         </Card>
 
-        <Card className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300">
+        <Card className="bg-gradient-to-br from-[#111118] to-[#111120] border-[#1e1e2e] rounded-xl glow-hover card-hover-glow transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-zinc-400 font-medium">{t('etf.beta')}</span>
@@ -577,7 +577,7 @@ export function ETFPortfolioView({ onNavigate }: ETFPortfolioViewProps) {
 
                     return (
                       <TableRow
-                        key={holding.id}
+                        key={holding.symbol}
                         className="border-[#1e1e2e] cursor-pointer hover:bg-[#1a1a2e]/50"
                         onClick={() => handleViewDetail(holding)}
                       >
@@ -706,7 +706,7 @@ export function ETFPortfolioView({ onNavigate }: ETFPortfolioViewProps) {
             <CardContent>
               {chart.data && chart.data.length > 0 ? (
                 <>
-                  <div className="h-44">
+                  <div className="h-44 pie-hover-rotate">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -793,7 +793,7 @@ export function ETFPortfolioView({ onNavigate }: ETFPortfolioViewProps) {
           {rebalanceLoading && !rebalanceData ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-12 rounded-lg bg-[#0a0a0f]" />
+                <div key={i} className="h-12 rounded-lg shimmer-skeleton" />
               ))}
             </div>
           ) : suggestions.length > 0 ? (

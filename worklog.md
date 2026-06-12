@@ -1122,3 +1122,127 @@ Stage Summary:
 - 侧边栏对齐修复完成并提交
 - 代码已推送到 https://github.com/whatgaohui/QuantFusion
 - 开发服务器在webpack模式下运行，约5-10次请求后可能需要重启
+
+---
+Task ID: 1
+Agent: full-stack-developer
+Task: Fix React key duplicate bug + Enhance sidebar with more navigation items
+
+## Part 1: Fix React key warning "510880undefined"
+
+**Problem**: Browser console showed "Encountered two children with the same key, 510880undefined" because `key={holding.id}` was used in the ETF holdings table row, and when `id` is undefined (from API data), React generates keys like `"510880undefined"` (symbol + undefined).
+
+**Fix**: Changed `key={holding.id}` to `key={holding.symbol}` on line 580 of `etf-portfolio-view.tsx`. ETF symbols are guaranteed unique within a portfolio, making them a reliable React key. All other list renderings in the file were already using appropriate keys (symbol-based or index-based for simple skeleton arrays).
+
+### File Modified
+- `/src/components/dashboard/etf-portfolio-view.tsx` — Line 580: `key={holding.id}` → `key={holding.symbol}`
+
+## Part 2: Enhance sidebar with additional navigation items
+
+**Changes**:
+
+### `/src/components/dashboard/sidebar.tsx`
+- Added `Brain`, `Radar`, `Swords` icon imports from lucide-react
+- Updated `NavItem` type: added `'aiAnalysis' | 'signalScanner' | 'strategyCenter'`
+- Added 3 new nav items in the correct layout order with separators:
+  1. 仪表盘 (dashboard)
+  2. ETF组合 (etfPortfolio) - accent
+  3. 自选股 (watchlist)
+  4. --- separator ---
+  5. AI分析 (aiAnalysis) - Brain icon
+  6. 信号扫描 (signalScanner) - Radar icon
+  7. 策略中心 (strategyCenter) - Swords icon
+  8. --- separator ---
+  9. 设置 (settings)
+- Created `SEPARATOR_BEFORE` set to generalize separator rendering (replaced hardcoded `item.id === 'settings'` check)
+- All new items use consistent styling (same padding, text sizes, hover effects, active states with emerald accent)
+
+### `/src/app/page.tsx`
+- Added 3 dynamic imports with `{ ssr: false }`:
+  - `AIInsightsView` from `@/components/dashboard/ai-insights-view`
+  - `SignalScannerView` from `@/components/dashboard/signal-scanner-view`
+  - `StrategyCenterView` from `@/components/dashboard/strategy-center-view`
+- Added 3 cases in `ViewRenderer` switch:
+  - `'aiAnalysis'` → `<AIInsightsView />`
+  - `'signalScanner'` → `<SignalScannerView />`
+  - `'strategyCenter'` → `<StrategyCenterView />`
+- Added 3 entries to `viewTitleKeys` mapping:
+  - `aiAnalysis: 'sidebar.aiAnalysis'`
+  - `signalScanner: 'sidebar.scanner'`
+  - `strategyCenter: 'sidebar.strategies'`
+
+### i18n translations
+- Already existed in `src/lib/i18n.ts`:
+  - `'sidebar.aiAnalysis'`: 'AI Analysis' / 'AI 分析'
+  - `'sidebar.scanner'`: 'Signal Scanner' / '信号扫描'
+  - `'sidebar.strategies'`: 'Strategy Center' / '策略中心'
+
+## Verification
+- `bun run lint` passed with no errors
+- Dev server running without errors
+- All existing functionality preserved
+
+---
+Task ID: 2
+Agent: frontend-styling-expert
+Task: Polish Dashboard Styles + Add Micro-Animations + Detail Enhancements
+
+## Summary
+Added comprehensive micro-animations, hover effects, and visual polish across the QuantFusion dark-themed trading platform. All changes maintain the existing dark theme aesthetic and preserve all functionality.
+
+## Files Modified
+
+### `/src/app/globals.css`
+Added 10 custom CSS animation utilities and component classes:
+- **shimmer**: Subtle horizontal shine sweep effect (2s ease-in-out infinite) — used on primary value cards
+- **glow-pulse**: Soft pulsing glow box-shadow (3s ease-in-out infinite) — used on sidebar logo and active indicator
+- **fade-in**: Simple opacity fade (0.3s ease-out)
+- **slide-up**: Slide up from below with fade (0.4s ease-out) — used on metric cards with staggered delay
+- **float**: Gentle floating effect (6s ease-in-out infinite) — available for decorative elements
+- **live-pulse**: Softer, more elegant pulse for LIVE badge (2.5s ease-in-out infinite, scale+opacity)
+- **skeleton-shimmer / shimmer-skeleton**: Gradient shimmer loading state (1.5s ease-in-out infinite) — replaces plain skeletons in rebalancing panel
+- **card-hover-glow**: Hover effect with emerald border glow + scale(1.02) — used on index cards and ETF overview cards
+- **logo-underline**: Animated gradient underline (3s ease-in-out infinite) — used on sidebar QuantFusion logo
+- **count-up-value**: Tabular-nums font variant + smooth transition — ready for JS count-up animation
+- **pie-hover-rotate**: Subtle 8deg rotation on hover — used on allocation pie chart containers
+
+### `/src/components/dashboard/dashboard-view.tsx`
+- **Metric cards**: Added `animate-slide-up` with staggered delay (60ms per card), `card-hover-glow` hover effect, `animate-shimmer` on the first (portfolio value) card, and `count-up-value` class on portfolio value text
+- **Market index cards**: Replaced `hover:border-[#2e2e3e] transition-colors` with `card-hover-glow` class for scale-up + emerald glow border effect on hover
+- **Index change percentages**: Added gradient text (emerald-400→emerald-300 for positive, red-400→red-300 for negative) using `bg-gradient-to-r` + `bg-clip-text text-transparent`
+- **Sparkline direction indicators**: Added small circular up/down arrow indicators (↑/↓) with color-coded backgrounds next to each index change percentage
+- **LIVE badge**: Replaced `animate-pulse` with custom `animate-live-pulse` for softer, more elegant pulsing
+
+### `/src/components/dashboard/sidebar.tsx`
+- **Logo icon**: Added `animate-glow-pulse` to the emerald icon container for a subtle pulsing glow
+- **Logo text**: Wrapped in `logo-underline` class for animated gradient underline animation
+- **Active item left border**: Added 2px emerald-400 left-border indicator (`absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-5 bg-emerald-400 rounded-r-full`) visible only when item is active
+- **Transition smoothness**: Increased `transition-all duration-200` to `duration-300` for smoother active state changes
+- **Active indicator dot**: Changed from `animate-pulse-glow` to `animate-glow-pulse` for the right-side dot indicator
+- **Relative positioning**: Added `relative` to button container for absolute left-border positioning
+
+### `/src/components/dashboard/etf-portfolio-view.tsx`
+- **Overview card gradients**: Replaced flat `bg-[#111118]` with diagonal gradients:
+  - Portfolio Value: `bg-gradient-to-br from-[#111118] to-[#0d0d14]` (darkest, with shimmer)
+  - Expense Ratio: `bg-gradient-to-br from-[#111118] to-[#13131f]` (purple tint)
+  - Dividend Yield: `bg-gradient-to-br from-[#111118] to-[#131316]` (warm tint)
+  - Beta: `bg-gradient-to-br from-[#111118] to-[#111120]` (blue tint)
+- **Overview cards**: Added `card-hover-glow` hover effect and `animate-shimmer` on portfolio value card; `count-up-value` class on total value
+- **Allocation pie charts**: Added `pie-hover-rotate` wrapper for subtle rotation on hover
+- **Rebalancing loading state**: Replaced plain `Skeleton` components with `shimmer-skeleton` div elements for animated gradient shimmer loading
+- **Category badge colors**: Made more vibrant by changing from `/15` opacity to `/20`, `-400` text to `-300`, and `/20` borders to `/30`:
+  - broad_market: emerald-500/20, text-emerald-300, border-emerald-500/30
+  - sector: purple-500/20, text-purple-300, border-purple-500/30
+  - bond: yellow-500/20, text-yellow-300, border-yellow-500/30
+  - commodity: amber-500/20, text-amber-300, border-amber-500/30
+  - international: blue-500/20, text-blue-300, border-blue-500/30
+  - thematic: pink-500/20, text-pink-300, border-pink-500/30
+
+## Verification
+- `bun run lint` passed with no errors
+- All animations are subtle and professional — no jarring or distracting effects
+- Dark theme aesthetic fully maintained
+- All existing functionality preserved
+- Responsive design maintained
+- No new component files created — only existing files modified
+

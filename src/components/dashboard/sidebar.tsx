@@ -10,6 +10,9 @@ import {
   ChevronsRight,
   TrendingUp,
   Globe,
+  Brain,
+  Radar,
+  Swords,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -21,7 +24,7 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/lib/i18n';
 
-export type NavItem = 'dashboard' | 'etfPortfolio' | 'etfDetail' | 'watchlist' | 'settings';
+export type NavItem = 'dashboard' | 'etfPortfolio' | 'etfDetail' | 'watchlist' | 'aiAnalysis' | 'signalScanner' | 'strategyCenter' | 'settings';
 
 interface NavConfig {
   id: NavItem;
@@ -34,10 +37,17 @@ const navItems: NavConfig[] = [
   { id: 'dashboard', labelKey: 'sidebar.dashboard', icon: LayoutDashboard },
   { id: 'etfPortfolio', labelKey: 'sidebar.etfPortfolio', icon: PieChart, accent: true },
   { id: 'watchlist', labelKey: 'sidebar.watchlist', icon: Eye },
+  // --- separator ---
+  { id: 'aiAnalysis', labelKey: 'sidebar.aiAnalysis', icon: Brain },
+  { id: 'signalScanner', labelKey: 'sidebar.scanner', icon: Radar },
+  { id: 'strategyCenter', labelKey: 'sidebar.strategies', icon: Swords },
+  // --- separator ---
   // etfDetail is NOT in the sidebar — it's navigated to from portfolio/watchlist items
-  // Settings at bottom
   { id: 'settings', labelKey: 'sidebar.settings', icon: Settings },
 ];
+
+// Items that should have a separator rendered before them
+const SEPARATOR_BEFORE = new Set<NavItem>(['aiAnalysis', 'settings']);
 
 interface SidebarProps {
   activeItem: NavItem;
@@ -61,11 +71,11 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
           'flex items-center h-16 px-4 border-b border-[#1e1e2e]',
           collapsed ? 'justify-center' : 'gap-3'
         )}>
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-600/20 flex-shrink-0">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-600/20 flex-shrink-0 animate-glow-pulse">
             <TrendingUp className="w-5 h-5 text-emerald-400" />
           </div>
           {!collapsed && (
-            <div className="overflow-hidden">
+            <div className="overflow-hidden logo-underline">
               <h1 className="text-lg font-bold gradient-text whitespace-nowrap">QuantFusion</h1>
             </div>
           )}
@@ -74,8 +84,8 @@ export function Sidebar({ activeItem, onItemChange }: SidebarProps) {
         {/* Navigation */}
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto custom-scrollbar">
           {navItems.map((item) => {
-            // Add separator before Settings
-            if (item.id === 'settings') {
+            // Add separator before certain items
+            if (SEPARATOR_BEFORE.has(item.id)) {
               return (
                 <div key={item.id}>
                   <div className="py-1.5 px-2">
@@ -174,7 +184,7 @@ function SidebarButton({
     <button
       onClick={() => onItemChange(item.id)}
       className={cn(
-        'w-full flex items-center gap-3 rounded-lg transition-all duration-200 group',
+        'w-full flex items-center gap-3 rounded-lg transition-all duration-300 group relative',
         collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5',
         isActive
           ? item.accent
@@ -183,6 +193,10 @@ function SidebarButton({
           : 'text-zinc-400 hover:bg-[#1a1a2e] hover:text-zinc-200'
       )}
     >
+      {/* Active left border indicator */}
+      {isActive && (
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-5 bg-emerald-400 rounded-r-full transition-all duration-300" />
+      )}
       {/* Icon container — 20×20 icon inside 28×28 wrapper for accent items, 20×20 icon directly for others */}
       {item.accent ? (
         <div className={cn(
@@ -217,7 +231,7 @@ function SidebarButton({
       )}
       {isActive && !collapsed && (
         <div className={cn(
-          'ml-auto rounded-full bg-emerald-400 animate-pulse-glow',
+          'ml-auto rounded-full bg-emerald-400 animate-glow-pulse',
           item.accent ? 'w-2 h-2' : 'w-1.5 h-1.5'
         )} />
       )}

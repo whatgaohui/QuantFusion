@@ -625,12 +625,13 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
         )}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {metricCards.map((card) => {
+        {metricCards.map((card, idx) => {
           const Icon = card.icon;
           return (
             <Card
               key={card.title}
-              className="bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover transition-all duration-300"
+              className={`bg-[#111118] border-[#1e1e2e] rounded-xl glow-hover card-hover-glow animate-slide-up ${idx === 0 ? 'animate-shimmer' : ''}`}
+              style={{ animationDelay: `${idx * 60}ms` }}
             >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -640,7 +641,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                   </div>
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-xl font-bold text-white">{card.value}</p>
+                  <p className={`text-xl font-bold text-white ${idx === 0 ? 'count-up-value' : ''}`}>{card.value}</p>
                   <div className="flex items-center gap-1">
                     {card.positive ? (
                       <TrendingUp className="w-3 h-3 text-emerald-400" />
@@ -785,7 +786,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
               {(indices || defaultIndices).map((index) => (
                 <div
                   key={index.symbol}
-                  className="bg-[#0a0a0f] rounded-lg p-3 border border-[#1e1e2e] hover:border-[#2e2e3e] transition-colors"
+                  className="bg-[#0a0a0f] rounded-lg p-3 border border-[#1e1e2e] card-hover-glow"
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[10px] font-medium text-zinc-400 truncate">{index.name}</span>
@@ -807,8 +808,12 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                     ) : (
                       <TrendingDown className="w-3 h-3 text-red-400" />
                     )}
-                    <span className={`text-[10px] font-medium ${index.change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <span className={`text-[10px] font-medium ${index.change >= 0 ? 'bg-gradient-to-r from-emerald-400 to-emerald-300 bg-clip-text' : 'bg-gradient-to-r from-red-400 to-red-300 bg-clip-text'} ${index.change >= 0 ? 'text-transparent' : 'text-transparent'}`}>
                       {index.change >= 0 ? '+' : ''}{index.changePercent.toFixed(2)}%
+                    </span>
+                    {/* Mini direction indicator */}
+                    <span className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-[7px] font-bold ${index.change >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
+                      {index.change >= 0 ? '↑' : '↓'}
                     </span>
                   </div>
                   <div className="mt-2 h-6">
@@ -843,7 +848,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
               <CardTitle className="text-base font-semibold text-white">{t('dash.allocation')}</CardTitle>
               {allocationIsLive && (
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-600/15 border border-emerald-600/20">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-live-pulse" />
                   <span className="text-[10px] font-medium text-emerald-400">LIVE</span>
                 </div>
               )}

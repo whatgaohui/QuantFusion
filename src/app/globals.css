@@ -152,3 +152,175 @@
 .number-transition {
   transition: all 0.3s ease-in-out;
 }
+
+/* ─── Micro-Animation Keyframes ──────────────────────────────────────────── */
+
+/* Shimmer: subtle horizontal shine sweep for cards */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.animate-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(16, 185, 129, 0.06) 40%,
+    rgba(16, 185, 129, 0.1) 50%,
+    rgba(16, 185, 129, 0.06) 60%,
+    transparent 100%
+  );
+  animation: shimmer 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Glow-pulse: soft pulsing glow effect */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+  }
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+/* Fade-in: simple opacity fade */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+/* Slide-up: slide up from below with fade */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out forwards;
+}
+
+/* Float: gentle floating effect */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* ─── Enhanced Live Badge Pulse ──────────────────────────────────────────── */
+
+@keyframes live-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.85);
+  }
+}
+
+.animate-live-pulse {
+  animation: live-pulse 2.5s ease-in-out infinite;
+}
+
+/* ─── Shimmer Skeleton Loading ──────────────────────────────────────────── */
+
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer-skeleton {
+  background: linear-gradient(
+    90deg,
+    #111118 25%,
+    #1a1a2e 37%,
+    #111118 63%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+/* ─── Card Hover Glow Border ─────────────────────────────────────────────── */
+
+.card-hover-glow {
+  transition: all 0.3s ease;
+}
+
+.card-hover-glow:hover {
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.08);
+  transform: scale(1.02);
+}
+
+/* ─── Logo Gradient Underline ────────────────────────────────────────────── */
+
+@keyframes gradient-underline {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.logo-underline {
+  position: relative;
+}
+
+.logo-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, #10b981, #0FEDBE, #10b981);
+  background-size: 200% 100%;
+  animation: gradient-underline 3s ease-in-out infinite;
+  border-radius: 1px;
+}
+
+/* ─── Count-up Animation Class ───────────────────────────────────────────── */
+
+.count-up-value {
+  transition: all 0.6s ease-out;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Pie Chart Hover Rotation ──────────────────────────────────────────── */
+
+.pie-hover-rotate {
+  transition: transform 0.6s ease;
+}
+
+.pie-hover-rotate:hover {
+  transform: rotate(8deg);
+}

@@ -44,6 +44,18 @@ const ETFDetailView = dynamic(
   () => import('@/components/dashboard/etf-detail-view').then(m => ({ default: m.ETFDetailView })),
   { ssr: false, loading: () => <ViewLoading /> }
 );
+const AIInsightsView = dynamic(
+  () => import('@/components/dashboard/ai-insights-view').then(m => ({ default: m.AIInsightsView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
+const SignalScannerView = dynamic(
+  () => import('@/components/dashboard/signal-scanner-view').then(m => ({ default: m.SignalScannerView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
+const StrategyCenterView = dynamic(
+  () => import('@/components/dashboard/strategy-center-view').then(m => ({ default: m.StrategyCenterView })),
+  { ssr: false, loading: () => <ViewLoading /> }
+);
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -76,6 +88,12 @@ function ViewRenderer({
       />;
     case 'watchlist':
       return <WatchlistView onNavigate={onNavigate} />;
+    case 'aiAnalysis':
+      return <AIInsightsView />;
+    case 'signalScanner':
+      return <SignalScannerView />;
+    case 'strategyCenter':
+      return <StrategyCenterView />;
     case 'settings':
       return <SettingsView />;
     default:
@@ -88,6 +106,9 @@ const viewTitleKeys: Record<NavItem, string> = {
   etfPortfolio: 'sidebar.etfPortfolio',
   etfDetail: 'sidebar.etfPortfolio',
   watchlist: 'sidebar.watchlist',
+  aiAnalysis: 'sidebar.aiAnalysis',
+  signalScanner: 'sidebar.scanner',
+  strategyCenter: 'sidebar.strategies',
   settings: 'sidebar.settings',
 };
 
